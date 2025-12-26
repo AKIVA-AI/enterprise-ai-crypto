@@ -5,6 +5,7 @@ import { PositionsTable } from '@/components/dashboard/PositionsTable';
 import { RecentEvents } from '@/components/dashboard/RecentEvents';
 import { RiskGauge } from '@/components/dashboard/RiskGauge';
 import { PnLChart } from '@/components/dashboard/PnLChart';
+import { PositionHeatMap } from '@/components/dashboard/PositionHeatMap';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscriptions';
 import { useTradingShortcuts } from '@/hooks/useTradingShortcuts';
@@ -72,6 +73,9 @@ export default function Index() {
 
         {/* P&L Chart */}
         <PnLChart />
+
+        {/* Position Heat Map */}
+        <PositionHeatMap />
 
         {/* Main content grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
