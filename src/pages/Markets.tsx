@@ -1,13 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { TradingViewChart } from '@/components/charts/TradingViewChart';
 import { TradeTicket } from '@/components/trading/TradeTicket';
 import { LiveOrderBook } from '@/components/trading/LiveOrderBook';
+import { TradeBlotter } from '@/components/trading/TradeBlotter';
+import { PortfolioSummaryWidget } from '@/components/portfolio/PortfolioSummaryWidget';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useLivePriceFeed } from '@/hooks/useLivePriceFeed';
 import { 
@@ -17,6 +20,8 @@ import {
   Star,
   BarChart2,
   Zap,
+  Activity,
+  Wallet,
 } from 'lucide-react';
 import { WebSocketHealthMonitor } from '@/components/trading/WebSocketHealthMonitor';
 
@@ -260,8 +265,35 @@ export default function Markets() {
               onSymbolChange={setSelectedSymbol}
             />
 
-            {/* Live Order Book */}
-            <LiveOrderBook symbol={selectedSymbol} depth={10} />
+            {/* Order Book, Blotter, Portfolio Tabs */}
+            <Tabs defaultValue="orderbook" className="space-y-4">
+              <TabsList className="glass-panel">
+                <TabsTrigger value="orderbook" className="gap-2">
+                  <BarChart2 className="h-4 w-4" />
+                  Order Book
+                </TabsTrigger>
+                <TabsTrigger value="blotter" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Trade Blotter
+                </TabsTrigger>
+                <TabsTrigger value="portfolio" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Portfolio
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="orderbook">
+                <LiveOrderBook symbol={selectedSymbol} depth={10} />
+              </TabsContent>
+
+              <TabsContent value="blotter">
+                <TradeBlotter />
+              </TabsContent>
+
+              <TabsContent value="portfolio">
+                <PortfolioSummaryWidget />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

@@ -51,10 +51,11 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
   const queryClient = useQueryClient();
   
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
+  const [orderType, setOrderType] = useState<'market' | 'limit' | 'stop_loss' | 'take_profit'>('market');
   const [instrument, setInstrument] = useState(defaultInstrument);
   const [size, setSize] = useState('0.1');
   const [price, setPrice] = useState('');
+  const [triggerPrice, setTriggerPrice] = useState('');
   const [bookId, setBookId] = useState(defaultBookId || '');
   const [strategyId, setStrategyId] = useState('');
   const [reduceOnly, setReduceOnly] = useState(false);
@@ -222,12 +223,13 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
         </div>
 
         {/* Order Type */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-4 gap-1">
           <Button
             type="button"
             variant={orderType === 'market' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setOrderType('market')}
+            className="text-xs"
           >
             Market
           </Button>
@@ -236,8 +238,27 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
             variant={orderType === 'limit' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setOrderType('limit')}
+            className="text-xs"
           >
             Limit
+          </Button>
+          <Button
+            type="button"
+            variant={orderType === 'stop_loss' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setOrderType('stop_loss')}
+            className="text-xs"
+          >
+            Stop Loss
+          </Button>
+          <Button
+            type="button"
+            variant={orderType === 'take_profit' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setOrderType('take_profit')}
+            className="text-xs"
+          >
+            Take Profit
           </Button>
         </div>
 
@@ -307,6 +328,56 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
               className="font-mono"
               step="0.01"
             />
+          </div>
+        )}
+
+        {/* Trigger Price (for SL/TP orders) */}
+        {(orderType === 'stop_loss' || orderType === 'take_profit') && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                {orderType === 'stop_loss' ? (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    Stop Loss Trigger
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="h-4 w-4 text-success" />
+                    Take Profit Trigger
+                  </>
+                )}
+              </Label>
+              <Input
+                type="number"
+                value={triggerPrice}
+                onChange={(e) => setTriggerPrice(e.target.value)}
+                placeholder={currentPrice.toString()}
+                className="font-mono"
+                step="0.01"
+              />
+              <p className="text-xs text-muted-foreground">
+                {orderType === 'stop_loss' 
+                  ? `Order triggers when price ${side === 'sell' ? 'falls below' : 'rises above'} this level`
+                  : `Order triggers when price ${side === 'buy' ? 'falls below' : 'rises above'} this level`
+                }
+              </p>
+            </div>
+            
+            {/* Distance from current price */}
+            {triggerPrice && currentPrice > 0 && (
+              <div className="rounded-lg bg-muted/30 p-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Distance</span>
+                  <span className={cn(
+                    'font-mono',
+                    orderType === 'stop_loss' ? 'text-destructive' : 'text-success'
+                  )}>
+                    {((Math.abs(parseFloat(triggerPrice) - currentPrice) / currentPrice) * 100).toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
