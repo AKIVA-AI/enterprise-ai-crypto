@@ -125,12 +125,11 @@ export function TopBar() {
             </Badge>
           )}
 
-          {/* Paper Trading Mode */}
-          {isPaperMode && (
-            <Badge variant="outline" className="bg-chart-4/20 text-chart-4 border-chart-4/30">
-              Paper Mode
-            </Badge>
-          )}
+          {/* System Mode Indicator - Always show simulation status */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-warning/10 border border-warning/30">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <span className="text-xs font-semibold text-warning">SIMULATION MODE</span>
+          </div>
         </div>
 
         {/* Center - Search */}
@@ -199,7 +198,7 @@ export function TopBar() {
           {/* Connection status */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50">
             <Wifi className="h-4 w-4 text-success" />
-            <span className="text-xs font-medium text-success">Live</span>
+            <span className="text-xs font-medium text-success">Feed</span>
           </div>
 
           {/* Time */}

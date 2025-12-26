@@ -17,6 +17,7 @@ import {
   BarChart3,
   History,
   Briefcase,
+  CircleCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'Treasury', href: '/treasury', icon: Wallet },
   { name: 'Observability', href: '/observability', icon: Activity },
   { name: 'Audit Log', href: '/audit', icon: History },
+  { name: 'System Status', href: '/status', icon: CircleCheck },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
