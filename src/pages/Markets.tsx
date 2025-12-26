@@ -17,9 +17,8 @@ import {
   Star,
   BarChart2,
   Zap,
-  Wifi,
-  WifiOff,
 } from 'lucide-react';
+import { WebSocketHealthMonitor } from '@/components/trading/WebSocketHealthMonitor';
 
 interface MarketTicker {
   symbol: string;
@@ -40,9 +39,17 @@ const TRACKED_SYMBOLS = [
   'AVAX-USDT',
   'MATIC-USDT',
   'LINK-USDT',
+  'DOGE-USDT',
+  'XRP-USDT',
+  'ADA-USDT',
+  'DOT-USDT',
+  'UNI-USDT',
+  'AAVE-USDT',
+  'NEAR-USDT',
+  'ATOM-USDT',
 ];
 
-const FAVORITES = new Set(['BTC-USDT', 'ETH-USDT']);
+const FAVORITES = new Set(['BTC-USDT', 'ETH-USDT', 'SOL-USDT']);
 
 export default function Markets() {
   const [selectedSymbol, setSelectedSymbol] = useState('BTC-USDT');
@@ -51,7 +58,14 @@ export default function Markets() {
   const [isTradeTicketOpen, setIsTradeTicketOpen] = useState(false);
 
   // Live WebSocket price feed from Binance
-  const { prices, isConnected, getAllPrices } = useLivePriceFeed({
+  const { 
+    prices, 
+    isConnected, 
+    isConnecting,
+    reconnectAttempts,
+    latencyMs,
+    connect: reconnectPriceFeed 
+  } = useLivePriceFeed({
     symbols: TRACKED_SYMBOLS,
     enabled: true,
   });
@@ -93,16 +107,15 @@ export default function Markets() {
               </h1>
               <p className="text-muted-foreground">Real-time market data and price charts</p>
             </div>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                'ml-2 gap-1',
-                isConnected ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive'
-              )}
-            >
-              {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {isConnected ? 'Live' : 'Offline'}
-            </Badge>
+            <WebSocketHealthMonitor
+              isConnected={isConnected}
+              isConnecting={isConnecting}
+              reconnectAttempts={reconnectAttempts}
+              latencyMs={latencyMs}
+              onReconnect={reconnectPriceFeed}
+              compact
+              className="ml-2"
+            />
           </div>
           <Sheet open={isTradeTicketOpen} onOpenChange={setIsTradeTicketOpen}>
             <SheetTrigger asChild>

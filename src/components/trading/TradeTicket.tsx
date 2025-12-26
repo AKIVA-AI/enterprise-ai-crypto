@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,15 @@ import {
   TrendingDown, 
   AlertTriangle, 
   Zap,
-  Calculator,
   Shield,
-  Loader2
+  Loader2,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useLivePriceFeed, LivePrice } from '@/hooks/useLivePriceFeed';
 
 interface TradeTicketProps {
   onClose?: () => void;
@@ -28,7 +30,24 @@ interface TradeTicketProps {
   defaultBookId?: string;
 }
 
-export function TradeTicket({ onClose, defaultInstrument = 'BTC/USD', defaultBookId }: TradeTicketProps) {
+// Convert instrument to Binance symbol format
+const toFeedSymbol = (instrument: string): string => {
+  return instrument.replace('/', '-');
+};
+
+// Available instruments
+const INSTRUMENTS = [
+  'BTC/USDT',
+  'ETH/USDT',
+  'SOL/USDT',
+  'ARB/USDT',
+  'OP/USDT',
+  'AVAX/USDT',
+  'MATIC/USDT',
+  'LINK/USDT',
+];
+
+export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBookId }: TradeTicketProps) {
   const queryClient = useQueryClient();
   
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
@@ -40,6 +59,18 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USD', defaultBoo
   const [strategyId, setStrategyId] = useState('');
   const [reduceOnly, setReduceOnly] = useState(false);
   const [riskPercent, setRiskPercent] = useState([1]);
+
+  // Get live price feed for the current instrument
+  const feedSymbols = useMemo(() => [toFeedSymbol(instrument)], [instrument]);
+  const { prices, isConnected, getPrice } = useLivePriceFeed({
+    symbols: feedSymbols,
+    enabled: true,
+  });
+
+  // Get the live price for the selected instrument
+  const livePrice: LivePrice | undefined = getPrice(toFeedSymbol(instrument));
+  const currentPrice = livePrice?.price || 0;
+  const priceChange = livePrice?.change24h || 0;
 
   // Fetch books
   const { data: books = [] } = useQuery({
@@ -80,10 +111,6 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USD', defaultBoo
       return data || [];
     },
   });
-
-  // Mock current price
-  const currentPrice = instrument.includes('BTC') ? 68432.50 : 
-                       instrument.includes('ETH') ? 3245.75 : 1.00;
 
   // Calculate notional
   const sizeNum = parseFloat(size) || 0;
@@ -147,9 +174,21 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USD', defaultBoo
             <Zap className="h-5 w-5 text-primary" />
             Trade Ticket
           </span>
-          <Badge variant="outline" className="font-mono">
-            {instrument}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge 
+              variant="outline" 
+              className={cn(
+                'gap-1 text-xs',
+                isConnected ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive'
+              )}
+            >
+              {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              {isConnected ? 'Live' : 'Off'}
+            </Badge>
+            <Badge variant="outline" className="font-mono">
+              {instrument}
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
 
@@ -234,10 +273,11 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USD', defaultBoo
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="BTC/USD">BTC/USD</SelectItem>
-              <SelectItem value="ETH/USD">ETH/USD</SelectItem>
-              <SelectItem value="SOL/USD">SOL/USD</SelectItem>
-              <SelectItem value="ETH/BTC">ETH/BTC</SelectItem>
+              {INSTRUMENTS.map((inst) => (
+                <SelectItem key={inst} value={inst}>
+                  {inst}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -307,7 +347,15 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USD', defaultBoo
         <div className="rounded-lg bg-muted/30 p-3 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Current Price</span>
-            <span className="font-mono">${currentPrice.toLocaleString()}</span>
+            <span className={cn(
+              'font-mono',
+              priceChange >= 0 ? 'text-success' : 'text-destructive'
+            )}>
+              ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              <span className="ml-1 text-xs">
+                ({priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%)
+              </span>
+            </span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Est. Notional</span>

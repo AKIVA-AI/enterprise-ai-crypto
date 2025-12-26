@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useWebSocketManager, WebSocketState } from './useWebSocketManager';
 
-interface LivePrice {
+export interface LivePrice {
   symbol: string;
   price: number;
   change24h: number;
@@ -28,118 +29,55 @@ const fromBinanceSymbol = (symbol: string): string => {
   if (upper.endsWith('USDT')) {
     return upper.replace('USDT', '-USDT');
   }
+  if (upper.endsWith('BTC')) {
+    return upper.replace('BTC', '-BTC');
+  }
   return upper;
 };
 
 export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOptions) {
   const [prices, setPrices] = useState<Map<string, LivePrice>>(new Map());
-  const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
 
-  const connect = useCallback(() => {
-    if (!enabled || symbols.length === 0) return;
-    
-    // Clean up existing connection
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
+  // Build WebSocket URL for all symbols
+  const wsUrl = useMemo(() => {
+    if (symbols.length === 0) return '';
+    const streams = symbols.map(s => `${toBinanceSymbol(s)}@ticker`).join('/');
+    return `wss://stream.binance.com:9443/stream?streams=${streams}`;
+  }, [symbols]);
 
-    try {
-      // Create streams for each symbol (ticker stream)
-      const streams = symbols.map(s => `${toBinanceSymbol(s)}@ticker`).join('/');
-      const wsUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+  const handleMessage = useCallback((message: any) => {
+    if (message.data) {
+      const ticker = message.data;
+      const symbol = fromBinanceSymbol(ticker.s);
       
-      console.log('[LivePriceFeed] Connecting to Binance WebSocket...');
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('[LivePriceFeed] Connected to Binance');
-        setIsConnected(true);
-        setConnectionError(null);
-        reconnectAttemptsRef.current = 0;
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          
-          if (message.data) {
-            const ticker = message.data;
-            const symbol = fromBinanceSymbol(ticker.s);
-            
-            setPrices(prev => {
-              const newPrices = new Map(prev);
-              newPrices.set(symbol, {
-                symbol,
-                price: parseFloat(ticker.c),
-                change24h: parseFloat(ticker.P),
-                volume24h: parseFloat(ticker.q),
-                high24h: parseFloat(ticker.h),
-                low24h: parseFloat(ticker.l),
-                bid: parseFloat(ticker.b),
-                ask: parseFloat(ticker.a),
-                timestamp: ticker.E,
-              });
-              return newPrices;
-            });
-          }
-        } catch (error) {
-          console.error('[LivePriceFeed] Error parsing message:', error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('[LivePriceFeed] WebSocket error:', error);
-        setConnectionError('WebSocket connection error');
-      };
-
-      ws.onclose = (event) => {
-        console.log('[LivePriceFeed] WebSocket closed:', event.code, event.reason);
-        setIsConnected(false);
-        
-        // Attempt reconnection with exponential backoff
-        if (enabled && reconnectAttemptsRef.current < maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
-          console.log(`[LivePriceFeed] Reconnecting in ${delay}ms...`);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttemptsRef.current++;
-            connect();
-          }, delay);
-        }
-      };
-    } catch (error) {
-      console.error('[LivePriceFeed] Connection error:', error);
-      setConnectionError('Failed to connect to price feed');
+      setPrices(prev => {
+        const newPrices = new Map(prev);
+        newPrices.set(symbol, {
+          symbol,
+          price: parseFloat(ticker.c),
+          change24h: parseFloat(ticker.P),
+          volume24h: parseFloat(ticker.q),
+          high24h: parseFloat(ticker.h),
+          low24h: parseFloat(ticker.l),
+          bid: parseFloat(ticker.b),
+          ask: parseFloat(ticker.a),
+          timestamp: ticker.E,
+        });
+        return newPrices;
+      });
     }
-  }, [enabled, symbols]);
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setIsConnected(false);
-    console.log('[LivePriceFeed] Disconnected');
   }, []);
 
-  useEffect(() => {
-    if (enabled && symbols.length > 0) {
-      connect();
-    }
-
-    return () => {
-      disconnect();
-    };
-  }, [enabled, symbols.join(','), connect, disconnect]);
+  const wsState = useWebSocketManager({
+    url: wsUrl,
+    enabled: enabled && symbols.length > 0,
+    maxReconnectAttempts: 10,
+    initialBackoffMs: 1000,
+    maxBackoffMs: 30000,
+    onMessage: handleMessage,
+    onConnect: () => console.log('[LivePriceFeed] Connected to Binance'),
+    onDisconnect: () => console.log('[LivePriceFeed] Disconnected from Binance'),
+  });
 
   const getPrice = useCallback((symbol: string): LivePrice | undefined => {
     return prices.get(symbol);
@@ -151,11 +89,16 @@ export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOp
 
   return {
     prices,
-    isConnected,
-    connectionError,
+    isConnected: wsState.isConnected,
+    isConnecting: wsState.isConnecting,
+    connectionError: wsState.error,
+    reconnectAttempts: wsState.reconnectAttempts,
+    latencyMs: wsState.latencyMs,
+    lastConnectedAt: wsState.lastConnectedAt,
     getPrice,
     getAllPrices,
-    connect,
-    disconnect,
+    connect: wsState.connect,
+    disconnect: wsState.disconnect,
+    resetReconnect: wsState.resetReconnectAttempts,
   };
 }
