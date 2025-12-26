@@ -16,81 +16,159 @@ interface DerivativesData {
   liquidations24hShort: number;
   topTraderLongRatio: number;
   topTraderShortRatio: number;
+  source: string;
 }
 
-// Simulated derivatives data - in production, fetch from Coinglass API
-function generateDerivativesData(instrument: string): DerivativesData {
+// Map instrument to Binance symbol format
+function toBinanceSymbol(instrument: string): string {
+  return instrument.replace('-', '').replace('/', '').toUpperCase();
+}
+
+// Fetch funding rate from Binance Futures API (FREE - no API key required)
+async function fetchBinanceFundingRate(symbol: string): Promise<{ fundingRate: number; nextFundingTime: string } | null> {
+  try {
+    const url = `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`;
+    const res = await fetch(url);
+    
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        fundingRate: parseFloat(data.lastFundingRate) || 0,
+        nextFundingTime: new Date(data.nextFundingTime).toISOString(),
+      };
+    }
+  } catch (error) {
+    console.error(`Binance funding rate error for ${symbol}:`, error);
+  }
+  return null;
+}
+
+// Fetch open interest from Binance Futures API (FREE - no API key required)
+async function fetchBinanceOpenInterest(symbol: string): Promise<{ openInterest: number } | null> {
+  try {
+    const url = `https://fapi.binance.com/fapi/v1/openInterest?symbol=${symbol}`;
+    const res = await fetch(url);
+    
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        openInterest: parseFloat(data.openInterest) || 0,
+      };
+    }
+  } catch (error) {
+    console.error(`Binance open interest error for ${symbol}:`, error);
+  }
+  return null;
+}
+
+// Fetch long/short ratio from Binance (FREE - top trader accounts)
+async function fetchBinanceLongShortRatio(symbol: string): Promise<{ longShortRatio: number; topLong: number; topShort: number } | null> {
+  try {
+    const url = `https://fapi.binance.com/futures/data/topLongShortAccountRatio?symbol=${symbol}&period=1h&limit=1`;
+    const res = await fetch(url);
+    
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const latest = data[0];
+        const longRatio = parseFloat(latest.longAccount) * 100;
+        const shortRatio = parseFloat(latest.shortAccount) * 100;
+        return {
+          longShortRatio: parseFloat(latest.longShortRatio) || 1,
+          topLong: longRatio,
+          topShort: shortRatio,
+        };
+      }
+    }
+  } catch (error) {
+    console.error(`Binance long/short ratio error for ${symbol}:`, error);
+  }
+  return null;
+}
+
+// Fetch 24h statistics for OI change calculation
+async function fetchBinance24hStats(symbol: string): Promise<{ priceChange: number; volume: number } | null> {
+  try {
+    const url = `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${symbol}`;
+    const res = await fetch(url);
+    
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        priceChange: parseFloat(data.priceChangePercent) || 0,
+        volume: parseFloat(data.quoteVolume) || 0,
+      };
+    }
+  } catch (error) {
+    console.error(`Binance 24h stats error for ${symbol}:`, error);
+  }
+  return null;
+}
+
+// Generate fallback data when APIs fail
+function generateFallbackData(instrument: string): DerivativesData {
   const baseOI = instrument.includes('BTC') ? 15000000000 : 
                  instrument.includes('ETH') ? 8000000000 : 
                  Math.random() * 500000000 + 100000000;
   
-  const fundingRate = (Math.random() - 0.5) * 0.0005; // -0.025% to +0.025%
-  const longShortRatio = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+  const fundingRate = (Math.random() - 0.5) * 0.0005;
+  const longShortRatio = 0.8 + Math.random() * 0.4;
   
   return {
     instrument,
     fundingRate,
     nextFundingTime: new Date(Date.now() + Math.random() * 8 * 60 * 60 * 1000).toISOString(),
     openInterest: baseOI,
-    oiChange24h: (Math.random() - 0.5) * 10, // -5% to +5%
+    oiChange24h: (Math.random() - 0.5) * 10,
     longShortRatio,
     liquidations24hLong: Math.random() * 50000000,
     liquidations24hShort: Math.random() * 50000000,
     topTraderLongRatio: 45 + Math.random() * 10,
     topTraderShortRatio: 45 + Math.random() * 10,
+    source: 'simulated',
   };
 }
 
-async function fetchCoinglassData(instrument: string, apiKey?: string): Promise<DerivativesData> {
-  // If API key is provided, attempt real API call
-  if (apiKey) {
-    try {
-      const symbol = instrument.replace('-USDT', '').replace('/', '');
+// Fetch real derivatives data from Binance (FREE APIs)
+async function fetchBinanceDerivatives(instrument: string): Promise<DerivativesData> {
+  const symbol = toBinanceSymbol(instrument);
+  
+  console.log(`Fetching Binance derivatives for ${symbol}...`);
+  
+  try {
+    // Fetch all data in parallel
+    const [fundingData, oiData, lsData, statsData] = await Promise.all([
+      fetchBinanceFundingRate(symbol),
+      fetchBinanceOpenInterest(symbol),
+      fetchBinanceLongShortRatio(symbol),
+      fetchBinance24hStats(symbol),
+    ]);
+    
+    // Check if we got at least funding rate (most important)
+    if (fundingData) {
+      console.log(`Successfully fetched Binance data for ${symbol}`);
       
-      // Coinglass API endpoints
-      const fundingUrl = `https://open-api.coinglass.com/public/v2/funding?symbol=${symbol}`;
-      const oiUrl = `https://open-api.coinglass.com/public/v2/open_interest?symbol=${symbol}`;
-      
-      const headers = {
-        'coinglassSecret': apiKey,
-        'Content-Type': 'application/json',
+      return {
+        instrument,
+        fundingRate: fundingData.fundingRate,
+        nextFundingTime: fundingData.nextFundingTime,
+        openInterest: oiData?.openInterest || 0,
+        oiChange24h: statsData?.priceChange || 0, // Use price change as proxy
+        longShortRatio: lsData?.longShortRatio || 1,
+        liquidations24hLong: 0, // Binance doesn't provide this in free API
+        liquidations24hShort: 0,
+        topTraderLongRatio: lsData?.topLong || 50,
+        topTraderShortRatio: lsData?.topShort || 50,
+        source: 'binance',
       };
-
-      const [fundingRes, oiRes] = await Promise.all([
-        fetch(fundingUrl, { headers }),
-        fetch(oiUrl, { headers }),
-      ]);
-
-      if (fundingRes.ok && oiRes.ok) {
-        const fundingData = await fundingRes.json();
-        const oiData = await oiRes.json();
-
-        // Parse real data if available
-        if (fundingData.success && oiData.success) {
-          const funding = fundingData.data?.[0] || {};
-          const oi = oiData.data?.[0] || {};
-          
-          return {
-            instrument,
-            fundingRate: funding.fundingRate || 0,
-            nextFundingTime: funding.nextFundingTime || new Date().toISOString(),
-            openInterest: oi.openInterest || 0,
-            oiChange24h: oi.oiChange24h || 0,
-            longShortRatio: funding.longShortRatio || 1,
-            liquidations24hLong: oi.liquidations24hLong || 0,
-            liquidations24hShort: oi.liquidations24hShort || 0,
-            topTraderLongRatio: funding.topTraderLongRatio || 50,
-            topTraderShortRatio: funding.topTraderShortRatio || 50,
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Coinglass API error:', error);
     }
+  } catch (error) {
+    console.error(`Error fetching Binance data for ${symbol}:`, error);
   }
   
-  // Fallback to simulated data
-  return generateDerivativesData(instrument);
+  // Fallback to simulated if Binance fails
+  console.log(`Falling back to simulated data for ${instrument}`);
+  return generateFallbackData(instrument);
 }
 
 Deno.serve(async (req) => {
@@ -101,7 +179,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const coinglassApiKey = Deno.env.get('COINGLASS_API_KEY');
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
@@ -114,14 +191,17 @@ Deno.serve(async (req) => {
         const symbolList = instruments || ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'];
         const results: DerivativesData[] = [];
         
-        for (const instrument of symbolList) {
-          const data = await fetchCoinglassData(instrument, coinglassApiKey);
+        // Fetch all instruments in parallel for speed
+        const dataPromises = symbolList.map((instrument: string) => fetchBinanceDerivatives(instrument));
+        const allData = await Promise.all(dataPromises);
+        
+        for (const data of allData) {
           results.push(data);
           
           // Store in database
-          await supabase.from('derivatives_metrics').insert({
-            instrument,
-            venue: coinglassApiKey ? 'coinglass' : 'simulated',
+          const { error } = await supabase.from('derivatives_metrics').insert({
+            instrument: data.instrument,
+            venue: data.source,
             funding_rate: data.fundingRate,
             next_funding_time: data.nextFundingTime,
             open_interest: data.openInterest,
@@ -132,12 +212,19 @@ Deno.serve(async (req) => {
             top_trader_long_ratio: data.topTraderLongRatio,
             top_trader_short_ratio: data.topTraderShortRatio,
           });
+          
+          if (error) {
+            console.error(`Error storing data for ${data.instrument}:`, error);
+          }
         }
+        
+        const sources = [...new Set(results.map(r => r.source))];
         
         return new Response(JSON.stringify({ 
           success: true, 
           data: results,
-          source: coinglassApiKey ? 'coinglass' : 'simulated'
+          source: sources.join(', '),
+          message: `Fetched ${results.length} instruments from ${sources.join(', ')}`
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
