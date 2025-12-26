@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, CandlestickData, Time, ColorType, CandlestickSeriesPartialOptions } from 'lightweight-charts';
+import { createChart, IChartApi, CandlestickData, Time, ColorType, CandlestickSeries, HistogramSeries, ISeriesApi } from 'lightweight-charts';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
@@ -96,8 +96,8 @@ export function TradingViewChart({
 }: TradingViewChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const candlestickSeriesRef = useRef<any>(null);
-  const volumeSeriesRef = useRef<any>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   
   const [currentSymbol, setCurrentSymbol] = useState(symbol);
   const [timeframe, setTimeframe] = useState('60');
@@ -153,8 +153,8 @@ export function TradingViewChart({
 
     chartRef.current = chart;
 
-    // Add candlestick series (using any to handle API version differences)
-    const candlestickSeries = (chart as any).addCandlestickSeries({
+    // Add candlestick series using v5 API
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: 'hsl(142, 76%, 36%)',
       downColor: 'hsl(0, 84%, 60%)',
       borderUpColor: 'hsl(142, 76%, 36%)',
@@ -164,8 +164,8 @@ export function TradingViewChart({
     });
     candlestickSeriesRef.current = candlestickSeries;
 
-    // Add volume series
-    const volumeSeries = (chart as any).addHistogramSeries({
+    // Add volume series using v5 API
+    const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: '',
     });
