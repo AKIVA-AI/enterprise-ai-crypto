@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { TradingViewChart } from '@/components/charts/TradingViewChart';
 import { TradeTicket } from '@/components/trading/TradeTicket';
+import { LiveOrderBook } from '@/components/trading/LiveOrderBook';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,6 @@ import {
   TrendingDown, 
   Search, 
   Star,
-  Activity,
   BarChart2,
   Zap,
   Wifi,
@@ -247,64 +247,8 @@ export default function Markets() {
               onSymbolChange={setSelectedSymbol}
             />
 
-            {/* Order Book Simulation */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="glass-panel rounded-xl p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-trading-long" />
-                  Bids
-                </h3>
-                <div className="space-y-1">
-                  {[...Array(5)].map((_, i) => {
-                    const basePrice = selectedMarket?.price || 100;
-                    const price = basePrice * (1 - (i + 1) * 0.001);
-                    const size = Math.random() * 10 + 1;
-                    const total = price * size;
-                    const widthPercent = 100 - i * 15;
-
-                    return (
-                      <div key={i} className="relative flex items-center justify-between text-sm py-1">
-                        <div 
-                          className="absolute inset-y-0 left-0 bg-trading-long/10 rounded-r"
-                          style={{ width: `${widthPercent}%` }}
-                        />
-                        <span className="relative font-mono text-trading-long">${price.toFixed(2)}</span>
-                        <span className="relative font-mono text-muted-foreground">{size.toFixed(4)}</span>
-                        <span className="relative font-mono">${total.toFixed(2)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="glass-panel rounded-xl p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-trading-short" />
-                  Asks
-                </h3>
-                <div className="space-y-1">
-                  {[...Array(5)].map((_, i) => {
-                    const basePrice = selectedMarket?.price || 100;
-                    const price = basePrice * (1 + (i + 1) * 0.001);
-                    const size = Math.random() * 10 + 1;
-                    const total = price * size;
-                    const widthPercent = 100 - i * 15;
-
-                    return (
-                      <div key={i} className="relative flex items-center justify-between text-sm py-1">
-                        <div 
-                          className="absolute inset-y-0 right-0 bg-trading-short/10 rounded-l"
-                          style={{ width: `${widthPercent}%` }}
-                        />
-                        <span className="relative font-mono text-trading-short">${price.toFixed(2)}</span>
-                        <span className="relative font-mono text-muted-foreground">{size.toFixed(4)}</span>
-                        <span className="relative font-mono">${total.toFixed(2)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            {/* Live Order Book */}
+            <LiveOrderBook symbol={selectedSymbol} depth={10} />
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { RecentEvents } from '@/components/dashboard/RecentEvents';
 import { RiskGauge } from '@/components/dashboard/RiskGauge';
 import { PnLChart } from '@/components/dashboard/PnLChart';
 import { PositionHeatMap } from '@/components/dashboard/PositionHeatMap';
+import { RealtimePnLTracker } from '@/components/trading/RealtimePnLTracker';
 import { MobileDashboard } from '@/components/mobile/MobileDashboard';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscriptions';
@@ -93,8 +94,11 @@ export default function Index() {
             <AgentStatusGrid />
           </div>
 
-          {/* Right column - risk and events */}
+          {/* Right column - risk, P&L tracker, and events */}
           <div className="space-y-6">
+            {/* Real-time P&L Tracker */}
+            <RealtimePnLTracker />
+
             {/* Risk overview */}
             <div className="glass-panel rounded-xl p-4">
               <h3 className="font-semibold mb-4">Risk Utilization</h3>
