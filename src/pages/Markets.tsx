@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { TradingViewChart } from '@/components/charts/TradingViewChart';
 import { TradeTicket } from '@/components/trading/TradeTicket';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { useLivePriceFeed } from '@/hooks/useLivePriceFeed';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -16,6 +17,8 @@ import {
   Activity,
   BarChart2,
   Zap,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 interface MarketTicker {
@@ -28,16 +31,18 @@ interface MarketTicker {
   isFavorite?: boolean;
 }
 
-const MARKET_DATA: MarketTicker[] = [
-  { symbol: 'BTC-USDT', price: 98542.50, change24h: 2.34, volume24h: 2840000000, high24h: 99200, low24h: 96800, isFavorite: true },
-  { symbol: 'ETH-USDT', price: 3456.80, change24h: -1.25, volume24h: 1420000000, high24h: 3520, low24h: 3410, isFavorite: true },
-  { symbol: 'SOL-USDT', price: 185.42, change24h: 5.67, volume24h: 890000000, high24h: 188, low24h: 175 },
-  { symbol: 'ARB-USDT', price: 1.25, change24h: -3.45, volume24h: 245000000, high24h: 1.32, low24h: 1.22 },
-  { symbol: 'OP-USDT', price: 2.15, change24h: 1.89, volume24h: 156000000, high24h: 2.20, low24h: 2.08 },
-  { symbol: 'AVAX-USDT', price: 42.35, change24h: -0.78, volume24h: 312000000, high24h: 43.50, low24h: 41.80 },
-  { symbol: 'MATIC-USDT', price: 0.9532, change24h: 2.12, volume24h: 198000000, high24h: 0.97, low24h: 0.93 },
-  { symbol: 'LINK-USDT', price: 23.45, change24h: 4.56, volume24h: 287000000, high24h: 24.10, low24h: 22.40 },
+const TRACKED_SYMBOLS = [
+  'BTC-USDT',
+  'ETH-USDT', 
+  'SOL-USDT',
+  'ARB-USDT',
+  'OP-USDT',
+  'AVAX-USDT',
+  'MATIC-USDT',
+  'LINK-USDT',
 ];
+
+const FAVORITES = new Set(['BTC-USDT', 'ETH-USDT']);
 
 export default function Markets() {
   const [selectedSymbol, setSelectedSymbol] = useState('BTC-USDT');
@@ -45,25 +50,59 @@ export default function Markets() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [isTradeTicketOpen, setIsTradeTicketOpen] = useState(false);
 
-  const filteredMarkets = MARKET_DATA.filter(market => {
+  // Live WebSocket price feed from Binance
+  const { prices, isConnected, getAllPrices } = useLivePriceFeed({
+    symbols: TRACKED_SYMBOLS,
+    enabled: true,
+  });
+
+  // Convert live prices to market data format
+  const marketData: MarketTicker[] = useMemo(() => {
+    return TRACKED_SYMBOLS.map(symbol => {
+      const livePrice = prices.get(symbol);
+      return {
+        symbol,
+        price: livePrice?.price || 0,
+        change24h: livePrice?.change24h || 0,
+        volume24h: livePrice?.volume24h || 0,
+        high24h: livePrice?.high24h || 0,
+        low24h: livePrice?.low24h || 0,
+        isFavorite: FAVORITES.has(symbol),
+      };
+    });
+  }, [prices]);
+
+  const filteredMarkets = marketData.filter(market => {
     const matchesSearch = market.symbol.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFavorites = !showFavoritesOnly || market.isFavorite;
     return matchesSearch && matchesFavorites;
   });
 
-  const selectedMarket = MARKET_DATA.find(m => m.symbol === selectedSymbol);
+  const selectedMarket = marketData.find(m => m.symbol === selectedSymbol);
 
   return (
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <BarChart2 className="h-7 w-7 text-primary" />
-              Markets
-            </h1>
-            <p className="text-muted-foreground">Real-time market data and price charts</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <BarChart2 className="h-7 w-7 text-primary" />
+                Markets
+              </h1>
+              <p className="text-muted-foreground">Real-time market data and price charts</p>
+            </div>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                'ml-2 gap-1',
+                isConnected ? 'border-success/50 text-success' : 'border-destructive/50 text-destructive'
+              )}
+            >
+              {isConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              {isConnected ? 'Live' : 'Offline'}
+            </Badge>
           </div>
           <Sheet open={isTradeTicketOpen} onOpenChange={setIsTradeTicketOpen}>
             <SheetTrigger asChild>
