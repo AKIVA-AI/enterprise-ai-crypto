@@ -7,6 +7,9 @@ import { TradeBlotter } from '@/components/trading/TradeBlotter';
 import { PortfolioSummaryWidget } from '@/components/portfolio/PortfolioSummaryWidget';
 import { MarketIntelligencePanel } from '@/components/intelligence/MarketIntelligencePanel';
 import { IntelligenceOverview } from '@/components/intelligence/IntelligenceOverview';
+import { WhaleAlertPanel } from '@/components/intelligence/WhaleAlertPanel';
+import { TradingCopilotPanel } from '@/components/intelligence/TradingCopilotPanel';
+import { ExchangeAPIManager } from '@/components/intelligence/ExchangeAPIManager';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -301,9 +304,16 @@ export default function Markets() {
               </TabsContent>
 
               <TabsContent value="intelligence">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <IntelligenceOverview instruments={TRACKED_SYMBOLS.slice(0, 6)} />
-                  <MarketIntelligencePanel instruments={TRACKED_SYMBOLS.slice(0, 6)} compact />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <IntelligenceOverview instruments={TRACKED_SYMBOLS.slice(0, 6)} />
+                    <MarketIntelligencePanel instruments={TRACKED_SYMBOLS.slice(0, 6)} compact />
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <WhaleAlertPanel compact />
+                    <TradingCopilotPanel defaultInstrument={selectedSymbol} compact />
+                    <ExchangeAPIManager />
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

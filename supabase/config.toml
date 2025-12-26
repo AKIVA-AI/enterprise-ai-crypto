@@ -29,3 +29,9 @@ verify_jwt = true
 
 [functions.market-intelligence]
 verify_jwt = true
+
+[functions.whale-alerts]
+verify_jwt = true
+
+[functions.trading-copilot]
+verify_jwt = true
