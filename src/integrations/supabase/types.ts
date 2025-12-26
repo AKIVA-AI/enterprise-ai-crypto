@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      agents: {
+        Row: {
+          capabilities: string[]
+          config: Json
+          cpu_usage: number
+          created_at: string
+          error_message: string | null
+          id: string
+          last_heartbeat: string
+          memory_usage: number
+          name: string
+          status: string
+          type: string
+          updated_at: string
+          uptime: number
+          version: string
+        }
+        Insert: {
+          capabilities?: string[]
+          config?: Json
+          cpu_usage?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_heartbeat?: string
+          memory_usage?: number
+          name: string
+          status?: string
+          type: string
+          updated_at?: string
+          uptime?: number
+          version?: string
+        }
+        Update: {
+          capabilities?: string[]
+          config?: Json
+          cpu_usage?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_heartbeat?: string
+          memory_usage?: number
+          name?: string
+          status?: string
+          type?: string
+          updated_at?: string
+          uptime?: number
+          version?: string
+        }
+        Relationships: []
+      }
       alerts: {
         Row: {
           created_at: string
@@ -1209,6 +1260,63 @@ export type Database = {
           status?: Database["public"]["Enums"]["venue_status"]
           supported_instruments?: string[]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      wallets: {
+        Row: {
+          address: string
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          is_watch_only: boolean
+          last_synced_at: string | null
+          metadata: Json
+          name: string
+          network: string
+          pending_approvals: number
+          required_signers: number
+          signers: number
+          type: string
+          updated_at: string
+          usd_value: number
+        }
+        Insert: {
+          address: string
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          is_watch_only?: boolean
+          last_synced_at?: string | null
+          metadata?: Json
+          name: string
+          network: string
+          pending_approvals?: number
+          required_signers?: number
+          signers?: number
+          type?: string
+          updated_at?: string
+          usd_value?: number
+        }
+        Update: {
+          address?: string
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          is_watch_only?: boolean
+          last_synced_at?: string | null
+          metadata?: Json
+          name?: string
+          network?: string
+          pending_approvals?: number
+          required_signers?: number
+          signers?: number
+          type?: string
+          updated_at?: string
+          usd_value?: number
         }
         Relationships: []
       }
