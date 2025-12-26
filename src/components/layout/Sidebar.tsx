@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Cpu,
   BarChart3,
+  History,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Meme Ventures', href: '/launch', icon: Rocket },
   { name: 'Treasury', href: '/treasury', icon: Wallet },
   { name: 'Observability', href: '/observability', icon: Activity },
+  { name: 'Audit Log', href: '/audit', icon: History },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

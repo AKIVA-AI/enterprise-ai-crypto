@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { TwoFactorConfirmDialog } from '@/components/auth/TwoFactorConfirmDialog';
 import { 
   Power, 
   AlertTriangle, 
@@ -33,6 +34,8 @@ import { toast } from 'sonner';
 export function KillSwitchPanel() {
   const queryClient = useQueryClient();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [is2FAOpen, setIs2FAOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<boolean | null>(null);
 
   // Fetch global settings
   const { data: settings, isLoading } = useQuery({
@@ -55,45 +58,54 @@ export function KillSwitchPanel() {
     },
   });
 
-  // Toggle global kill switch
-  const toggleKillSwitch = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const { error } = await supabase
-        .from('global_settings')
-        .update({ 
-          global_kill_switch: enabled,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', settings?.id);
-      
-      if (error) throw error;
+  // Execute kill switch after 2FA
+  const executeKillSwitch = async (enabled: boolean) => {
+    const { error } = await supabase
+      .from('global_settings')
+      .update({ 
+        global_kill_switch: enabled,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', settings?.id);
+    
+    if (error) throw error;
 
-      // Log audit event
-      await supabase.from('audit_events').insert({
-        action: enabled ? 'KILL_SWITCH_ACTIVATED' : 'KILL_SWITCH_DEACTIVATED',
-        resource_type: 'global_settings',
-        severity: enabled ? 'critical' : 'warning',
-      });
+    // Log audit event
+    await supabase.from('audit_events').insert({
+      action: enabled ? 'kill_switch.activate' : 'kill_switch.deactivate',
+      resource_type: 'global_settings',
+      severity: enabled ? 'critical' : 'warning',
+    });
 
-      // Create alert
-      await supabase.from('alerts').insert({
-        title: enabled ? 'KILL SWITCH ACTIVATED' : 'Kill Switch Deactivated',
-        message: enabled ? 'All trading has been halted' : 'Trading has been resumed',
-        severity: enabled ? 'critical' : 'info',
-        source: 'risk_engine',
-      });
-    },
-    onSuccess: (_, enabled) => {
-      toast[enabled ? 'error' : 'success'](
-        enabled ? '🚨 KILL SWITCH ACTIVATED' : '✅ Kill Switch Deactivated',
-        { duration: 10000 }
-      );
-      queryClient.invalidateQueries({ queryKey: ['global-settings'] });
-    },
-    onError: (error: any) => {
-      toast.error('Failed to toggle kill switch', { description: error.message });
-    },
-  });
+    // Create alert
+    await supabase.from('alerts').insert({
+      title: enabled ? 'KILL SWITCH ACTIVATED' : 'Kill Switch Deactivated',
+      message: enabled ? 'All trading has been halted' : 'Trading has been resumed',
+      severity: enabled ? 'critical' : 'info',
+      source: 'risk_engine',
+    });
+
+    toast[enabled ? 'error' : 'success'](
+      enabled ? '🚨 KILL SWITCH ACTIVATED' : '✅ Kill Switch Deactivated',
+      { duration: 10000 }
+    );
+    queryClient.invalidateQueries({ queryKey: ['global-settings'] });
+  };
+
+  // Handle initial confirmation -> opens 2FA
+  const handleConfirmAction = () => {
+    setIsConfirmOpen(false);
+    setPendingAction(!killSwitchActive);
+    setIs2FAOpen(true);
+  };
+
+  // Handle 2FA confirmation
+  const handle2FAConfirm = async () => {
+    if (pendingAction !== null) {
+      await executeKillSwitch(pendingAction);
+      setPendingAction(null);
+    }
+  };
 
   // Toggle reduce-only mode
   const toggleReduceOnly = useMutation({
@@ -223,22 +235,29 @@ export function KillSwitchPanel() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => toggleKillSwitch.mutate(!killSwitchActive)}
+                    onClick={handleConfirmAction}
                     className={cn(
                       killSwitchActive ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'
                     )}
                   >
-                    {toggleKillSwitch.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : killSwitchActive ? (
-                      'Resume Trading'
-                    ) : (
-                      'ACTIVATE KILL SWITCH'
-                    )}
+                    {killSwitchActive ? 'Resume Trading' : 'ACTIVATE KILL SWITCH'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+            {/* 2FA Confirmation */}
+            <TwoFactorConfirmDialog
+              open={is2FAOpen}
+              onOpenChange={setIs2FAOpen}
+              onConfirm={handle2FAConfirm}
+              action={pendingAction ? 'Kill Switch' : 'Resume Trading'}
+              description={pendingAction 
+                ? 'You are about to halt ALL trading activity. This requires verification.'
+                : 'You are about to resume trading operations.'
+              }
+              severity={pendingAction ? 'critical' : 'warning'}
+            />
           </div>
         </CardContent>
       </Card>

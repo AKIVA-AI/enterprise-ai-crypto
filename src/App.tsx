@@ -18,6 +18,7 @@ import Settings from "./pages/Settings";
 import Engine from "./pages/Engine";
 import Analytics from "./pages/Analytics";
 import Markets from "./pages/Markets";
+import AuditLog from "./pages/AuditLog";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/engine" element={<ProtectedRoute><Engine /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/markets" element={<ProtectedRoute><Markets /></ProtectedRoute>} />
+              <Route path="/audit" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AlertNotificationProvider>
