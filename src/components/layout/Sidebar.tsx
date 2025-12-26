@@ -16,6 +16,7 @@ import {
   Cpu,
   BarChart3,
   History,
+  Briefcase,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Agents', href: '/agents', icon: Bot },
   { name: 'Strategies', href: '/strategies', icon: Activity },
   { name: 'Execution', href: '/execution', icon: Crosshair },
+  { name: 'Positions', href: '/positions', icon: Briefcase },
   { name: 'Risk', href: '/risk', icon: Shield },
   { name: 'Meme Ventures', href: '/launch', icon: Rocket },
   { name: 'Treasury', href: '/treasury', icon: Wallet },
