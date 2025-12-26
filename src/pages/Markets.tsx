@@ -4,6 +4,7 @@ import { TradingViewChart } from '@/components/charts/TradingViewChart';
 import { TradeTicket } from '@/components/trading/TradeTicket';
 import { LiveOrderBook } from '@/components/trading/LiveOrderBook';
 import { TradeBlotter } from '@/components/trading/TradeBlotter';
+import { BracketOrderTicket } from '@/components/trading/BracketOrderTicket';
 import { PortfolioSummaryWidget } from '@/components/portfolio/PortfolioSummaryWidget';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
