@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Agents from "./pages/Agents";
 import Strategies from "./pages/Strategies";
@@ -11,6 +13,7 @@ import Risk from "./pages/Risk";
 import Launch from "./pages/Launch";
 import Treasury from "./pages/Treasury";
 import Observability from "./pages/Observability";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,20 +21,23 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/agents" element={<Agents />} />
-          <Route path="/strategies" element={<Strategies />} />
-          <Route path="/execution" element={<Execution />} />
-          <Route path="/risk" element={<Risk />} />
-          <Route path="/launch" element={<Launch />} />
-          <Route path="/treasury" element={<Treasury />} />
-          <Route path="/observability" element={<Observability />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
+            <Route path="/strategies" element={<ProtectedRoute><Strategies /></ProtectedRoute>} />
+            <Route path="/execution" element={<ProtectedRoute><Execution /></ProtectedRoute>} />
+            <Route path="/risk" element={<ProtectedRoute><Risk /></ProtectedRoute>} />
+            <Route path="/launch" element={<ProtectedRoute><Launch /></ProtectedRoute>} />
+            <Route path="/treasury" element={<ProtectedRoute><Treasury /></ProtectedRoute>} />
+            <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

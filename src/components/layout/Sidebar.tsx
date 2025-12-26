@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useState } from 'react';
-import { currentUser } from '@/lib/mockData';
+import { useAuth } from '@/hooks/useAuth';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -30,15 +30,27 @@ const navigation = [
 
 const roleColors: Record<string, string> = {
   admin: 'bg-primary/20 text-primary',
-  trader: 'bg-success/20 text-success',
-  researcher: 'bg-chart-4/20 text-chart-4',
-  ops: 'bg-warning/20 text-warning',
+  cio: 'bg-success/20 text-success',
+  trader: 'bg-chart-4/20 text-chart-4',
+  research: 'bg-warning/20 text-warning',
+  ops: 'bg-chart-3/20 text-chart-3',
   auditor: 'bg-muted-foreground/20 text-muted-foreground',
+  viewer: 'bg-muted-foreground/20 text-muted-foreground',
 };
 
 export function Sidebar() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { user, signOut } = useAuth();
+
+  const userEmail = user?.email || '';
+  const userName = user?.user_metadata?.full_name || userEmail.split('@')[0];
+  const userInitials = userName
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <aside
@@ -94,28 +106,39 @@ export function Sidebar() {
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center">
                 <span className="text-primary font-medium text-sm">
-                  {currentUser.name.split(' ').map(n => n[0]).join('')}
+                  {userInitials}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  {currentUser.name}
+                  {userName}
                 </p>
-                <span className={cn('text-xs px-1.5 py-0.5 rounded', roleColors[currentUser.role])}>
-                  {currentUser.role}
+                <span className={cn('text-xs px-1.5 py-0.5 rounded', roleColors.viewer)}>
+                  viewer
                 </span>
               </div>
-              <button className="p-1.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-sidebar-foreground">
-                <Settings size={18} />
+              <button 
+                onClick={signOut}
+                className="p-1.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-destructive"
+                title="Sign out"
+              >
+                <LogOut size={18} />
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
               <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center">
                 <span className="text-primary font-medium text-sm">
-                  {currentUser.name.split(' ').map(n => n[0]).join('')}
+                  {userInitials}
                 </span>
               </div>
+              <button 
+                onClick={signOut}
+                className="p-1.5 rounded-md hover:bg-sidebar-accent text-muted-foreground hover:text-destructive"
+                title="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
           )}
         </div>
