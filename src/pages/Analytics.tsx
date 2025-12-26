@@ -1,6 +1,8 @@
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PortfolioAnalyticsPanel } from '@/components/portfolio/PortfolioAnalyticsPanel';
-import { BarChart3 } from 'lucide-react';
+import { TradeJournalPanel } from '@/components/journal/TradeJournalPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart3, BookOpen } from 'lucide-react';
 
 export default function Analytics() {
   return (
@@ -12,11 +14,29 @@ export default function Analytics() {
             <BarChart3 className="h-7 w-7 text-primary" />
             Portfolio Analytics
           </h1>
-          <p className="text-muted-foreground">Performance metrics, exposure analysis, and risk attribution</p>
+          <p className="text-muted-foreground">Performance metrics, trade journal, and risk attribution</p>
         </div>
 
-        {/* Analytics Panel */}
-        <PortfolioAnalyticsPanel />
+        <Tabs defaultValue="analytics" className="space-y-4">
+          <TabsList className="glass-panel">
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Performance
+            </TabsTrigger>
+            <TabsTrigger value="journal" className="gap-2">
+              <BookOpen className="h-4 w-4" />
+              Trade Journal
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analytics">
+            <PortfolioAnalyticsPanel />
+          </TabsContent>
+
+          <TabsContent value="journal">
+            <TradeJournalPanel />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
