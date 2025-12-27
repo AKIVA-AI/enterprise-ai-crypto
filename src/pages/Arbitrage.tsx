@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   ArrowLeftRight, 
   TrendingUp, 
@@ -23,10 +24,12 @@ import {
   Play,
   Pause,
   Settings,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useArbitrageMonitor, useExecuteArbitrage, ArbitrageOpportunity } from '@/hooks/useCrossExchangeArbitrage';
+import { useArbitrageHistory, useArbitrageStats, useRecordArbitrageExecution } from '@/hooks/useArbitrageHistory';
 import { VENUES } from '@/lib/tradingModes';
 
 export default function Arbitrage() {
@@ -37,22 +40,46 @@ export default function Arbitrage() {
 
   const { opportunities, isScanning: loading, lastScan, status, refetch } = useArbitrageMonitor(isScanning);
   const executeArbitrage = useExecuteArbitrage();
+  const recordExecution = useRecordArbitrageExecution();
+  const { data: history = [], isLoading: historyLoading } = useArbitrageHistory(20);
+  const { data: stats } = useArbitrageStats();
 
   // Auto-execute logic
   useEffect(() => {
     if (autoExecute && opportunities.length > 0) {
       const best = opportunities[0];
       if (best.costs && best.costs.netProfit > 10) { // Only if > $10 profit
-        executeArbitrage.mutate(best);
-        toast.info('Auto-executing arbitrage', {
-          description: `${best.buyExchange} → ${best.sellExchange} for $${best.costs.netProfit.toFixed(2)}`,
-        });
+        handleExecute(best);
       }
     }
   }, [opportunities, autoExecute]);
 
-  const handleExecute = (opportunity: ArbitrageOpportunity) => {
-    executeArbitrage.mutate(opportunity);
+  const handleExecute = async (opportunity: ArbitrageOpportunity) => {
+    // Execute the arbitrage
+    const result = await executeArbitrage.mutateAsync(opportunity);
+    
+    // Record to database
+    await recordExecution.mutateAsync({
+      opportunity_id: opportunity.id,
+      symbol: opportunity.symbol,
+      buy_exchange: opportunity.buyExchange,
+      sell_exchange: opportunity.sellExchange,
+      buy_price: opportunity.buyPrice,
+      sell_price: opportunity.sellPrice,
+      quantity: opportunity.volume,
+      spread_percent: opportunity.spreadPercent,
+      gross_profit: opportunity.estimatedProfit,
+      trading_fees: opportunity.costs?.tradingFees || 0,
+      withdrawal_fee: opportunity.costs?.withdrawalFee || 0,
+      slippage: opportunity.costs?.slippage || 0,
+      net_profit: opportunity.costs?.netProfit || 0,
+      status: result.status === 'SIMULATED' ? 'simulated' : 'completed',
+      buy_order_id: result.buyOrder?.orderId,
+      sell_order_id: result.sellOrder?.orderId,
+      executed_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      metadata: { result },
+    });
   };
 
   // Calculate stats
@@ -350,16 +377,76 @@ export default function Arbitrage() {
             {/* Execution History */}
             <Card className="glass-panel">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <Clock className="h-4 w-4" />
-                  Recent Executions
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4" />
+                    Execution History
+                  </span>
+                  {stats && (
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-muted-foreground">
+                        Total: <span className="font-mono text-foreground">{stats.totalExecutions}</span>
+                      </span>
+                      <span className="text-success">
+                        P&L: <span className="font-mono">${stats.totalProfit.toFixed(2)}</span>
+                      </span>
+                    </div>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-6 text-muted-foreground text-sm">
-                  <p>No executions yet</p>
-                  <p className="text-xs">Executed trades will appear here</p>
-                </div>
+                {historyLoading ? (
+                  <div className="text-center py-6 text-muted-foreground text-sm">
+                    <RefreshCw className="h-5 w-5 mx-auto animate-spin mb-2" />
+                    Loading history...
+                  </div>
+                ) : history.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground text-sm">
+                    <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No executions yet</p>
+                    <p className="text-xs">Executed trades will appear here</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-48">
+                    <div className="space-y-2">
+                      {history.map((exec) => (
+                        <div 
+                          key={exec.id}
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/30 text-sm"
+                        >
+                          <div className="flex items-center gap-3">
+                            {exec.status === 'completed' ? (
+                              <CheckCircle2 className="h-4 w-4 text-success" />
+                            ) : exec.status === 'simulated' ? (
+                              <Circle className="h-4 w-4 text-warning" />
+                            ) : exec.status === 'failed' ? (
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />
+                            )}
+                            <div>
+                              <div className="font-medium">{exec.symbol}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {VENUES[exec.buy_exchange]?.icon} → {VENUES[exec.sell_exchange]?.icon}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={cn(
+                              'font-mono font-medium',
+                              exec.net_profit >= 0 ? 'text-success' : 'text-destructive'
+                            )}>
+                              {exec.net_profit >= 0 ? '+' : ''}${exec.net_profit.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(exec.created_at).toLocaleTimeString()}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </CardContent>
             </Card>
           </div>
