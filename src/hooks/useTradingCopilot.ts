@@ -19,6 +19,7 @@ interface CopilotContext {
   instrument?: string;
   positions?: any[];
   portfolio_value?: number;
+  page?: string;
 }
 
 export function useTradingCopilot() {

@@ -9,6 +9,7 @@ import { PositionHeatMap } from '@/components/dashboard/PositionHeatMap';
 import { RealtimePnLTracker } from '@/components/trading/RealtimePnLTracker';
 import { UnifiedPortfolioPanel } from '@/components/portfolio/UnifiedPortfolioPanel';
 import { MobileDashboard } from '@/components/mobile/MobileDashboard';
+import { MarketPulseWidget } from '@/components/intelligence/MarketPulseWidget';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscriptions';
 import { useTradingShortcuts } from '@/hooks/useTradingShortcuts';
@@ -80,6 +81,9 @@ export default function Index() {
             />
           </div>
         )}
+
+        {/* Market Pulse - Intelligence at a glance */}
+        <MarketPulseWidget />
 
         {/* P&L Chart */}
         <PnLChart />
