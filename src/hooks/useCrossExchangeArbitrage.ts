@@ -266,3 +266,90 @@ export function useDailyPnLLimits() {
     isLoading: status.isLoading,
   };
 }
+
+// P&L Analytics hook
+export interface PnLHistoryEntry {
+  timestamp: number;
+  pnl: number;
+  tradeId: string;
+  symbol: string;
+}
+
+export interface DailyStats {
+  tradesExecuted: number;
+  totalProfit: number;
+  totalLoss: number;
+  winCount: number;
+  lossCount: number;
+  maxDrawdown: number;
+  peakPnL: number;
+  winRate: number;
+  avgWin: number;
+  avgLoss: number;
+  profitFactor: number;
+}
+
+export interface PositionSizingRules {
+  baseSize: number;
+  minSize: number;
+  maxSize: number;
+  scaleDownAt70Percent: boolean;
+  scaleDownAt90Percent: boolean;
+  currentSize?: number;
+}
+
+export function usePnLAnalytics() {
+  const queryClient = useQueryClient();
+
+  const analytics = useQuery({
+    queryKey: ['arbitrage', 'analytics'],
+    queryFn: () => invokeArbitrage('analytics', {}),
+    staleTime: 5000,
+    refetchInterval: 10000,
+  });
+
+  return {
+    dailyPnL: analytics.data?.dailyPnL || 0,
+    dailyPnLLimit: analytics.data?.dailyPnLLimit || -500,
+    percentUsed: analytics.data?.percentUsed || 0,
+    stats: analytics.data?.stats as DailyStats | undefined,
+    history: (analytics.data?.history || []) as PnLHistoryEntry[],
+    positionSizing: analytics.data?.positionSizing as PositionSizingRules | undefined,
+    warningAlertsSent: analytics.data?.warningAlertsSent || { at70: false, at90: false },
+    isLoading: analytics.isLoading,
+    refetch: analytics.refetch,
+  };
+}
+
+// Position sizing hook
+export function usePositionSizing() {
+  const queryClient = useQueryClient();
+
+  const updateRules = useMutation({
+    mutationFn: (rules: Partial<PositionSizingRules>) =>
+      invokeArbitrage('position-sizing', rules),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
+      toast.success('Position sizing updated', {
+        description: `Current size: ${data.currentSize.toFixed(4)}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update position sizing', { description: error.message });
+    },
+  });
+
+  const status = useQuery({
+    queryKey: ['arbitrage', 'position-sizing'],
+    queryFn: () => invokeArbitrage('position-sizing', {}),
+    staleTime: 10000,
+  });
+
+  return {
+    rules: status.data?.positionSizingRules as PositionSizingRules | undefined,
+    currentSize: status.data?.currentSize || 0.1,
+    pnlPercentUsed: status.data?.pnlPercentUsed || 0,
+    updateRules,
+    isLoading: status.isLoading,
+  };
+}

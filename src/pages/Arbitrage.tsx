@@ -30,6 +30,7 @@ import {
   Shield,
   Ban,
   RotateCcw,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -40,11 +41,14 @@ import {
   useAutoExecuteArbitrage, 
   useKillSwitch,
   useDailyPnLLimits,
+  usePnLAnalytics,
   ArbitrageOpportunity, 
   AutoExecuteSettings 
 } from '@/hooks/useCrossExchangeArbitrage';
 import { useArbitrageHistory, useArbitrageStats, useRecordArbitrageExecution } from '@/hooks/useArbitrageHistory';
 import { VENUES } from '@/lib/tradingModes';
+import { PnLAnalyticsDashboard } from '@/components/arbitrage/PnLAnalyticsDashboard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // All supported pairs
 const SUPPORTED_PAIRS = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'AVAX/USD', 'LINK/USD'];
@@ -132,7 +136,21 @@ export default function Arbitrage() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <Tabs defaultValue="scanner" className="space-y-6">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="scanner" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Scanner
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        
+        <TabsContent value="scanner" className="space-y-6">
         {/* Kill Switch Banner */}
         {killSwitch.isActive && (
           <div className="p-4 rounded-lg bg-destructive/10 border border-destructive animate-pulse">
@@ -706,7 +724,12 @@ export default function Arbitrage() {
             </Card>
           </div>
         </div>
-      </div>
+        </TabsContent>
+        
+        <TabsContent value="analytics">
+          <PnLAnalyticsDashboard />
+        </TabsContent>
+      </Tabs>
     </MainLayout>
   );
 }

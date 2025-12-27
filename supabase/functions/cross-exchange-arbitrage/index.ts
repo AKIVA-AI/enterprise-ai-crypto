@@ -229,6 +229,163 @@ let killSwitchActivatedAt: number | null = null;
 let dailyPnL = 0;
 let dailyPnLDate = new Date().toDateString();
 let dailyPnLLimit = -500; // Default -$500 daily loss limit
+let warningAlertsSent = { at70: false, at90: false }; // Track warning alerts
+
+// P&L history for analytics
+interface PnLHistoryEntry {
+  timestamp: number;
+  pnl: number;
+  tradeId: string;
+  symbol: string;
+}
+let pnlHistory: PnLHistoryEntry[] = [];
+let dailyStats = {
+  tradesExecuted: 0,
+  totalProfit: 0,
+  totalLoss: 0,
+  winCount: 0,
+  lossCount: 0,
+  maxDrawdown: 0,
+  peakPnL: 0,
+};
+
+// Position sizing rules
+interface PositionSizingRules {
+  baseSize: number;
+  minSize: number;
+  maxSize: number;
+  scaleDownAt70Percent: boolean;
+  scaleDownAt90Percent: boolean;
+}
+let positionSizingRules: PositionSizingRules = {
+  baseSize: 0.1,
+  minSize: 0.01,
+  maxSize: 0.5,
+  scaleDownAt70Percent: true,
+  scaleDownAt90Percent: true,
+};
+
+// Calculate dynamic position size based on P&L performance
+function calculateDynamicPositionSize(baseSize: number): number {
+  const percentUsed = dailyPnLLimit < 0 ? (dailyPnL / dailyPnLLimit) * 100 : 0;
+  
+  // Scale down as we approach limits
+  if (percentUsed >= 90 && positionSizingRules.scaleDownAt90Percent) {
+    return Math.max(positionSizingRules.minSize, baseSize * 0.25); // 25% of base
+  } else if (percentUsed >= 70 && positionSizingRules.scaleDownAt70Percent) {
+    return Math.max(positionSizingRules.minSize, baseSize * 0.5); // 50% of base
+  }
+  
+  // Scale up if we're in profit (max 50% increase)
+  if (dailyPnL > 0) {
+    const profitBonus = Math.min(0.5, dailyPnL / 500); // Up to 50% bonus for $500 profit
+    return Math.min(positionSizingRules.maxSize, baseSize * (1 + profitBonus));
+  }
+  
+  return Math.min(positionSizingRules.maxSize, baseSize);
+}
+
+// Send P&L warning alert via Telegram
+async function sendPnLWarningAlert(percentUsed: number, threshold: number): Promise<void> {
+  const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
+  if (!botToken) return;
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  const { data: channels } = await supabase
+    .from('notification_channels')
+    .select('*')
+    .eq('type', 'telegram')
+    .eq('is_enabled', true);
+
+  if (!channels || channels.length === 0) return;
+
+  const emoji = threshold >= 90 ? '🚨' : '⚠️';
+  const urgency = threshold >= 90 ? 'CRITICAL' : 'WARNING';
+  const message = `
+${emoji} *P&L ${urgency} ALERT* ${emoji}
+
+📊 Daily P&L Limit Usage: *${percentUsed.toFixed(1)}%*
+
+💰 Current P&L: *$${dailyPnL.toFixed(2)}*
+🎯 Daily Limit: *$${dailyPnLLimit}*
+📉 Remaining: *$${(dailyPnLLimit - dailyPnL).toFixed(2)}*
+
+${threshold >= 90 ? '⚡ Position sizes reduced to 25%' : '📉 Position sizes reduced to 50%'}
+
+_Trading will halt automatically at 100%_
+  `.trim();
+
+  for (const channel of channels) {
+    const chatIdMatch = channel.webhook_url.match(/telegram:\/\/(.+)/);
+    if (chatIdMatch) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatIdMatch[1],
+            text: message,
+            parse_mode: 'Markdown',
+          }),
+        });
+        console.log(`[Arbitrage] P&L warning alert sent (${threshold}%)`);
+      } catch (e) {
+        console.error('[Arbitrage] P&L warning alert failed:', e);
+      }
+    }
+  }
+}
+
+// Check and send P&L warning alerts
+async function checkPnLWarnings() {
+  const percentUsed = dailyPnLLimit < 0 ? (dailyPnL / dailyPnLLimit) * 100 : 0;
+  
+  if (percentUsed >= 90 && !warningAlertsSent.at90) {
+    await sendPnLWarningAlert(percentUsed, 90);
+    warningAlertsSent.at90 = true;
+  } else if (percentUsed >= 70 && !warningAlertsSent.at70) {
+    await sendPnLWarningAlert(percentUsed, 70);
+    warningAlertsSent.at70 = true;
+  }
+}
+
+// Update P&L history and stats
+function recordTradeResult(tradeId: string, symbol: string, profit: number) {
+  pnlHistory.push({
+    timestamp: Date.now(),
+    pnl: profit,
+    tradeId,
+    symbol,
+  });
+  
+  // Keep only last 100 entries
+  if (pnlHistory.length > 100) {
+    pnlHistory = pnlHistory.slice(-100);
+  }
+  
+  // Update stats
+  dailyStats.tradesExecuted++;
+  if (profit >= 0) {
+    dailyStats.totalProfit += profit;
+    dailyStats.winCount++;
+  } else {
+    dailyStats.totalLoss += Math.abs(profit);
+    dailyStats.lossCount++;
+  }
+  
+  // Track peak and drawdown
+  if (dailyPnL > dailyStats.peakPnL) {
+    dailyStats.peakPnL = dailyPnL;
+  }
+  const currentDrawdown = dailyStats.peakPnL - dailyPnL;
+  if (currentDrawdown > dailyStats.maxDrawdown) {
+    dailyStats.maxDrawdown = currentDrawdown;
+  }
+}
 
 // Reset daily P&L at midnight
 function checkDailyReset() {
@@ -236,6 +393,17 @@ function checkDailyReset() {
   if (today !== dailyPnLDate) {
     dailyPnL = 0;
     dailyPnLDate = today;
+    warningAlertsSent = { at70: false, at90: false };
+    pnlHistory = [];
+    dailyStats = {
+      tradesExecuted: 0,
+      totalProfit: 0,
+      totalLoss: 0,
+      winCount: 0,
+      lossCount: 0,
+      maxDrawdown: 0,
+      peakPnL: 0,
+    };
     // Auto-reset kill switch if it was triggered by P&L
     if (killSwitchActive && killSwitchReason.includes('P&L limit')) {
       killSwitchActive = false;
@@ -424,14 +592,21 @@ serve(async (req) => {
         const autoSymbols = params.symbols || ['BTC/USD', 'ETH/USD', 'SOL/USD', 'AVAX/USD', 'LINK/USD'];
         const autoMinSpread = params.minSpreadPercent || 0.1;
         const minProfitThreshold = params.minProfitThreshold || 25; // $25 minimum
-        const maxPositionSize = params.maxPositionSize || 0.1; // Max position
+        const basePositionSize = params.maxPositionSize || 0.1; // Base position
         const cooldownMs = params.cooldownMs || 60000; // 1 minute cooldown
+        
+        // Calculate dynamic position size based on P&L
+        const dynamicPositionSize = calculateDynamicPositionSize(basePositionSize);
         
         console.log('[Arbitrage] Auto-execute scan with params:', {
           minProfitThreshold,
-          maxPositionSize,
+          basePositionSize,
+          dynamicPositionSize,
           cooldownMs,
         });
+        
+        // Check P&L warnings
+        await checkPnLWarnings();
         
         // Scan for opportunities
         const autoAllOpps: ArbitrageOpportunity[] = [];
@@ -441,11 +616,11 @@ serve(async (req) => {
           autoAllOpps.push(...opportunities);
         }
         
-        // Analyze costs
+        // Analyze costs with dynamic position size
         const autoAnalyzed = autoAllOpps.map(opp => ({
           ...opp,
-          volume: Math.min(opp.volume, maxPositionSize), // Cap position size
-          costs: calculateCosts({ ...opp, volume: Math.min(opp.volume, maxPositionSize) }),
+          volume: Math.min(opp.volume, dynamicPositionSize),
+          costs: calculateCosts({ ...opp, volume: Math.min(opp.volume, dynamicPositionSize) }),
         }));
         
         // Filter for profitable opportunities above threshold
@@ -465,33 +640,37 @@ serve(async (req) => {
           await sendTelegramAlert(bestOpp, bestOpp.costs);
           
           // Execute (simulation mode for now)
+          const tradeId = `auto_${Date.now()}`;
           const execResult = {
             status: 'SIMULATED',
             opportunity: bestOpp,
             buyOrder: {
               exchange: bestOpp.buyExchange,
-              orderId: `auto_buy_${Date.now()}`,
+              orderId: `${tradeId}_buy`,
               status: 'FILLED',
               price: bestOpp.buyPrice,
               quantity: bestOpp.volume,
             },
             sellOrder: {
               exchange: bestOpp.sellExchange,
-              orderId: `auto_sell_${Date.now()}`,
+              orderId: `${tradeId}_sell`,
               status: 'FILLED',
               price: bestOpp.sellPrice,
               quantity: bestOpp.volume,
             },
             netProfit: bestOpp.costs.netProfit,
+            positionSize: dynamicPositionSize,
             executedAt: Date.now(),
           };
           
           executedTrades.push(execResult);
           
-          // Update daily P&L
+          // Update daily P&L and record trade
           dailyPnL += bestOpp.costs.netProfit;
+          recordTradeResult(tradeId, bestOpp.symbol, bestOpp.costs.netProfit);
           
-          // Check P&L limit
+          // Check P&L warnings and limits
+          await checkPnLWarnings();
           if (dailyPnL <= dailyPnLLimit) {
             killSwitchActive = true;
             killSwitchReason = `Daily P&L limit breached: $${dailyPnL.toFixed(2)}`;
@@ -506,9 +685,10 @@ serve(async (req) => {
           executed: executedTrades.length,
           trades: executedTrades,
           nextScanAfter: Date.now() + cooldownMs,
-          settings: { minProfitThreshold, maxPositionSize, cooldownMs },
+          settings: { minProfitThreshold, basePositionSize, dynamicPositionSize, cooldownMs },
           dailyPnL,
           dailyPnLLimit,
+          positionSizingRules,
           killSwitchActive,
           timestamp: Date.now(),
         };
@@ -539,12 +719,21 @@ serve(async (req) => {
         // Execute arbitrage trade (simulation for now)
         if (!params.opportunity) throw new Error('Opportunity required');
         
-        console.log('[Arbitrage] Executing trade:', params.opportunity);
+        // Calculate dynamic position size
+        const execDynamicSize = calculateDynamicPositionSize(params.opportunity.volume);
+        const adjustedOpportunity = { ...params.opportunity, volume: execDynamicSize };
         
-        const execCosts = calculateCosts(params.opportunity);
+        console.log('[Arbitrage] Executing trade:', adjustedOpportunity);
         
-        // Update daily P&L
+        const execCosts = calculateCosts(adjustedOpportunity);
+        const execTradeId = `exec_${Date.now()}`;
+        
+        // Update daily P&L and record trade
         dailyPnL += execCosts.netProfit;
+        recordTradeResult(execTradeId, adjustedOpportunity.symbol, execCosts.netProfit);
+        
+        // Check P&L warnings
+        await checkPnLWarnings();
         
         // Check P&L limit after trade
         if (dailyPnL <= dailyPnLLimit) {
@@ -555,22 +744,24 @@ serve(async (req) => {
         
         result = {
           status: 'SIMULATED',
-          opportunity: params.opportunity,
+          opportunity: adjustedOpportunity,
           buyOrder: {
-            exchange: params.opportunity.buyExchange,
-            orderId: `buy_${Date.now()}`,
+            exchange: adjustedOpportunity.buyExchange,
+            orderId: `${execTradeId}_buy`,
             status: 'FILLED',
-            price: params.opportunity.buyPrice,
-            quantity: params.opportunity.volume,
+            price: adjustedOpportunity.buyPrice,
+            quantity: adjustedOpportunity.volume,
           },
           sellOrder: {
-            exchange: params.opportunity.sellExchange,
-            orderId: `sell_${Date.now()}`,
+            exchange: adjustedOpportunity.sellExchange,
+            orderId: `${execTradeId}_sell`,
             status: 'FILLED',
-            price: params.opportunity.sellPrice,
-            quantity: params.opportunity.volume,
+            price: adjustedOpportunity.sellPrice,
+            quantity: adjustedOpportunity.volume,
           },
           realizedProfit: execCosts.netProfit,
+          originalSize: params.opportunity.volume,
+          adjustedSize: execDynamicSize,
           dailyPnL,
           dailyPnLLimit,
           message: 'Trade simulated - enable live trading for real execution',
@@ -598,6 +789,58 @@ serve(async (req) => {
             date: dailyPnLDate,
             percentUsed: dailyPnLLimit < 0 ? (dailyPnL / dailyPnLLimit) * 100 : 0,
           },
+          positionSizing: positionSizingRules,
+          warningAlertsSent,
+        };
+        break;
+
+      case 'analytics':
+        // Get P&L analytics and history
+        const winRate = dailyStats.tradesExecuted > 0 
+          ? (dailyStats.winCount / dailyStats.tradesExecuted) * 100 
+          : 0;
+        const avgWin = dailyStats.winCount > 0 
+          ? dailyStats.totalProfit / dailyStats.winCount 
+          : 0;
+        const avgLoss = dailyStats.lossCount > 0 
+          ? dailyStats.totalLoss / dailyStats.lossCount 
+          : 0;
+        const profitFactor = dailyStats.totalLoss > 0 
+          ? dailyStats.totalProfit / dailyStats.totalLoss 
+          : dailyStats.totalProfit > 0 ? Infinity : 0;
+        
+        result = {
+          dailyPnL,
+          dailyPnLLimit,
+          percentUsed: dailyPnLLimit < 0 ? (dailyPnL / dailyPnLLimit) * 100 : 0,
+          stats: {
+            ...dailyStats,
+            winRate,
+            avgWin,
+            avgLoss,
+            profitFactor,
+          },
+          history: pnlHistory,
+          positionSizing: {
+            ...positionSizingRules,
+            currentSize: calculateDynamicPositionSize(positionSizingRules.baseSize),
+          },
+          warningAlertsSent,
+        };
+        break;
+
+      case 'position-sizing':
+        // Update position sizing rules
+        if (params.baseSize !== undefined) positionSizingRules.baseSize = params.baseSize;
+        if (params.minSize !== undefined) positionSizingRules.minSize = params.minSize;
+        if (params.maxSize !== undefined) positionSizingRules.maxSize = params.maxSize;
+        if (params.scaleDownAt70Percent !== undefined) positionSizingRules.scaleDownAt70Percent = params.scaleDownAt70Percent;
+        if (params.scaleDownAt90Percent !== undefined) positionSizingRules.scaleDownAt90Percent = params.scaleDownAt90Percent;
+        
+        result = {
+          positionSizingRules,
+          currentSize: calculateDynamicPositionSize(positionSizingRules.baseSize),
+          pnlPercentUsed: dailyPnLLimit < 0 ? (dailyPnL / dailyPnLLimit) * 100 : 0,
         };
         break;
 
