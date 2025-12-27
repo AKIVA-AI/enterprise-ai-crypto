@@ -139,6 +139,48 @@ async function runSafetyChecks(
   return { passed: true };
 }
 
+// Binance API integration for real trading
+async function getBinancePrice(symbol: string): Promise<number | null> {
+  try {
+    const formattedSymbol = symbol.replace('/', '').toUpperCase();
+    const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${formattedSymbol}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return parseFloat(data.price);
+  } catch (error) {
+    console.error('Binance price fetch error:', error);
+    return null;
+  }
+}
+
+async function executeBinanceOrder(order: TradeOrder): Promise<{
+  filledPrice: number;
+  filledSize: number;
+  fee: number;
+  latencyMs: number;
+  slippage: number;
+  mode: 'live' | 'simulated';
+} | null> {
+  const binanceApiKey = Deno.env.get('BINANCE_API_KEY');
+  const binanceApiSecret = Deno.env.get('BINANCE_API_SECRET');
+  
+  // If no Binance credentials, fall back to simulation
+  if (!binanceApiKey || !binanceApiSecret) {
+    console.log('No Binance credentials, using simulation mode');
+    return null;
+  }
+  
+  // TODO: Implement real Binance order execution with HMAC signing
+  // For now, return null to use simulation
+  // Real implementation would:
+  // 1. Create timestamp
+  // 2. Build query string with order params
+  // 3. Sign with HMAC SHA256
+  // 4. POST to /api/v3/order
+  console.log('Binance credentials found, but live execution not yet enabled');
+  return null;
+}
+
 async function simulateFill(order: TradeOrder): Promise<{
   filledPrice: number;
   filledSize: number;
@@ -146,8 +188,11 @@ async function simulateFill(order: TradeOrder): Promise<{
   latencyMs: number;
   slippage: number;
 }> {
+  // Try to get real price from Binance for accurate simulation
+  const realPrice = await getBinancePrice(order.instrument);
+  const basePrice = realPrice || order.price || 0;
+  
   // Simulate market conditions
-  const basePrice = order.price || 0;
   const slippageBps = order.orderType === 'market' ? Math.random() * 10 : 0; // 0-10 bps for market
   const slippage = basePrice * (slippageBps / 10000) * (order.side === 'buy' ? 1 : -1);
   const filledPrice = basePrice + slippage;
@@ -161,6 +206,8 @@ async function simulateFill(order: TradeOrder): Promise<{
   
   // Simulate latency
   const latencyMs = 20 + Math.random() * 80;
+  
+  console.log(`Simulated fill: ${filledSize}@${filledPrice} (real price: ${realPrice || 'N/A'})`);
   
   return {
     filledPrice,
