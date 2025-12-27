@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationSystem";
 import { TradingModeProvider } from "@/contexts/TradingModeContext";
+import { AIChatDrawer } from "@/components/chat/AIChatDrawer";
 import Index from "./pages/Index";
 import Agents from "./pages/Agents";
 import Strategies from "./pages/Strategies";
@@ -38,6 +39,7 @@ const App = () => (
             <AlertNotificationProvider>
               <Toaster />
               <Sonner />
+              <AIChatDrawer />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
