@@ -101,6 +101,84 @@ export type Database = {
         }
         Relationships: []
       }
+      arbitrage_executions: {
+        Row: {
+          buy_exchange: string
+          buy_order_id: string | null
+          buy_price: number
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          executed_at: string | null
+          gross_profit: number
+          id: string
+          metadata: Json
+          net_profit: number
+          opportunity_id: string
+          quantity: number
+          sell_exchange: string
+          sell_order_id: string | null
+          sell_price: number
+          slippage: number
+          spread_percent: number
+          status: string
+          symbol: string
+          trading_fees: number
+          updated_at: string
+          withdrawal_fee: number
+        }
+        Insert: {
+          buy_exchange: string
+          buy_order_id?: string | null
+          buy_price: number
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          executed_at?: string | null
+          gross_profit: number
+          id?: string
+          metadata?: Json
+          net_profit: number
+          opportunity_id: string
+          quantity: number
+          sell_exchange: string
+          sell_order_id?: string | null
+          sell_price: number
+          slippage?: number
+          spread_percent: number
+          status?: string
+          symbol: string
+          trading_fees?: number
+          updated_at?: string
+          withdrawal_fee?: number
+        }
+        Update: {
+          buy_exchange?: string
+          buy_order_id?: string | null
+          buy_price?: number
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          executed_at?: string | null
+          gross_profit?: number
+          id?: string
+          metadata?: Json
+          net_profit?: number
+          opportunity_id?: string
+          quantity?: number
+          sell_exchange?: string
+          sell_order_id?: string | null
+          sell_price?: number
+          slippage?: number
+          spread_percent?: number
+          status?: string
+          symbol?: string
+          trading_fees?: number
+          updated_at?: string
+          withdrawal_fee?: number
+        }
+        Relationships: []
+      }
       audit_events: {
         Row: {
           action: string
