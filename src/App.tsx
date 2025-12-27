@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AlertNotificationProvider } from "@/components/alerts/AlertNotificationSystem";
+import { TradingModeProvider } from "@/contexts/TradingModeContext";
 import Index from "./pages/Index";
 import Agents from "./pages/Agents";
 import Strategies from "./pages/Strategies";
@@ -31,29 +32,31 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <AuthProvider>
-          <AlertNotificationProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
-              <Route path="/strategies" element={<ProtectedRoute><Strategies /></ProtectedRoute>} />
-              <Route path="/execution" element={<ProtectedRoute><Execution /></ProtectedRoute>} />
-              <Route path="/risk" element={<ProtectedRoute><Risk /></ProtectedRoute>} />
-              <Route path="/launch" element={<ProtectedRoute><Launch /></ProtectedRoute>} />
-              <Route path="/treasury" element={<ProtectedRoute><Treasury /></ProtectedRoute>} />
-              <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              <Route path="/engine" element={<ProtectedRoute><Engine /></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-              <Route path="/markets" element={<ProtectedRoute><Markets /></ProtectedRoute>} />
-              <Route path="/positions" element={<ProtectedRoute><Positions /></ProtectedRoute>} />
-              <Route path="/audit" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
-              <Route path="/status" element={<ProtectedRoute><SystemStatus /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AlertNotificationProvider>
+          <TradingModeProvider>
+            <AlertNotificationProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
+                <Route path="/strategies" element={<ProtectedRoute><Strategies /></ProtectedRoute>} />
+                <Route path="/execution" element={<ProtectedRoute><Execution /></ProtectedRoute>} />
+                <Route path="/risk" element={<ProtectedRoute><Risk /></ProtectedRoute>} />
+                <Route path="/launch" element={<ProtectedRoute><Launch /></ProtectedRoute>} />
+                <Route path="/treasury" element={<ProtectedRoute><Treasury /></ProtectedRoute>} />
+                <Route path="/observability" element={<ProtectedRoute><Observability /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/engine" element={<ProtectedRoute><Engine /></ProtectedRoute>} />
+                <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+                <Route path="/markets" element={<ProtectedRoute><Markets /></ProtectedRoute>} />
+                <Route path="/positions" element={<ProtectedRoute><Positions /></ProtectedRoute>} />
+                <Route path="/audit" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
+                <Route path="/status" element={<ProtectedRoute><SystemStatus /></ProtectedRoute>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AlertNotificationProvider>
+          </TradingModeProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

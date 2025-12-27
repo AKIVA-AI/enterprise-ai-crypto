@@ -23,6 +23,7 @@ import { useUnreadAlertsCount, useAlerts } from '@/hooks/useAlerts';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { WalletButton } from '@/components/wallet/WalletButton';
+import { TradingModeSelector } from '@/components/settings/TradingModeSelector';
 
 export function TopBar() {
   const [time, setTime] = useState(new Date());
@@ -143,6 +144,9 @@ export function TopBar() {
 
         {/* Right side */}
         <div className="flex items-center gap-3">
+          {/* Trading Mode Selector */}
+          <TradingModeSelector />
+
           {/* Venue Health */}
           <Popover>
             <PopoverTrigger asChild>
