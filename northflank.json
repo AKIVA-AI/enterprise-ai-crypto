@@ -1,0 +1,171 @@
+{
+  "$schema": "https://northflank.com/schemas/v1/project.json",
+  "name": "crypto-ops-platform",
+  "description": "Institutional Crypto Trading Platform - Full Stack Deployment",
+  "spec": {
+    "kind": "Project",
+    "spec": {
+      "services": {
+        "frontend": {
+          "kind": "Combined",
+          "spec": {
+            "billing": {
+              "deploymentPlan": "nf-compute-200"
+            },
+            "deployment": {
+              "instances": 1,
+              "docker": {
+                "configType": "customCommand",
+                "customCommand": "npm run build && npx serve -s dist -l 3000"
+              }
+            },
+            "build": {
+              "type": "dockerfile",
+              "dockerfile": {
+                "content": "",
+                "dockerfilePath": "Dockerfile.frontend"
+              }
+            },
+            "ports": [
+              {
+                "name": "http",
+                "internalPort": 3000,
+                "protocol": "HTTP",
+                "public": true,
+                "domains": []
+              }
+            ],
+            "runtimeEnvironment": {
+              "VITE_SUPABASE_URL": "${SUPABASE_URL}",
+              "VITE_SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+              "VITE_API_URL": "https://${BACKEND_HOST}"
+            },
+            "healthChecks": [
+              {
+                "type": "http",
+                "protocol": "HTTP",
+                "path": "/",
+                "port": 3000,
+                "initialDelaySeconds": 30,
+                "periodSeconds": 10,
+                "timeoutSeconds": 5,
+                "successThreshold": 1,
+                "failureThreshold": 3
+              }
+            ]
+          }
+        },
+        "api": {
+          "kind": "Combined",
+          "spec": {
+            "billing": {
+              "deploymentPlan": "nf-compute-400"
+            },
+            "deployment": {
+              "instances": 1,
+              "docker": {
+                "configType": "default"
+              }
+            },
+            "build": {
+              "type": "dockerfile",
+              "dockerfile": {
+                "content": "",
+                "dockerfilePath": "backend/Dockerfile"
+              }
+            },
+            "ports": [
+              {
+                "name": "http",
+                "internalPort": 8000,
+                "protocol": "HTTP",
+                "public": true,
+                "domains": []
+              }
+            ],
+            "runtimeEnvironment": {
+              "ENV": "production",
+              "PAPER_TRADING": "false",
+              "SUPABASE_URL": "${SUPABASE_URL}",
+              "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}",
+              "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}",
+              "REDIS_URL": "${REDIS_URL}",
+              "COINBASE_API_KEY": "${COINBASE_API_KEY}",
+              "COINBASE_API_SECRET": "${COINBASE_API_SECRET}",
+              "KRAKEN_API_KEY": "${KRAKEN_API_KEY}",
+              "KRAKEN_API_SECRET": "${KRAKEN_API_SECRET}"
+            },
+            "healthChecks": [
+              {
+                "type": "http",
+                "protocol": "HTTP",
+                "path": "/health",
+                "port": 8000,
+                "initialDelaySeconds": 30,
+                "periodSeconds": 10,
+                "timeoutSeconds": 5,
+                "successThreshold": 1,
+                "failureThreshold": 3
+              }
+            ]
+          }
+        }
+      },
+      "addons": {
+        "redis": {
+          "kind": "Addon",
+          "spec": {
+            "type": "redis",
+            "version": "7",
+            "billing": {
+              "deploymentPlan": "nf-compute-200",
+              "storageClass": "ssd",
+              "storage": 2048
+            },
+            "tlsEnabled": true,
+            "externalAccessEnabled": false
+          }
+        }
+      },
+      "jobs": {
+        "db-migrate": {
+          "kind": "Job",
+          "spec": {
+            "billing": {
+              "deploymentPlan": "nf-compute-100"
+            },
+            "docker": {
+              "configType": "customCommand",
+              "customCommand": "python -c 'print(\"Database migrations run via Supabase\")'"
+            },
+            "build": {
+              "type": "dockerfile",
+              "dockerfile": {
+                "dockerfilePath": "backend/Dockerfile"
+              }
+            },
+            "runOnEvents": ["manual"]
+          }
+        }
+      }
+    }
+  },
+  "environments": {
+    "production": {
+      "description": "Production environment for live trading",
+      "variables": {
+        "TRADING_MODE": "us",
+        "PAPER_TRADING": "false",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "staging": {
+      "description": "Staging environment for paper trading tests",
+      "variables": {
+        "TRADING_MODE": "us",
+        "PAPER_TRADING": "true",
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}

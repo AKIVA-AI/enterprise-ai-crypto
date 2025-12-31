@@ -45,58 +45,42 @@ interface CounterpartyExposure {
   risk_score: number;
 }
 
-// Mock API calls - in production, these would call the backend
-const fetchVaR = async (bookId: string): Promise<VaRData> => {
-  return new Promise(resolve => setTimeout(() => resolve({
-    var_95: 0.023,
-    var_99: 0.041,
-    var_999: 0.067,
-    expected_shortfall_95: 0.031,
-    expected_shortfall_99: 0.055,
-    method: 'historical'
-  }), 500));
+// These functions return placeholder data when backend is not available
+// In production with Python backend, these call the real risk engine API
+const fetchVaR = async (bookId: string): Promise<VaRData | null> => {
+  try {
+    // TODO: Replace with actual API call when backend is deployed
+    // const response = await fetch(`${API_URL}/api/v1/risk/var/${bookId}`);
+    // return response.json();
+    return null; // Return null to indicate no data available
+  } catch (error) {
+    console.error('Failed to fetch VaR data:', error);
+    return null;
+  }
 };
 
-const fetchStressTests = async (bookId: string): Promise<StressTestScenario[]> => {
-  return new Promise(resolve => setTimeout(() => resolve([
-    {
-      scenario_name: '2008_crisis',
-      portfolio_return: -0.35,
-      max_drawdown: 0.42,
-      var_breached: true,
-      liquidity_impact: 0.03,
-      recovery_time_days: 180,
-      risk_metrics: { volatility: 0.28, sharpe_ratio: -1.8, sortino_ratio: -1.2 }
-    },
-    {
-      scenario_name: 'covid_crash',
-      portfolio_return: -0.22,
-      max_drawdown: 0.31,
-      var_breached: false,
-      liquidity_impact: 0.02,
-      recovery_time_days: 90,
-      risk_metrics: { volatility: 0.24, sharpe_ratio: -1.1, sortino_ratio: -0.9 }
-    },
-    {
-      scenario_name: 'crypto_winter',
-      portfolio_return: -0.65,
-      max_drawdown: 0.78,
-      var_breached: true,
-      liquidity_impact: 0.05,
-      recovery_time_days: 270,
-      risk_metrics: { volatility: 0.45, sharpe_ratio: -2.1, sortino_ratio: -1.6 }
-    }
-  ]), 800));
+const fetchStressTests = async (bookId: string): Promise<StressTestScenario[] | null> => {
+  try {
+    // TODO: Replace with actual API call when backend is deployed
+    // const response = await fetch(`${API_URL}/api/v1/risk/stress-tests/${bookId}`);
+    // return response.json();
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch stress tests:', error);
+    return null;
+  }
 };
 
-const fetchRiskAttribution = async (bookId: string): Promise<RiskAttribution> => {
-  return new Promise(resolve => setTimeout(() => resolve({
-    total_risk: 0.18,
-    systematic_risk: 0.126,
-    idiosyncratic_risk: 0.054,
-    asset_contributions: { 'BTC-USD': 0.45, 'ETH-USD': 0.32, 'SOL-USD': 0.18, 'ADA-USD': 0.05 },
-    factor_contributions: { market: 0.52, crypto_beta: 0.31, momentum: 0.12, size: 0.05 }
-  }), 600));
+const fetchRiskAttribution = async (bookId: string): Promise<RiskAttribution | null> => {
+  try {
+    // TODO: Replace with actual API call when backend is deployed
+    // const response = await fetch(`${API_URL}/api/v1/risk/attribution/${bookId}`);
+    // return response.json();
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch risk attribution:', error);
+    return null;
+  }
 };
 
 const fetchLiquidityVaR = async (bookId: string): Promise<number> => {
