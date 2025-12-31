@@ -43,7 +43,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, symbol, paperMode = true } = await req.json();
+    // Parse body ONCE - this is critical as the body can only be consumed once in Deno
+    const body = await req.json();
+    const { action, symbol, paperMode = true } = body;
+
+    console.log(`[Funding Arb] Action: ${action}`);
 
     switch (action) {
       case 'scan_funding_opportunities':
@@ -53,13 +57,13 @@ serve(async (req) => {
         return await getFundingHistory(supabase, symbol);
       
       case 'execute_funding_arb':
-        return await executeFundingArb(supabase, await req.json(), paperMode);
+        return await executeFundingArb(supabase, body, paperMode);
       
       case 'get_active_positions':
         return await getActiveFundingPositions(supabase);
       
       case 'close_funding_position':
-        return await closeFundingPosition(supabase, await req.json(), paperMode);
+        return await closeFundingPosition(supabase, body, paperMode);
       
       default:
         return new Response(
