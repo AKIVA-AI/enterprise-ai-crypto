@@ -566,40 +566,58 @@ export type Database = {
       }
       intelligence_signals: {
         Row: {
+          composite_score: number | null
           confidence: number | null
           created_at: string
           direction: string
           expires_at: string | null
+          factor_scores: Json | null
           id: string
           instrument: string
+          is_high_probability: boolean | null
+          product_type: string | null
           reasoning: string | null
           signal_type: string
           source_data: Json | null
           strength: number | null
+          tier: number | null
+          venue: string | null
         }
         Insert: {
+          composite_score?: number | null
           confidence?: number | null
           created_at?: string
           direction: string
           expires_at?: string | null
+          factor_scores?: Json | null
           id?: string
           instrument: string
+          is_high_probability?: boolean | null
+          product_type?: string | null
           reasoning?: string | null
           signal_type: string
           source_data?: Json | null
           strength?: number | null
+          tier?: number | null
+          venue?: string | null
         }
         Update: {
+          composite_score?: number | null
           confidence?: number | null
           created_at?: string
           direction?: string
           expires_at?: string | null
+          factor_scores?: Json | null
           id?: string
           instrument?: string
+          is_high_probability?: boolean | null
+          product_type?: string | null
           reasoning?: string | null
           signal_type?: string
           source_data?: Json | null
           strength?: number | null
+          tier?: number | null
+          venue?: string | null
         }
         Relationships: []
       }
@@ -1446,6 +1464,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tradeable_instruments: {
+        Row: {
+          base_asset: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_us_compliant: boolean
+          last_verified_at: string | null
+          maker_fee: number | null
+          min_order_size: number | null
+          product_type: string
+          quote_asset: string
+          symbol: string
+          taker_fee: number | null
+          tick_size: number | null
+          tier: number
+          updated_at: string
+          venue: string
+          volume_24h: number | null
+        }
+        Insert: {
+          base_asset: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_us_compliant?: boolean
+          last_verified_at?: string | null
+          maker_fee?: number | null
+          min_order_size?: number | null
+          product_type?: string
+          quote_asset?: string
+          symbol: string
+          taker_fee?: number | null
+          tick_size?: number | null
+          tier?: number
+          updated_at?: string
+          venue: string
+          volume_24h?: number | null
+        }
+        Update: {
+          base_asset?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_us_compliant?: boolean
+          last_verified_at?: string | null
+          maker_fee?: number | null
+          min_order_size?: number | null
+          product_type?: string
+          quote_asset?: string
+          symbol?: string
+          taker_fee?: number | null
+          tick_size?: number | null
+          tier?: number
+          updated_at?: string
+          venue?: string
+          volume_24h?: number | null
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
