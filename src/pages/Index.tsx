@@ -40,9 +40,9 @@ export default function Index() {
             <h1 className="text-2xl font-bold">Control Center</h1>
             <p className="text-muted-foreground">Real-time overview of your crypto operations</p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-success/10 border border-success/20">
-            <span className="status-dot status-online" />
-            <span className="text-sm font-medium text-success">All Systems Operational</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-success/10 border border-success/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            <span className="text-xs font-medium text-success">All Systems Operational</span>
           </div>
         </div>
 
