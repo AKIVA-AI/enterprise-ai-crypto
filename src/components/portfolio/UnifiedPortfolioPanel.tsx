@@ -49,17 +49,12 @@ export function UnifiedPortfolioPanel() {
             {portfolio.priceConnectionStatus === 'connected' ? (
               <Badge variant="outline" className="text-[10px] h-5 border-success text-success gap-1">
                 <Wifi className="h-2.5 w-2.5" />
-                Live Prices
-              </Badge>
-            ) : portfolio.priceConnectionStatus === 'connecting' ? (
-              <Badge variant="outline" className="text-[10px] h-5 border-warning text-warning gap-1 animate-pulse">
-                <Wifi className="h-2.5 w-2.5" />
-                Connecting...
+                Live
               </Badge>
             ) : (
-              <Badge variant="outline" className="text-[10px] h-5 border-muted-foreground text-muted-foreground gap-1">
+              <Badge variant="outline" className="text-[10px] h-5 border-muted-foreground/50 text-muted-foreground gap-1">
                 <WifiOff className="h-2.5 w-2.5" />
-                Offline
+                Static
               </Badge>
             )}
             {portfolio.hasRealData ? (

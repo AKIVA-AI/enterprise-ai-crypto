@@ -15,25 +15,22 @@ import {
   AlertTriangle,
   Loader2,
   User,
-  Lightbulb,
   PanelRightClose,
   PanelRightOpen,
   RotateCcw,
-  Activity,
-  Zap,
-  Brain,
   Maximize2,
   Minimize2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useLocation } from 'react-router-dom';
 
-const QUICK_PROMPTS = [
-  { label: 'Market Analysis', prompt: 'Give me a quick analysis of current market conditions.', icon: Activity },
-  { label: 'Trading Ideas', prompt: 'What are the best trading opportunities right now?', icon: Zap },
-  { label: 'Risk Assessment', prompt: 'What key risks should I monitor?', icon: AlertTriangle },
-  { label: 'BTC Outlook', prompt: 'What is the Bitcoin outlook based on latest data?', icon: TrendingUp },
-  { label: 'Strategy Status', prompt: 'Status update on active strategies.', icon: Brain },
+// Simple suggestion chips that populate the input
+const SUGGESTIONS = [
+  'Market overview',
+  'BTC analysis',
+  'Risk check',
+  'Top opportunities',
+  'Portfolio review',
 ];
 
 interface AICopilotSidebarProps {
@@ -57,7 +54,6 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
   } = useTradingCopilot();
 
   // Sidebar width based on expanded state
-  const sidebarWidth = isExpanded ? 'w-[520px]' : 'w-[380px]';
   const sidebarWidthPx = isExpanded ? 520 : 380;
 
   // Auto-scroll to bottom on new messages
@@ -102,18 +98,14 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
       context,
     });
     setInput('');
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
   };
 
-  const handleQuickPrompt = (prompt: string) => {
-    const context = getContextFromRoute();
-    sendMessage({
-      message: prompt,
-      context,
-    });
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion);
+    textareaRef.current?.focus();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -132,7 +124,7 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
     return variants[risk] || variants.moderate;
   };
 
-  // Collapsed state - just show toggle button
+  // Collapsed state
   if (!isOpen) {
     return (
       <div className="fixed right-0 top-1/2 -translate-y-1/2 z-30">
@@ -155,10 +147,7 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
 
   return (
     <aside
-      className={cn(
-        'fixed right-0 top-0 z-40 h-screen bg-background border-l border-border flex flex-col shadow-xl transition-all duration-300',
-        sidebarWidth
-      )}
+      className="fixed right-0 top-0 z-40 h-screen bg-background border-l border-border flex flex-col shadow-xl transition-all duration-300"
       style={{ width: sidebarWidthPx }}
     >
       {/* Header */}
@@ -170,8 +159,8 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
           <div>
             <h2 className="font-semibold text-sm">Crypto CoPilot</h2>
             <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              <span className="text-[10px] text-muted-foreground">Online</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              <span className="text-[10px] text-muted-foreground">Ready</span>
             </div>
           </div>
         </div>
@@ -217,40 +206,14 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
       {/* Messages Area */}
       <ScrollArea ref={scrollRef} className="flex-1 p-4">
         {messages.length === 0 ? (
-          <div className="space-y-6">
-            {/* Welcome */}
-            <div className="text-center py-8">
-              <div className="h-14 w-14 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 shadow-lg">
-                <Sparkles className="h-7 w-7 text-primary" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Crypto CoPilot</h3>
-              <p className="text-sm text-muted-foreground max-w-[300px] mx-auto leading-relaxed">
-                Real-time market intelligence and trading insights powered by AI
-              </p>
+          <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-5 shadow-lg">
+              <Sparkles className="h-8 w-8 text-primary" />
             </div>
-
-            {/* Quick prompts */}
-            <div className="space-y-3">
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium flex items-center gap-1.5 px-1">
-                <Lightbulb className="h-3 w-3" />
-                Quick Actions
-              </p>
-              <div className="grid grid-cols-1 gap-1.5">
-                {QUICK_PROMPTS.map((item) => (
-                  <Button
-                    key={item.label}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleQuickPrompt(item.prompt)}
-                    disabled={isSending}
-                    className="w-full justify-start text-left h-11 px-3 text-sm font-normal hover:bg-muted/60 rounded-lg"
-                  >
-                    <item.icon className="h-4 w-4 mr-3 text-muted-foreground" />
-                    {item.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <h3 className="font-semibold text-lg mb-2">Crypto CoPilot</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-[280px] leading-relaxed">
+              Ask me about market conditions, trading strategies, risk analysis, or portfolio insights.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -277,7 +240,6 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
                 >
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
 
-                  {/* Insights for assistant */}
                   {msg.role === 'assistant' && msg.insights && (
                     <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/30">
                       {msg.insights.suggested_actions.map((action) => (
@@ -332,12 +294,27 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
         )}
       </ScrollArea>
 
-      {/* Input Area - Larger, Lovable-style */}
-      <div className="p-4 border-t border-border shrink-0 bg-card/80 backdrop-blur-sm">
+      {/* Input Area */}
+      <div className="p-4 border-t border-border shrink-0 bg-card/80 backdrop-blur-sm space-y-3">
+        {/* Suggestion chips - only when input is empty and no messages */}
+        {!input && messages.length === 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {SUGGESTIONS.map((suggestion) => (
+              <button
+                key={suggestion}
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="px-2.5 py-1 text-xs rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="relative">
           <Textarea
             ref={textareaRef}
-            placeholder="Ask about markets, strategies, risk assessment..."
+            placeholder="Ask about markets, strategies, risk..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
@@ -358,8 +335,8 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
             )}
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Press Enter to send • Shift+Enter for new line
+        <p className="text-[10px] text-muted-foreground text-center">
+          Enter to send • Shift+Enter for new line
         </p>
       </div>
     </aside>
