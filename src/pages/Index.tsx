@@ -10,6 +10,7 @@ import { RealtimePnLTracker } from '@/components/trading/RealtimePnLTracker';
 import { UnifiedPortfolioPanel } from '@/components/portfolio/UnifiedPortfolioPanel';
 import { MobileDashboard } from '@/components/mobile/MobileDashboard';
 import { MarketPulseWidget } from '@/components/intelligence/MarketPulseWidget';
+import { OpportunityScannerPanel } from '@/components/intelligence/OpportunityScannerPanel';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDashboardRealtime } from '@/hooks/useRealtimeSubscriptions';
 import { useTradingShortcuts } from '@/hooks/useTradingShortcuts';
@@ -99,8 +100,11 @@ export default function Index() {
             <AgentStatusGrid />
           </div>
 
-          {/* Right column - portfolio, risk, and events */}
+          {/* Right column - opportunities, portfolio, risk, and events */}
           <div className="space-y-6">
+            {/* Opportunity Scanner - High Probability Trades */}
+            <OpportunityScannerPanel compact />
+
             {/* Unified Portfolio */}
             <UnifiedPortfolioPanel />
 
