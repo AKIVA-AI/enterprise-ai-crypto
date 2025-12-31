@@ -45,71 +45,71 @@ export default function Launch() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="space-y-5">
+        {/* Header - more subtle */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Rocket className="h-7 w-7 text-primary" />
+            <h1 className="text-xl font-semibold flex items-center gap-2">
+              <Rocket className="h-5 w-5 text-primary" />
               Meme Ventures
             </h1>
-            <p className="text-muted-foreground">Pipeline management & go/no-go workflow</p>
+            <p className="text-sm text-muted-foreground">Pipeline management & go/no-go workflow</p>
           </div>
-          <div className="flex items-center gap-3">
-            {/* View toggle */}
-            <div className="flex border border-border rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2">
+            {/* View toggle - smaller */}
+            <div className="flex border border-border rounded-md overflow-hidden">
               <button
                 onClick={() => setViewMode('pipeline')}
-                className={`p-2 transition-colors ${viewMode === 'pipeline' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
+                className={`p-1.5 transition-colors ${viewMode === 'pipeline' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 hover:bg-muted'}`}
               >
-                <Columns3 className="h-4 w-4" />
+                <Columns3 className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
+                className={`p-1.5 transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 hover:bg-muted'}`}
               >
-                <LayoutGrid className="h-4 w-4" />
+                <LayoutGrid className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
+            <Button size="sm" className="gap-1.5 h-8">
+              <Plus className="h-3.5 w-3.5" />
               New Project
             </Button>
           </div>
         </div>
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="glass-panel rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-chart-4/20">
-                <AlertCircle className="h-5 w-5 text-chart-4" />
+        {/* Stats Row - more compact */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="glass-panel rounded-lg p-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-chart-4/15">
+                <AlertCircle className="h-4 w-4 text-chart-4" />
               </div>
               <div>
-                <p className="text-2xl font-bold font-mono">{opportunityCount}</p>
-                <p className="text-sm text-muted-foreground">Opportunities</p>
+                <p className="text-xl font-semibold font-mono">{opportunityCount}</p>
+                <p className="text-xs text-muted-foreground">Opportunities</p>
               </div>
             </div>
           </div>
-          <div className="glass-panel rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-warning/20">
-                <Clock className="h-5 w-5 text-warning" />
+          <div className="glass-panel rounded-lg p-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-warning/15">
+                <Clock className="h-4 w-4 text-warning" />
               </div>
               <div>
-                <p className="text-2xl font-bold font-mono">{buildCount}</p>
-                <p className="text-sm text-muted-foreground">In Build</p>
+                <p className="text-xl font-semibold font-mono">{buildCount}</p>
+                <p className="text-xs text-muted-foreground">In Build</p>
               </div>
             </div>
           </div>
-          <div className="glass-panel rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-success/20">
-                <CheckCircle2 className="h-5 w-5 text-success" />
+          <div className="glass-panel rounded-lg p-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-success/15">
+                <CheckCircle2 className="h-4 w-4 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold font-mono">{launchedCount}</p>
-                <p className="text-sm text-muted-foreground">Launched</p>
+                <p className="text-xl font-semibold font-mono">{launchedCount}</p>
+                <p className="text-xs text-muted-foreground">Launched</p>
               </div>
             </div>
           </div>
