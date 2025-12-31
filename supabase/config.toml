@@ -62,3 +62,12 @@ verify_jwt = false
 
 [functions.ai-trading-copilot]
 verify_jwt = false
+
+[functions.external-signals]
+verify_jwt = false
+
+[functions.tradingview-webhook]
+verify_jwt = false
+
+[functions.real-news-feed]
+verify_jwt = false
