@@ -135,18 +135,18 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
   }
 
   return (
-    <aside className="fixed right-0 top-0 z-40 h-screen w-80 bg-background border-l border-border flex flex-col shadow-xl">
-      {/* Header */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-border shrink-0">
+    <aside className="fixed right-0 top-0 z-40 h-screen w-[360px] bg-background border-l border-border flex flex-col shadow-xl">
+      {/* Header - more compact */}
+      <div className="flex items-center justify-between h-14 px-4 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary" />
+          <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Bot className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm">Crypto CoPilot</h2>
+            <h2 className="font-medium text-sm">Crypto CoPilot</h2>
             <div className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              <span className="text-xs text-muted-foreground">Online</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              <span className="text-[10px] text-muted-foreground">Online</span>
             </div>
           </div>
         </div>
@@ -179,25 +179,25 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
       {/* Messages Area */}
       <ScrollArea ref={scrollRef} className="flex-1 p-4">
         {messages.length === 0 ? (
-          <div className="space-y-4">
-            {/* Welcome */}
-            <div className="text-center py-6">
-              <div className="h-14 w-14 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                <Sparkles className="h-7 w-7 text-primary" />
+          <div className="space-y-6">
+            {/* Welcome - more spacious */}
+            <div className="text-center py-8">
+              <div className="h-12 w-12 mx-auto rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                <Sparkles className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold text-lg mb-1">Crypto CoPilot</h3>
-              <p className="text-sm text-muted-foreground">
-                Real-time market intelligence, analysis, and trading insights.
+              <h3 className="font-medium text-base mb-1">Crypto CoPilot</h3>
+              <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
+                Real-time market intelligence and trading insights
               </p>
             </div>
 
-            {/* Quick prompts */}
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium flex items-center gap-1.5 px-1">
+            {/* Quick prompts - cleaner styling */}
+            <div className="space-y-3">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium flex items-center gap-1.5 px-1">
                 <Lightbulb className="h-3 w-3" />
                 Quick Actions
               </p>
-              <div className="space-y-1.5">
+              <div className="grid grid-cols-1 gap-1">
                 {QUICK_PROMPTS.map((item) => (
                   <Button
                     key={item.label}
@@ -205,9 +205,9 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
                     variant="ghost"
                     onClick={() => handleQuickPrompt(item.prompt)}
                     disabled={isSending}
-                    className="w-full justify-start text-left h-auto py-2.5 px-3 text-sm font-normal hover:bg-muted/80"
+                    className="w-full justify-start text-left h-10 px-3 text-sm font-normal hover:bg-muted/60 rounded-lg"
                   >
-                    <item.icon className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <item.icon className="h-3.5 w-3.5 mr-2.5 text-muted-foreground" />
                     {item.label}
                   </Button>
                 ))}
@@ -225,8 +225,8 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
                 )}
               >
                 {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="h-4 w-4 text-primary" />
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Bot className="h-3.5 w-3.5 text-primary" />
                   </div>
                 )}
                 <div
@@ -270,22 +270,22 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
                   </span>
                 </div>
                 {msg.role === 'user' && (
-                  <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <User className="h-4 w-4 text-primary-foreground" />
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                    <User className="h-3.5 w-3.5 text-primary-foreground" />
                   </div>
                 )}
               </div>
             ))}
 
             {isTyping && (
-              <div className="flex gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Bot className="h-4 w-4 text-primary" />
+              <div className="flex gap-2">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Bot className="h-3.5 w-3.5 text-primary" />
                 </div>
-                <div className="bg-muted rounded-xl rounded-bl-md p-3">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-sm text-muted-foreground">Analyzing...</span>
+                <div className="bg-muted rounded-xl rounded-bl-sm px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">Analyzing...</span>
                   </div>
                 </div>
               </div>
@@ -294,8 +294,8 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
         )}
       </ScrollArea>
 
-      {/* Input Area */}
-      <div className="p-3 border-t border-border shrink-0 bg-muted/30">
+      {/* Input Area - cleaner */}
+      <div className="p-3 border-t border-border shrink-0 bg-card/50">
         <div className="flex gap-2">
           <Input
             ref={inputRef}
@@ -304,13 +304,13 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
             disabled={isSending}
-            className="flex-1 bg-background"
+            className="flex-1 bg-background h-9 text-sm"
           />
-          <Button onClick={handleSend} disabled={!input.trim() || isSending} size="icon">
-            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <Button onClick={handleSend} disabled={!input.trim() || isSending} size="sm" className="h-9 w-9 p-0">
+            {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 text-center">
+        <p className="text-[10px] text-muted-foreground mt-2 text-center">
           Powered by real-time market intelligence
         </p>
       </div>

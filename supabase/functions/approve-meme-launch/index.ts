@@ -71,17 +71,17 @@ serve(async (req) => {
       go_no_go_approved: currentProject.go_no_go_approved 
     };
 
-    // Validate stage - must be in due_diligence to approve
-    if (approved && currentProject.stage !== 'due_diligence') {
+    // Validate stage - must be in 'build' stage to approve (matches DB enum)
+    if (approved && currentProject.stage !== 'build') {
       return new Response(JSON.stringify({ 
-        error: `Cannot approve project in ${currentProject.stage} stage. Must be in due_diligence.` 
+        error: `Cannot approve project in ${currentProject.stage} stage. Must be in 'build' stage.` 
       }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const timestamp = new Date().toISOString();
-    const newStage = approved ? 'approved' : 'closed';
+    const newStage = approved ? 'launch' : 'completed'; // 'launch' for approved, 'completed' for rejected
 
     // Update project
     const { data: updatedProject, error: updateError } = await supabaseClient

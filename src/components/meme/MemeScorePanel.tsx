@@ -31,22 +31,22 @@ function ScoreCard({ icon: Icon, label, value, maxValue = 100, suffix = '', inve
   const colors = getColor(percentage);
 
   return (
-    <div className={cn('glass-panel rounded-lg p-4', colors.bg.replace('/20', '/5'))}>
+    <div className={cn('glass-panel rounded-lg p-3', colors.bg.replace('/20', '/5'))}>
       <div className="flex items-center gap-2 mb-2">
-        <div className={cn('p-2 rounded-lg', colors.bg)}>
-          <Icon className={cn('h-4 w-4', colors.text)} />
+        <div className={cn('p-1.5 rounded-md', colors.bg)}>
+          <Icon className={cn('h-3.5 w-3.5', colors.text)} />
         </div>
-        <span className="text-sm font-medium text-foreground">{label}</span>
+        <span className="text-xs font-medium text-foreground">{label}</span>
       </div>
-      <div className="flex items-baseline gap-1 mb-2">
-        <span className={cn('text-3xl font-mono font-bold', colors.text)}>
+      <div className="flex items-baseline gap-1 mb-1.5">
+        <span className={cn('text-2xl font-mono font-semibold', colors.text)}>
           {value.toFixed(0)}
         </span>
-        <span className="text-muted-foreground text-sm">{suffix || `/ ${maxValue}`}</span>
+        <span className="text-muted-foreground text-xs">{suffix || `/ ${maxValue}`}</span>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-2">
+      <div className="h-1 bg-muted/50 rounded-full overflow-hidden mb-2">
         <div 
-          className={cn('h-full transition-all duration-500', colors.bar)} 
+          className={cn('h-full transition-all duration-500 ease-out', colors.bar)} 
           style={{ width: `${percentage * 100}%` }} 
         />
       </div>
@@ -57,13 +57,13 @@ function ScoreCard({ icon: Icon, label, value, maxValue = 100, suffix = '', inve
 
 export function MemeScorePanel({ project }: MemeScorePanelProps) {
   return (
-    <div className="space-y-4">
-      <h3 className="font-semibold text-foreground flex items-center gap-2">
-        <TrendingUp className="h-5 w-5 text-primary" />
+    <div className="space-y-3">
+      <h3 className="font-medium text-sm text-foreground flex items-center gap-2">
+        <TrendingUp className="h-4 w-4 text-primary" />
         Project Scores
       </h3>
       
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <ScoreCard
           icon={TrendingUp}
           label="Viral Score"
