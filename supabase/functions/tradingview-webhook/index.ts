@@ -15,7 +15,7 @@ interface TradingViewAlert {
   
   // Custom fields from alert message
   instrument?: string;
-  action?: 'buy' | 'sell' | 'close' | 'neutral';
+  action?: 'buy' | 'sell' | 'close' | 'neutral' | 'long' | 'short';
   price?: number;
   strategy?: string;
   
@@ -43,6 +43,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -58,7 +60,7 @@ serve(async (req) => {
     try {
       alert = JSON.parse(alertText);
     } catch {
-      // Parse plain text format: "BTCUSDT buy 50000 strength=0.8"
+      // Parse plain text format
       alert = parseTextAlert(alertText);
     }
 
@@ -66,8 +68,22 @@ serve(async (req) => {
 
     // Validate webhook secret if configured
     const headerSecret = req.headers.get('x-tv-secret');
-    if (webhookSecret && webhookSecret !== (alert.secret || headerSecret)) {
-      console.error('[tradingview-webhook] Invalid secret');
+    const providedSecret = alert.secret || headerSecret;
+    
+    if (webhookSecret && webhookSecret !== providedSecret) {
+      console.error('[tradingview-webhook] Invalid secret provided');
+      
+      // Log failed attempt
+      await supabase.from('audit_events').insert({
+        action: 'tradingview_auth_failed',
+        resource_type: 'external_signal',
+        severity: 'warning',
+        after_state: { 
+          alert_ticker: alert.ticker,
+          ip: req.headers.get('x-forwarded-for') || 'unknown',
+        },
+      });
+      
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid webhook secret' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
@@ -85,14 +101,14 @@ serve(async (req) => {
 
     // Map TradingView action to our signal direction
     const direction = mapActionToDirection(alert.action);
-    const signalType = alert.signal_type || alert.indicator || alert.strategy || 'tradingview';
-    const strength = alert.strength || 0.7;
-    const confidence = alert.confidence || 0.6;
+    const signalType = alert.signal_type || alert.indicator || alert.strategy || 'tradingview_custom';
+    const strength = Math.min(1, Math.max(0, alert.strength || 0.7));
+    const confidence = Math.min(1, Math.max(0, alert.confidence || 0.65));
 
     // Create intelligence signal
     const signal = {
       instrument,
-      signal_type: signalType,
+      signal_type: `tradingview_${signalType}`,
       direction,
       strength,
       confidence,
@@ -105,10 +121,13 @@ serve(async (req) => {
         take_profit: alert.take_profit,
         position_size_pct: alert.position_size_pct,
         comment: alert.comment,
+        strategy: alert.strategy,
+        indicator: alert.indicator,
         raw_time: alert.time,
+        processing_ms: Date.now() - startTime,
       },
-      reasoning: `TradingView alert: ${alert.strategy || 'Custom Alert'} on ${instrument}. ${alert.comment || ''}`,
-      expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hour expiry
+      reasoning: buildReasoning(alert, instrument, direction),
+      expires_at: calculateExpiry(alert.interval),
       created_at: new Date().toISOString(),
     };
 
@@ -127,7 +146,7 @@ serve(async (req) => {
     console.log('[tradingview-webhook] Signal created:', insertedSignal.id);
 
     // If action is buy/sell with sufficient confidence, create a trade intent
-    if ((alert.action === 'buy' || alert.action === 'sell') && confidence >= 0.6) {
+    if ((alert.action === 'buy' || alert.action === 'sell' || alert.action === 'long' || alert.action === 'short') && confidence >= 0.6) {
       await createTradeIntent(supabase, alert, instrument, direction, confidence);
     }
 
@@ -137,7 +156,13 @@ serve(async (req) => {
       resource_type: 'external_signal',
       resource_id: insertedSignal.id,
       severity: 'info',
-      after_state: { signal, alert },
+      after_state: { 
+        signal_id: insertedSignal.id,
+        instrument,
+        direction,
+        strategy: alert.strategy,
+        processing_ms: Date.now() - startTime,
+      },
     });
 
     return new Response(
@@ -146,7 +171,10 @@ serve(async (req) => {
         signal_id: insertedSignal.id,
         instrument,
         direction,
-        message: `Signal received for ${instrument}: ${direction}`
+        strength,
+        confidence,
+        message: `TradingView signal received for ${instrument}: ${direction}`,
+        processing_ms: Date.now() - startTime,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -162,17 +190,44 @@ serve(async (req) => {
 });
 
 function parseTextAlert(text: string): TradingViewAlert {
-  // Parse format: "BTCUSDT buy 50000 strength=0.8 sl=49000 tp=52000"
-  const parts = text.trim().split(/\s+/);
+  // Parse multiple formats:
+  // Format 1: "BTCUSDT buy 50000 strength=0.8 sl=49000 tp=52000"
+  // Format 2: "BTC/USD,long,43500,strategy=momentum"
+  // Format 3: JSON-like but malformed
+  
   const alert: TradingViewAlert = {};
-
+  const cleanText = text.trim();
+  
+  // Try comma-separated format first
+  if (cleanText.includes(',')) {
+    const parts = cleanText.split(',').map(p => p.trim());
+    if (parts.length >= 1) alert.ticker = parts[0];
+    if (parts.length >= 2) {
+      const action = parts[1].toLowerCase();
+      if (['buy', 'sell', 'long', 'short', 'close', 'neutral'].includes(action)) {
+        alert.action = action as any;
+      }
+    }
+    if (parts.length >= 3 && !isNaN(parseFloat(parts[2]))) {
+      alert.price = parseFloat(parts[2]);
+    }
+    // Parse remaining key=value pairs
+    for (const part of parts.slice(3)) {
+      parseKeyValue(part, alert);
+    }
+    return alert;
+  }
+  
+  // Space-separated format
+  const parts = cleanText.split(/\s+/);
+  
   if (parts.length >= 1) {
     alert.ticker = parts[0];
   }
   if (parts.length >= 2) {
     const action = parts[1].toLowerCase();
-    if (['buy', 'sell', 'close', 'neutral'].includes(action)) {
-      alert.action = action as 'buy' | 'sell' | 'close' | 'neutral';
+    if (['buy', 'sell', 'long', 'short', 'close', 'neutral'].includes(action)) {
+      alert.action = action as any;
     }
   }
   if (parts.length >= 3 && !isNaN(parseFloat(parts[2]))) {
@@ -181,73 +236,95 @@ function parseTextAlert(text: string): TradingViewAlert {
 
   // Parse key=value pairs
   for (const part of parts.slice(3)) {
-    const [key, value] = part.split('=');
-    if (key && value) {
-      switch (key.toLowerCase()) {
-        case 'strength':
-          alert.strength = parseFloat(value);
-          break;
-        case 'confidence':
-          alert.confidence = parseFloat(value);
-          break;
-        case 'sl':
-        case 'stoploss':
-        case 'stop_loss':
-          alert.stop_loss = parseFloat(value);
-          break;
-        case 'tp':
-        case 'takeprofit':
-        case 'take_profit':
-          alert.take_profit = parseFloat(value);
-          break;
-        case 'size':
-        case 'position_size':
-          alert.position_size_pct = parseFloat(value);
-          break;
-        case 'strategy':
-          alert.strategy = value;
-          break;
-        case 'comment':
-          alert.comment = value;
-          break;
-        case 'secret':
-          alert.secret = value;
-          break;
-      }
-    }
+    parseKeyValue(part, alert);
   }
 
   return alert;
 }
 
+function parseKeyValue(part: string, alert: TradingViewAlert): void {
+  const [key, value] = part.split('=');
+  if (!key || !value) return;
+  
+  switch (key.toLowerCase()) {
+    case 'strength':
+    case 's':
+      alert.strength = parseFloat(value);
+      break;
+    case 'confidence':
+    case 'c':
+      alert.confidence = parseFloat(value);
+      break;
+    case 'sl':
+    case 'stoploss':
+    case 'stop_loss':
+      alert.stop_loss = parseFloat(value);
+      break;
+    case 'tp':
+    case 'takeprofit':
+    case 'take_profit':
+      alert.take_profit = parseFloat(value);
+      break;
+    case 'size':
+    case 'position_size':
+    case 'pct':
+      alert.position_size_pct = parseFloat(value);
+      break;
+    case 'strategy':
+    case 'strat':
+      alert.strategy = value;
+      break;
+    case 'indicator':
+    case 'ind':
+      alert.indicator = value;
+      break;
+    case 'timeframe':
+    case 'tf':
+    case 'interval':
+      alert.timeframe = value;
+      break;
+    case 'comment':
+    case 'msg':
+      alert.comment = value;
+      break;
+    case 'secret':
+      alert.secret = value;
+      break;
+  }
+}
+
 function normalizeInstrument(ticker: string): string {
   if (!ticker) return '';
   
-  // Common conversions
-  const normalized = ticker.toUpperCase()
+  // Clean up common ticker formats
+  let normalized = ticker.toUpperCase()
+    .replace(/[\/\-_]/g, '') // Remove separators first for processing
     .replace('PERP', '')
     .replace('PERPETUAL', '')
     .replace('.P', '')
+    .replace('1000', '') // Handle Binance 1000PEPE etc
     .trim();
 
-  // Convert BTCUSDT to BTC-USDT format
-  const usdtMatch = normalized.match(/^([A-Z]+)(USDT?)$/);
-  if (usdtMatch) {
-    return `${usdtMatch[1]}-USDT`;
+  // Known quote currencies
+  const quotes = ['USDT', 'USDC', 'USD', 'BUSD', 'EUR', 'BTC', 'ETH'];
+  
+  for (const quote of quotes) {
+    if (normalized.endsWith(quote) && normalized.length > quote.length) {
+      const base = normalized.slice(0, -quote.length);
+      return `${base}-${quote === 'BUSD' ? 'USDT' : quote}`;
+    }
   }
 
-  const usdMatch = normalized.match(/^([A-Z]+)(USD)$/);
-  if (usdMatch) {
-    return `${usdMatch[1]}-USD`;
+  // If already formatted with separator, just normalize
+  if (ticker.includes('/') || ticker.includes('-')) {
+    const [base, quote] = ticker.toUpperCase().split(/[\/\-]/);
+    if (base && quote) {
+      return `${base}-${quote === 'BUSD' ? 'USDT' : quote}`;
+    }
   }
 
-  // If already has dash, return as-is
-  if (normalized.includes('-')) {
-    return normalized;
-  }
-
-  // Default: assume USD pair
-  return `${normalized}-USD`;
+  // Default: assume USDT pair
+  return `${normalized}-USDT`;
 }
 
 function mapActionToDirection(action?: string): string {
@@ -266,6 +343,54 @@ function mapActionToDirection(action?: string): string {
   }
 }
 
+function buildReasoning(alert: TradingViewAlert, instrument: string, direction: string): string {
+  const parts: string[] = [];
+  
+  if (alert.strategy) {
+    parts.push(`Strategy: ${alert.strategy}`);
+  } else if (alert.indicator) {
+    parts.push(`Indicator: ${alert.indicator}`);
+  } else {
+    parts.push('TradingView Custom Alert');
+  }
+  
+  parts.push(`${direction.toUpperCase()} signal on ${instrument}`);
+  
+  if (alert.price) {
+    parts.push(`@ $${alert.price.toLocaleString()}`);
+  }
+  
+  if (alert.timeframe || alert.interval) {
+    parts.push(`(${alert.timeframe || alert.interval})`);
+  }
+  
+  if (alert.comment) {
+    parts.push(`- ${alert.comment}`);
+  }
+  
+  return parts.join(' ');
+}
+
+function calculateExpiry(interval?: string): string {
+  // Set expiry based on timeframe
+  const intervalMinutes: Record<string, number> = {
+    '1': 15,
+    '5': 30,
+    '15': 60,
+    '30': 120,
+    '60': 240,
+    '1h': 240,
+    '4h': 480,
+    '1d': 1440,
+    'd': 1440,
+    '1w': 10080,
+    'w': 10080,
+  };
+  
+  const minutes = intervalMinutes[interval?.toLowerCase() || ''] || 240; // Default 4 hours
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+}
+
 async function createTradeIntent(
   supabase: any,
   alert: TradingViewAlert,
@@ -274,25 +399,37 @@ async function createTradeIntent(
   confidence: number
 ) {
   try {
-    // Get the first active book for external signals
-    const { data: book } = await supabase
+    // Get the first active PROP book for external signals
+    let { data: book } = await supabase
       .from('books')
-      .select('id')
+      .select('id, capital_allocated')
       .eq('status', 'active')
-      .eq('type', 'prop')
+      .eq('type', 'PROP')
       .limit(1)
       .single();
+
+    if (!book) {
+      // Try any active book
+      const { data: anyBook } = await supabase
+        .from('books')
+        .select('id, capital_allocated')
+        .eq('status', 'active')
+        .limit(1)
+        .single();
+      book = anyBook;
+    }
 
     if (!book) {
       console.log('[tradingview-webhook] No active book found for trade intent');
       return;
     }
 
-    // Get or create external signal strategy
+    // Get or create external signals strategy
     let { data: strategy } = await supabase
       .from('strategies')
       .select('id')
-      .eq('name', 'external_signals')
+      .eq('name', 'TradingView Signals')
+      .eq('book_id', book.id)
       .limit(1)
       .single();
 
@@ -300,28 +437,40 @@ async function createTradeIntent(
       const { data: newStrategy } = await supabase
         .from('strategies')
         .insert({
-          name: 'external_signals',
+          name: 'TradingView Signals',
           book_id: book.id,
-          timeframe: '1h',
+          timeframe: alert.timeframe || alert.interval || '1h',
           status: 'paper',
           asset_class: 'crypto',
-          config_metadata: { source: 'tradingview' },
+          config_metadata: { 
+            source: 'tradingview',
+            auto_created: true,
+          },
+          venue_scope: ['coinbase', 'binance', 'kraken'],
         })
         .select()
         .single();
       strategy = newStrategy;
     }
 
-    if (!strategy) return;
+    if (!strategy) {
+      console.log('[tradingview-webhook] Could not create strategy');
+      return;
+    }
 
     // Calculate position sizing
-    const defaultExposure = 5000; // $5k default
-    const positionSizePct = alert.position_size_pct || 2; // 2% of portfolio
-    const targetExposure = Math.min(defaultExposure, 100000 * (positionSizePct / 100));
+    const portfolioValue = book.capital_allocated || 100000;
+    const positionSizePct = alert.position_size_pct || 2; // Default 2% of portfolio
+    const targetExposure = Math.min(portfolioValue * (positionSizePct / 100), 10000); // Cap at $10k
     
     // Calculate stop loss
     const price = alert.price || 0;
-    const stopLossPct = alert.stop_loss ? Math.abs((alert.stop_loss - price) / price) : 0.02;
+    let stopLossPct = 0.02; // Default 2%
+    
+    if (alert.stop_loss && price) {
+      stopLossPct = Math.abs((alert.stop_loss - price) / price);
+    }
+    
     const maxLoss = targetExposure * stopLossPct;
 
     // Create trade intent
@@ -331,33 +480,52 @@ async function createTradeIntent(
       instrument,
       direction: direction === 'bullish' ? 'buy' : 'sell',
       target_exposure_usd: targetExposure,
-      max_loss_usd: maxLoss,
+      max_loss_usd: Math.max(maxLoss, 50), // Minimum $50 max loss
       confidence,
-      horizon_minutes: 240, // 4 hours default
+      horizon_minutes: getHorizonMinutes(alert.interval || alert.timeframe),
       invalidation_price: alert.stop_loss,
       liquidity_requirement: 'normal',
       status: 'pending',
       metadata: {
         source: 'tradingview',
         strategy: alert.strategy,
+        indicator: alert.indicator,
         entry_price: alert.price,
         stop_loss: alert.stop_loss,
         take_profit: alert.take_profit,
         comment: alert.comment,
+        timeframe: alert.interval || alert.timeframe,
       },
     };
 
-    const { error: intentError } = await supabase
+    const { data: createdIntent, error: intentError } = await supabase
       .from('trade_intents')
-      .insert(intent);
+      .insert(intent)
+      .select()
+      .single();
 
     if (intentError) {
       console.error('[tradingview-webhook] Intent creation error:', intentError);
     } else {
-      console.log('[tradingview-webhook] Trade intent created for', instrument);
+      console.log('[tradingview-webhook] Trade intent created:', createdIntent.id);
     }
 
   } catch (error) {
     console.error('[tradingview-webhook] Error creating trade intent:', error);
   }
+}
+
+function getHorizonMinutes(interval?: string): number {
+  const horizons: Record<string, number> = {
+    '1': 15,
+    '5': 60,
+    '15': 120,
+    '30': 240,
+    '60': 480,
+    '1h': 480,
+    '4h': 960,
+    '1d': 2880,
+    'd': 2880,
+  };
+  return horizons[interval?.toLowerCase() || ''] || 240;
 }
