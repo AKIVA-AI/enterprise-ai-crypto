@@ -34,33 +34,8 @@ export function PnLChart() {
   const [showVolatility, setShowVolatility] = useState(true);
 
   const chartData = useMemo(() => {
-    // Generate data with volatility overlay
-    const now = new Date();
-    const data: PnLDataPoint[] = [];
-    let cumulative = 0;
-    
-    for (let i = 23; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-      const baseVol = 10 + Math.sin(i / 4) * 8;
-      const volatility = baseVol + (Math.random() - 0.5) * 5;
-      const pnl = (Math.random() - 0.45) * (1000 + volatility * 100);
-      cumulative += pnl;
-      
-      let regime: 'trending' | 'ranging' | 'volatile' = 'ranging';
-      if (volatility > 15) regime = 'volatile';
-      else if (Math.abs(pnl) > 2000) regime = 'trending';
-      
-      data.push({
-        time: time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        pnl: Math.round(pnl),
-        cumulative: Math.round(cumulative),
-        volatility: Math.round(volatility * 10) / 10,
-        regime,
-      });
-    }
-
+    // Use real position data if available
     if (positions?.length) {
-      // Use real position data if available
       const hourlyData: Record<string, { pnl: number; count: number }> = {};
       
       positions.forEach(pos => {
@@ -77,7 +52,13 @@ export function PnLChart() {
       });
 
       let realCumulative = 0;
-      return Object.entries(hourlyData).map(([time, { pnl, count }]) => {
+      const entries = Object.entries(hourlyData);
+      
+      if (entries.length === 0) {
+        return [];
+      }
+      
+      return entries.map(([time, { pnl, count }]) => {
         realCumulative += pnl;
         const volatility = Math.abs(pnl) / (count || 1) / 100;
         return { 
@@ -90,12 +71,31 @@ export function PnLChart() {
       });
     }
 
-    return data;
+    // Return empty array when no positions - no mock data
+    return [];
   }, [positions]);
 
-  const currentRegime = chartData.length > 0 ? chartData[chartData.length - 1].regime : 'ranging';
-  const avgVolatility = chartData.reduce((sum, d) => sum + d.volatility, 0) / chartData.length;
+  // Handle empty data state
+  if (!chartData.length && !isLoading) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold">Daily P&L Performance</h3>
+            <p className="text-xs text-muted-foreground">Cumulative returns over 24h with volatility</p>
+          </div>
+        </div>
+        <div className="h-48 flex flex-col items-center justify-center text-muted-foreground">
+          <TrendingUp className="h-8 w-8 mb-2 opacity-30" />
+          <p className="text-sm">No P&L data available</p>
+          <p className="text-xs">Open positions will generate P&L history</p>
+        </div>
+      </Card>
+    );
+  }
 
+  const currentRegime = chartData.length > 0 ? chartData[chartData.length - 1].regime : 'ranging';
+  const avgVolatility = chartData.length > 0 ? chartData.reduce((sum, d) => sum + d.volatility, 0) / chartData.length : 0;
   const totalPnL = chartData.length > 0 ? chartData[chartData.length - 1].cumulative : 0;
   const isPositive = totalPnL >= 0;
 
