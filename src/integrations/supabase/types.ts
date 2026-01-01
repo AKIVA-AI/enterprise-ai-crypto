@@ -1863,7 +1863,7 @@ export type Database = {
         | "ops"
         | "auditor"
         | "viewer"
-      book_status: "active" | "frozen"
+      book_status: "active" | "frozen" | "halted" | "reduce_only"
       book_type: "HEDGE" | "PROP" | "MEME"
       meme_project_stage:
         | "opportunity"
@@ -2012,7 +2012,7 @@ export const Constants = {
         "auditor",
         "viewer",
       ],
-      book_status: ["active", "frozen"],
+      book_status: ["active", "frozen", "halted", "reduce_only"],
       book_type: ["HEDGE", "PROP", "MEME"],
       meme_project_stage: [
         "opportunity",

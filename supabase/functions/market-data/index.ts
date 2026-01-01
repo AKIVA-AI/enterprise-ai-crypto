@@ -21,6 +21,9 @@ const COINGECKO_BASE_URL = COINGECKO_API_KEY
   ? 'https://pro-api.coingecko.com/api/v3'
   : 'https://api.coingecko.com/api/v3';
 
+// Data quality flags for trading gate enforcement
+type DataQuality = 'realtime' | 'delayed' | 'derived' | 'simulated' | 'unavailable';
+
 interface TickerData {
   symbol: string;
   price: number;
@@ -31,6 +34,7 @@ interface TickerData {
   bid: number;
   ask: number;
   timestamp: number;
+  dataQuality: DataQuality;  // REQUIRED: Block trading on simulated data
 }
 
 interface CacheEntry {
@@ -229,6 +233,14 @@ async function fetchDetailedFromCoinGecko(coinIds: string[]): Promise<TickerData
   
   const tickers = data.map((coin: any) => {
     const symbol = Object.entries(COINGECKO_IDS).find(([_, v]) => v === coin.id)?.[0] || coin.symbol.toUpperCase();
+    
+    // Determine data quality based on data freshness
+    const lastUpdated = new Date(coin.last_updated).getTime();
+    const ageMs = Date.now() - lastUpdated;
+    let dataQuality: DataQuality = 'realtime';
+    if (ageMs > 60000) dataQuality = 'delayed';  // >1 minute old
+    if (ageMs > 300000) dataQuality = 'derived'; // >5 minutes old
+    
     return {
       symbol: symbol.includes('USDT') ? symbol : `${symbol}USDT`,
       price: coin.current_price || 0,
@@ -238,7 +250,8 @@ async function fetchDetailedFromCoinGecko(coinIds: string[]): Promise<TickerData
       low24h: coin.low_24h || coin.current_price,
       bid: coin.current_price * 0.999,
       ask: coin.current_price * 1.001,
-      timestamp: new Date(coin.last_updated).getTime(),
+      timestamp: lastUpdated,
+      dataQuality,
     };
   });
   
@@ -280,6 +293,13 @@ async function fetchFromCoinGecko(coinIds: string[]): Promise<TickerData[]> {
     const coinInfo = info as any;
     const symbol = Object.entries(COINGECKO_IDS).find(([_, v]) => v === id)?.[0] || id.toUpperCase();
     
+    // Determine data quality based on data freshness
+    const lastUpdatedAt = coinInfo.last_updated_at ? coinInfo.last_updated_at * 1000 : Date.now();
+    const ageMs = Date.now() - lastUpdatedAt;
+    let dataQuality: DataQuality = 'realtime';
+    if (ageMs > 60000) dataQuality = 'delayed';
+    if (ageMs > 300000) dataQuality = 'derived';
+    
     tickers.push({
       symbol: symbol.includes('USDT') ? symbol : `${symbol}USDT`,
       price: coinInfo.usd || 0,
@@ -289,7 +309,8 @@ async function fetchFromCoinGecko(coinIds: string[]): Promise<TickerData[]> {
       low24h: null,
       bid: coinInfo.usd * 0.999,
       ask: coinInfo.usd * 1.001,
-      timestamp: (coinInfo.last_updated_at || Math.floor(Date.now() / 1000)) * 1000,
+      timestamp: lastUpdatedAt,
+      dataQuality,
     });
   }
   
@@ -381,6 +402,8 @@ serve(async (req) => {
           .filter((id): id is string => id !== null);
         
         if (coinIds.length === 0) {
+          // Return simulated data with explicit quality flag
+          // Trading systems MUST check dataQuality and reject simulated data
           const mockTickers = symbols.map(s => ({
             symbol: s,
             price: 0,
@@ -391,11 +414,14 @@ serve(async (req) => {
             bid: 0,
             ask: 0,
             timestamp: Date.now(),
+            dataQuality: 'simulated' as DataQuality,  // CRITICAL: Mark as simulated
           }));
           
           return new Response(JSON.stringify({ 
             tickers: mockTickers,
             source: 'mock',
+            dataQuality: 'simulated',  // Top-level flag for easy checking
+            tradingAllowed: false,     // Explicit: DO NOT TRADE on this data
             latencyMs: Date.now() - startTime,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -410,9 +436,17 @@ serve(async (req) => {
           source: 'coingecko'
         });
 
+        // Determine overall data quality (worst of all tickers)
+        const overallQuality = tickers.some(t => t.dataQuality === 'simulated') ? 'simulated'
+          : tickers.some(t => t.dataQuality === 'derived') ? 'derived'
+          : tickers.some(t => t.dataQuality === 'delayed') ? 'delayed'
+          : 'realtime';
+        
         return new Response(JSON.stringify({ 
           tickers,
           source: 'coingecko',
+          dataQuality: overallQuality,
+          tradingAllowed: overallQuality !== 'simulated',  // Block trading on simulated
           latencyMs: latency,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -435,6 +469,8 @@ serve(async (req) => {
             price: 0,
             timestamp: Date.now(),
             source: 'mock',
+            dataQuality: 'simulated',
+            tradingAllowed: false,
             latencyMs: Date.now() - startTime,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -452,6 +488,8 @@ serve(async (req) => {
           price: ticker?.price || 0,
           timestamp: Date.now(),
           source: 'coingecko',
+          dataQuality: ticker?.dataQuality || 'realtime',
+          tradingAllowed: ticker?.dataQuality !== 'simulated',
           latencyMs: latency,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -492,6 +530,9 @@ serve(async (req) => {
           asks,
           timestamp: Date.now(),
           source: 'simulated',
+          dataQuality: 'simulated',  // CRITICAL: Explicit quality flag
+          tradingAllowed: false,     // BLOCK TRADING on simulated orderbooks
+          warning: 'This is simulated orderbook data - DO NOT use for live trading',
           latencyMs: latency,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

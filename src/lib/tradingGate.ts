@@ -9,11 +9,18 @@
  * 1. HALTED (kill switch) - No trading allowed whatsoever
  * 2. REDUCE_ONLY - Only position-closing trades allowed
  * 3. NORMAL - Full trading allowed
+ * 
+ * Data Quality Enforcement:
+ * - Trading is BLOCKED when market data quality is 'simulated'
+ * - Realtime and delayed data are acceptable for trading
  */
 
 export type TradingState = 'halted' | 'reduce_only' | 'normal';
 export type BookStatus = 'active' | 'frozen' | 'halted' | 'reduce_only';
 export type OrderSide = 'buy' | 'sell';
+
+// Data quality levels - trading MUST be blocked on 'simulated' or 'unavailable'
+export type DataQuality = 'realtime' | 'delayed' | 'derived' | 'simulated' | 'unavailable';
 
 export interface TradingGateSettings {
   globalKillSwitch: boolean;
@@ -40,6 +47,26 @@ export interface TradingGateResult {
   reason?: string;
   tradingState: TradingState;
   requiresPrice: boolean;
+}
+
+/**
+ * Check if data quality allows trading
+ * CRITICAL: Simulated data MUST NOT be used for trading decisions
+ */
+export function isDataQualityTradeable(quality: DataQuality): { allowed: boolean; reason?: string } {
+  switch (quality) {
+    case 'realtime':
+    case 'delayed':
+      return { allowed: true };
+    case 'derived':
+      return { allowed: true }; // Acceptable but log warning
+    case 'simulated':
+      return { allowed: false, reason: 'Trading blocked: market data is simulated/mock' };
+    case 'unavailable':
+      return { allowed: false, reason: 'Trading blocked: market data unavailable' };
+    default:
+      return { allowed: false, reason: `Unknown data quality: ${quality}` };
+  }
 }
 
 /**

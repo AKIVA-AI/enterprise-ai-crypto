@@ -1,5 +1,8 @@
 """
 OMS Execution Service - Order management and venue routing.
+
+IMPORTANT: This is the SINGLE SOURCE OF TRUTH for order writes.
+No other service should write to the orders table.
 """
 import structlog
 from typing import Dict, List, Optional
@@ -19,6 +22,15 @@ from app.services.portfolio_engine import portfolio_engine
 logger = structlog.get_logger()
 
 
+# Data quality flags for market data
+class DataQuality:
+    REALTIME = "realtime"       # Live venue data
+    DELAYED = "delayed"         # Delayed data (acceptable for some uses)
+    DERIVED = "derived"         # Calculated/synthetic data
+    SIMULATED = "simulated"     # Mock/test data
+    UNAVAILABLE = "unavailable" # No data available
+
+
 class OMSExecutionService:
     """
     Order Management System and Execution Service.
@@ -29,7 +41,13 @@ class OMSExecutionService:
     - Track order lifecycle
     - Handle fills and partial fills
     - Manage reduce-only and cancel operations
+    - Execution cost modeling and rejection
+    
+    CRITICAL: This is the ONLY service that writes to the orders table.
     """
+    
+    # Execution cost thresholds
+    MIN_EDGE_BUFFER_BPS = 10  # 10 basis points buffer required above costs
     
     def __init__(self):
         self._adapters: Dict[str, 'VenueAdapter'] = {}
@@ -53,9 +71,10 @@ class OMSExecutionService:
         1. Check kill switch
         2. Get book and positions
         3. Run risk checks
-        4. Size the position
-        5. Create and submit order
-        6. Track and return result
+        4. Check execution costs vs expected edge
+        5. Size the position
+        6. Create and submit order
+        7. Track and return result
         """
         # Check kill switch first
         allowed, reason = await check_kill_switch_for_trading()
@@ -67,7 +86,7 @@ class OMSExecutionService:
                 resource_id=str(intent.id),
                 book_id=str(intent.book_id),
                 severity="warning",
-                after_state={"reason": reason}
+                after_state={"reason": reason, "gate": "kill_switch"}
             )
             return None
 
@@ -77,9 +96,25 @@ class OMSExecutionService:
             logger.error("book_not_found", book_id=str(intent.book_id))
             return None
         
-        if book.status != "active":
-            logger.warning("book_not_active", book_id=str(intent.book_id), status=book.status)
-            return None
+        # Check book status - support new statuses
+        if book.status not in ["active"]:
+            if book.status == "reduce_only":
+                # Check if this is a reducing order
+                positions = await self._get_book_positions(intent.book_id)
+                if not self._is_reducing_order(intent, positions):
+                    logger.warning("reduce_only_not_reducing", book_id=str(intent.book_id))
+                    await audit_log(
+                        action="trade_blocked",
+                        resource_type="trade_intent",
+                        resource_id=str(intent.id),
+                        book_id=str(intent.book_id),
+                        severity="warning",
+                        after_state={"reason": "reduce_only_mode", "gate": "book_status"}
+                    )
+                    return None
+            else:
+                logger.warning("book_not_active", book_id=str(intent.book_id), status=book.status)
+                return None
         
         # Get venue health
         venue_health = await self._get_venue_health(venue_id)
@@ -102,6 +137,31 @@ class OMSExecutionService:
                 reasons=risk_result.reasons
             )
             await self._log_rejected_intent(intent, risk_result)
+            return None
+        
+        # Execution cost check
+        cost_check = await self._check_execution_costs(intent, venue_health)
+        if not cost_check["allowed"]:
+            logger.warning(
+                "intent_rejected_cost",
+                intent_id=str(intent.id),
+                reason=cost_check["reason"],
+                expected_cost_bps=cost_check.get("expected_cost_bps"),
+                min_edge_bps=cost_check.get("min_edge_bps")
+            )
+            await audit_log(
+                action="trade_blocked",
+                resource_type="trade_intent",
+                resource_id=str(intent.id),
+                book_id=str(intent.book_id),
+                severity="info",
+                after_state={
+                    "reason": cost_check["reason"],
+                    "gate": "execution_cost",
+                    "expected_cost_bps": cost_check.get("expected_cost_bps"),
+                    "min_edge_bps": cost_check.get("min_edge_bps")
+                }
+            )
             return None
         
         # Calculate position size
@@ -142,21 +202,39 @@ class OMSExecutionService:
             
             executed_order.latency_ms = int(latency)
             
-            # Save to database
-            await self._save_order(executed_order)
-            
-            # Update book exposure
+            # Validate fill price before proceeding
             if executed_order.status in [OrderStatus.FILLED, OrderStatus.PARTIAL]:
-                exposure_delta = executed_order.filled_size * (executed_order.filled_price or 0)
-                if executed_order.side == OrderSide.SELL:
-                    exposure_delta = -exposure_delta
-                await portfolio_engine.update_book_exposure(book.id, exposure_delta)
+                if executed_order.filled_price is None or executed_order.filled_price <= 0:
+                    logger.error(
+                        "invalid_fill_price",
+                        order_id=str(executed_order.id),
+                        filled_price=executed_order.filled_price
+                    )
+                    # Mark as needing reconciliation
+                    executed_order.status = OrderStatus.REJECTED
+                    executed_order.slippage = None
+                    await create_alert(
+                        title="Invalid Fill Price - Reconciliation Required",
+                        message=f"Order {executed_order.id} returned invalid fill price: {executed_order.filled_price}",
+                        severity="critical",
+                        source="oms"
+                    )
+                else:
+                    # Valid fill - update book exposure
+                    exposure_delta = executed_order.filled_size * executed_order.filled_price
+                    if executed_order.side == OrderSide.SELL:
+                        exposure_delta = -exposure_delta
+                    await portfolio_engine.update_book_exposure(book.id, exposure_delta)
+            
+            # Save to database (OMS is the single writer)
+            await self._save_order(executed_order)
             
             logger.info(
                 "order_executed",
                 order_id=str(executed_order.id),
                 status=executed_order.status.value,
-                latency_ms=latency
+                latency_ms=latency,
+                filled_price=executed_order.filled_price
             )
             
             return executed_order
@@ -166,6 +244,70 @@ class OMSExecutionService:
             order.status = OrderStatus.REJECTED
             await self._save_order(order)
             return order
+    
+    async def _check_execution_costs(
+        self, 
+        intent: TradeIntent, 
+        venue_health: Optional[VenueHealth]
+    ) -> Dict:
+        """
+        Check if expected execution costs are acceptable relative to edge.
+        
+        Returns:
+            Dict with 'allowed', 'reason', and cost metrics
+        """
+        # Estimate spread cost (basis points)
+        spread_cost_bps = 5  # Default 5 bps if unknown
+        
+        # Estimate slippage based on size and liquidity
+        # Larger orders have more slippage
+        size_usd = intent.target_exposure_usd
+        slippage_bps = min(size_usd / 100000 * 5, 20)  # 5 bps per $100k, max 20 bps
+        
+        # Venue latency penalty (high latency = more slippage risk)
+        latency_penalty_bps = 0
+        if venue_health and venue_health.latency_ms > 100:
+            latency_penalty_bps = (venue_health.latency_ms - 100) / 100  # 1 bp per 100ms over 100ms
+        
+        # Trading fee estimate
+        fee_bps = 10  # Default 10 bps (0.1%)
+        
+        # Total expected cost
+        expected_cost_bps = spread_cost_bps + slippage_bps + latency_penalty_bps + fee_bps
+        
+        # Required edge = cost + buffer
+        min_edge_bps = expected_cost_bps + self.MIN_EDGE_BUFFER_BPS
+        
+        # Estimate edge from confidence (rough heuristic)
+        # Higher confidence = higher expected edge
+        estimated_edge_bps = intent.confidence * 100  # 100% confidence = 100 bps expected
+        
+        if estimated_edge_bps < min_edge_bps:
+            return {
+                "allowed": False,
+                "reason": f"Expected edge ({estimated_edge_bps:.1f} bps) < required minimum ({min_edge_bps:.1f} bps)",
+                "expected_cost_bps": expected_cost_bps,
+                "min_edge_bps": min_edge_bps,
+                "estimated_edge_bps": estimated_edge_bps
+            }
+        
+        return {
+            "allowed": True,
+            "expected_cost_bps": expected_cost_bps,
+            "min_edge_bps": min_edge_bps,
+            "estimated_edge_bps": estimated_edge_bps
+        }
+    
+    def _is_reducing_order(self, intent: TradeIntent, positions: List) -> bool:
+        """Check if an intent would reduce an existing position."""
+        for pos in positions:
+            if pos.instrument == intent.instrument:
+                # Reducing if opposite side
+                if pos.side == OrderSide.BUY and intent.direction == OrderSide.SELL:
+                    return True
+                if pos.side == OrderSide.SELL and intent.direction == OrderSide.BUY:
+                    return True
+        return False
     
     async def place_order(
         self,
@@ -312,7 +454,11 @@ class OMSExecutionService:
         return positions
     
     async def _save_order(self, order: Order):
-        """Save order to database."""
+        """
+        Save order to database.
+        
+        CRITICAL: This is the ONLY place orders should be written.
+        """
         supabase = get_supabase()
         supabase.table("orders").upsert({
             "id": str(order.id),
@@ -325,7 +471,7 @@ class OMSExecutionService:
             "price": order.price,
             "status": order.status.value,
             "filled_size": order.filled_size,
-            "filled_price": order.filled_price,
+            "filled_price": order.filled_price,  # Never use || 0 fallback
             "slippage": order.slippage,
             "latency_ms": order.latency_ms,
             "updated_at": datetime.utcnow().isoformat()

@@ -8,6 +8,8 @@ This service coordinates:
 4. Order execution (paper or live)
 5. Position/order snapshot writes
 6. Venue health monitoring
+
+IMPORTANT: Order writes are handled ONLY by OMS to prevent duplicates.
 """
 import structlog
 import asyncio
@@ -110,10 +112,17 @@ class EngineRunner:
                 if result.decision == RiskDecision.APPROVE:
                     stats["intents_approved"] += 1
                     
-                    # Execute the intent
-                    order = await self._execute_intent(intent, book)
+                    # Get venue for execution
+                    venue_id, venue_name = await self._get_execution_venue(intent)
+                    if not venue_id or not venue_name:
+                        logger.warning("no_venue_for_intent", intent_id=str(intent.id))
+                        continue
+                    
+                    # Execute the intent via OMS (OMS handles order writes)
+                    order = await oms_service.execute_intent(intent, venue_id, venue_name)
                     if order:
                         stats["orders_placed"] += 1
+                        # Note: OMS handles all order writes, no duplicate write here
                         
                 elif result.decision == RiskDecision.REJECT:
                     stats["intents_rejected"] += 1
@@ -207,31 +216,56 @@ class EngineRunner:
         except Exception as e:
             logger.error("venue_health_update_failed", error=str(e))
     
-    async def _execute_intent(self, intent: TradeIntent, book: Book) -> Optional[Order]:
-        """Execute a trade intent via OMS."""
+    async def _get_execution_venue(self, intent: TradeIntent) -> tuple:
+        """Get venue ID and name for executing an intent."""
         try:
-            order = await oms_service.execute_intent(intent)
+            supabase = get_supabase()
             
-            if order:
-                # Update book exposure
-                await self._update_book_exposure(book, order)
-                
-                # Write order to database
-                await self._write_order(order)
-                
-            return order
+            # Get first healthy, enabled venue
+            result = supabase.table("venues").select("id, name").eq(
+                "is_enabled", True
+            ).eq("status", "healthy").limit(1).execute()
+            
+            if result.data:
+                return UUID(result.data[0]["id"]), result.data[0]["name"]
+            
+            # Fallback to any enabled venue
+            result = supabase.table("venues").select("id, name").eq(
+                "is_enabled", True
+            ).limit(1).execute()
+            
+            if result.data:
+                return UUID(result.data[0]["id"]), result.data[0]["name"]
+            
+            return None, None
             
         except Exception as e:
-            logger.error("intent_execution_failed", error=str(e))
-            return None
+            logger.error("venue_lookup_failed", error=str(e))
+            return None, None
     
     async def _update_book_exposure(self, book: Book, order: Order):
         """Update book exposure after order fill."""
         try:
             supabase = get_supabase()
             
-            # Calculate new exposure
-            fill_value = order.filled_size * (order.filled_price or 0)
+            # CRITICAL: Require valid fill price - never use 0
+            if order.filled_price is None or order.filled_price <= 0:
+                logger.error(
+                    "invalid_fill_price_for_exposure",
+                    order_id=str(order.id),
+                    filled_price=order.filled_price
+                )
+                # Log reconciliation issue instead of proceeding with bad data
+                await create_alert(
+                    title="Invalid Fill Price",
+                    message=f"Order {order.id} has invalid fill price: {order.filled_price}. Cannot update exposure.",
+                    severity="warning",
+                    source="engine_runner"
+                )
+                return
+            
+            # Calculate new exposure with validated price
+            fill_value = order.filled_size * order.filled_price
             
             if order.side == OrderSide.BUY:
                 new_exposure = book.current_exposure + fill_value
@@ -245,29 +279,6 @@ class EngineRunner:
             
         except Exception as e:
             logger.error("book_exposure_update_failed", error=str(e))
-    
-    async def _write_order(self, order: Order):
-        """Write order to database."""
-        try:
-            supabase = get_supabase()
-            supabase.table("orders").insert({
-                "id": str(order.id) if order.id else None,
-                "book_id": str(order.book_id),
-                "strategy_id": str(order.strategy_id) if order.strategy_id else None,
-                "venue_id": str(order.venue_id) if order.venue_id else None,
-                "instrument": order.instrument,
-                "side": order.side.value,
-                "size": order.size,
-                "price": order.price,
-                "status": order.status.value,
-                "filled_size": order.filled_size,
-                "filled_price": order.filled_price,
-                "slippage": order.slippage,
-                "latency_ms": order.latency_ms,
-            }).execute()
-            
-        except Exception as e:
-            logger.error("order_write_failed", error=str(e))
     
     async def _write_position_snapshots(self):
         """Write current positions to database."""
