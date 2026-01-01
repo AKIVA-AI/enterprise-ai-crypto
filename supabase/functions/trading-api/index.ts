@@ -1,12 +1,28 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// SECURITY: Restrict CORS to known origins in production
+const ALLOWED_ORIGINS = [
+  'https://amvakxshlojoshdfcqos.lovableproject.com',
+  'https://amvakxshlojoshdfcqos.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -116,9 +132,11 @@ serve(async (req) => {
           return new Response(JSON.stringify({ error: 'Missing required fields: book_id, instrument, side, size' }), { status: 400, headers: corsHeaders });
         }
 
-        // Check global kill switch
-        const { data: settings } = await supabase.from('global_settings').select('global_kill_switch, paper_trading_mode').single();
+        // Check global kill switch and settings
+        const { data: settings } = await supabase.from('global_settings').select('global_kill_switch, paper_trading_mode, reduce_only_mode').single();
+        
         if (settings?.global_kill_switch) {
+          console.log('[TRADING GATE] Order blocked: Kill switch active');
           return new Response(JSON.stringify({ error: 'Trading is halted - kill switch is active' }), { status: 403, headers: corsHeaders });
         }
 
@@ -127,16 +145,67 @@ serve(async (req) => {
         if (!book) {
           return new Response(JSON.stringify({ error: 'Book not found' }), { status: 404, headers: corsHeaders });
         }
-        if (book.status !== 'active') {
+        if (book.status === 'halted' || book.status === 'frozen') {
+          console.log(`[TRADING GATE] Order blocked: Book is ${book.status}`);
           return new Response(JSON.stringify({ error: `Book is ${book.status} - cannot place orders` }), { status: 403, headers: corsHeaders });
         }
 
-        // Calculate notional and check exposure limits
-        const notional = size * (price || 0);
+        // Check for existing position (for reduce-only logic)
+        const { data: existingPosition } = await supabase
+          .from('positions')
+          .select('side, size')
+          .eq('book_id', book_id)
+          .eq('instrument', instrument)
+          .eq('is_open', true)
+          .single();
+
+        const isReducingPosition = existingPosition && existingPosition.side !== side;
+
+        // Enforce reduce-only mode
+        if (settings?.reduce_only_mode || book.status === 'reduce_only') {
+          if (!isReducingPosition) {
+            console.log('[TRADING GATE] Order blocked: Reduce-only mode, not a reducing order');
+            return new Response(JSON.stringify({ 
+              error: 'Only position-reducing trades are allowed in reduce-only mode',
+              reduce_only_mode: true
+            }), { status: 403, headers: corsHeaders });
+          }
+        }
+
+        // CRITICAL: Resolve market price - NEVER use price || 0
+        let resolvedPrice = price;
+        if (!resolvedPrice || resolvedPrice <= 0) {
+          // Try to fetch live price from Binance
+          try {
+            const binanceSymbol = instrument.replace(/[\/\-]/g, '').toUpperCase();
+            const priceResponse = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${binanceSymbol}`);
+            if (priceResponse.ok) {
+              const priceData = await priceResponse.json();
+              resolvedPrice = parseFloat(priceData.price);
+              console.log(`[PRICE RESOLUTION] Fetched ${instrument} price: ${resolvedPrice}`);
+            }
+          } catch (e) {
+            console.error('[PRICE RESOLUTION] Binance fetch failed:', e);
+          }
+        }
+
+        // Reject if price still not resolved
+        if (!resolvedPrice || resolvedPrice <= 0) {
+          console.log('[TRADING GATE] Order rejected: Unable to resolve price');
+          return new Response(JSON.stringify({ 
+            error: 'Unable to resolve market price - cannot calculate risk. Please provide a price or try again.',
+            price_required: true
+          }), { status: 400, headers: corsHeaders });
+        }
+
+        // Calculate notional with RESOLVED price (never 0)
+        const notional = size * resolvedPrice;
         const newExposure = Number(book.current_exposure) + notional;
         const maxExposure = Number(book.capital_allocated) * 2; // 2x leverage max
 
-        if (newExposure > maxExposure) {
+        // Skip exposure check for reducing positions
+        if (!isReducingPosition && newExposure > maxExposure) {
+          console.log(`[TRADING GATE] Order rejected: Exposure limit exceeded (${newExposure} > ${maxExposure})`);
           return new Response(JSON.stringify({ 
             error: 'Order would exceed exposure limits',
             current_exposure: book.current_exposure,
@@ -145,12 +214,12 @@ serve(async (req) => {
           }), { status: 403, headers: corsHeaders });
         }
 
-        // Create order (paper mode - simulate fill)
         const orderId = crypto.randomUUID();
         const isPaperMode = settings?.paper_trading_mode ?? true;
         
+        // Use resolved price for simulation
         const simulatedSlippage = Math.random() * 0.002; // 0-0.2% slippage
-        const fillPrice = price ? (side === 'buy' ? price * (1 + simulatedSlippage) : price * (1 - simulatedSlippage)) : null;
+        const fillPrice = side === 'buy' ? resolvedPrice * (1 + simulatedSlippage) : resolvedPrice * (1 - simulatedSlippage);
         
         const orderData = {
           id: orderId,
@@ -160,7 +229,7 @@ serve(async (req) => {
           instrument,
           side,
           size,
-          price,
+          price: resolvedPrice,
           status: isPaperMode ? 'filled' : 'open',
           filled_size: isPaperMode ? size : 0,
           filled_price: isPaperMode ? fillPrice : null,

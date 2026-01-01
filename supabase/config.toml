@@ -43,22 +43,22 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.live-trading]
-verify_jwt = false
+verify_jwt = true
 
 [functions.hyperliquid]
 verify_jwt = false
 
 [functions.coinbase-trading]
-verify_jwt = false
+verify_jwt = true
 
 [functions.kraken-trading]
-verify_jwt = false
+verify_jwt = true
 
 [functions.binance-us-trading]
-verify_jwt = false
+verify_jwt = true
 
 [functions.cross-exchange-arbitrage]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ai-trading-copilot]
 verify_jwt = false

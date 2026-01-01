@@ -1,9 +1,22 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = [
+  'https://amvakxshlojoshdfcqos.lovableproject.com',
+  'https://amvakxshlojoshdfcqos.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 interface TradeOrder {
   bookId: string;
@@ -30,7 +43,7 @@ async function runSafetyChecks(
 ): Promise<SafetyCheck> {
   const checks: { name: string; check: () => Promise<SafetyCheck> }[] = [];
 
-  // Check 1: Kill switch
+  // Check 1: Kill switch and trading modes
   checks.push({
     name: 'kill_switch',
     check: async () => {
@@ -40,16 +53,32 @@ async function runSafetyChecks(
         .single();
       
       if (data?.global_kill_switch) {
-        return { passed: false, reason: 'Global kill switch is active' };
+        return { passed: false, reason: 'Global kill switch is active - all trading halted' };
       }
-      if (data?.reduce_only_mode && order.side === 'buy') {
-        return { passed: false, reason: 'System is in reduce-only mode' };
+      
+      // Check reduce-only mode - need to verify if this is a reducing order
+      if (data?.reduce_only_mode) {
+        // Get existing position
+        const { data: position } = await supabase
+          .from('positions')
+          .select('side, size')
+          .eq('book_id', order.bookId)
+          .eq('instrument', order.instrument)
+          .eq('is_open', true)
+          .single();
+        
+        const isReducing = position && position.side !== order.side;
+        
+        if (!isReducing) {
+          return { passed: false, reason: 'System is in reduce-only mode - only position-closing trades allowed' };
+        }
       }
+      
       return { passed: true };
     },
   });
 
-  // Check 2: Book status
+  // Check 2: Book status with proper reduce-only handling
   checks.push({
     name: 'book_status',
     check: async () => {
@@ -62,14 +91,32 @@ async function runSafetyChecks(
       if (!data) {
         return { passed: false, reason: 'Book not found' };
       }
-      if (data.status === 'frozen') {
-        return { passed: false, reason: 'Book is frozen' };
+      
+      if (data.status === 'frozen' || data.status === 'halted') {
+        return { passed: false, reason: `Book is ${data.status} - no trading allowed` };
       }
+      
+      // Handle book-level reduce-only
+      if (data.status === 'reduce_only') {
+        const { data: position } = await supabase
+          .from('positions')
+          .select('side')
+          .eq('book_id', order.bookId)
+          .eq('instrument', order.instrument)
+          .eq('is_open', true)
+          .single();
+        
+        const isReducing = position && position.side !== order.side;
+        if (!isReducing) {
+          return { passed: false, reason: 'Book is in reduce-only mode' };
+        }
+      }
+      
       return { passed: true };
     },
   });
 
-  // Check 3: Risk limits
+  // Check 3: Risk limits with PROPER price resolution
   checks.push({
     name: 'risk_limits',
     check: async () => {
@@ -91,7 +138,21 @@ async function runSafetyChecks(
         .single();
       
       if (book) {
-        const orderValue = order.size * (order.price || 0);
+        // CRITICAL: Resolve price - never use 0
+        let resolvedPrice = order.price;
+        if (!resolvedPrice || resolvedPrice <= 0) {
+          const livePrice = await getBinancePrice(order.instrument);
+          resolvedPrice = livePrice || 0;
+        }
+        
+        if (!resolvedPrice || resolvedPrice <= 0) {
+          return { 
+            passed: false, 
+            reason: 'Unable to resolve market price for risk calculation' 
+          };
+        }
+        
+        const orderValue = order.size * resolvedPrice;
         const projectedExposure = (book.current_exposure || 0) + orderValue;
         const exposureRatio = projectedExposure / (book.capital_allocated || 1);
         
@@ -219,6 +280,9 @@ async function simulateFill(order: TradeOrder): Promise<{
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

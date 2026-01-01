@@ -3,9 +3,19 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode, decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 
+// SECURITY: Restrict CORS to known origins
+const ALLOWED_ORIGINS = [
+  'https://amvakxshlojoshdfcqos.lovableproject.com',
+  'https://amvakxshlojoshdfcqos.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+// Default corsHeaders for backward compatibility
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGINS[0],
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Coinbase Advanced Trade API base URL
