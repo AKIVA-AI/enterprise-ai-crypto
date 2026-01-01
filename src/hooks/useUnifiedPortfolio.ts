@@ -117,8 +117,13 @@ export function useUnifiedPortfolio(): AggregatedPortfolio {
   }, [coinbaseData, krakenData, binanceData]);
 
   // Subscribe to live price feeds
+  const subscribedSymbols = useMemo(
+    () => (allAssets.length > 0 ? allAssets : ['BTC-USDT', 'ETH-USDT']),
+    [allAssets]
+  );
+
   const { prices, isConnected, isConnecting } = useLivePriceFeed({
-    symbols: allAssets.length > 0 ? allAssets : ['BTC-USDT', 'ETH-USDT'],
+    symbols: subscribedSymbols,
     enabled: true,
   });
 
