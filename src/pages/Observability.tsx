@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAgents } from '@/hooks/useAgents';
 import { useAlerts } from '@/hooks/useAlerts';
+import { useMetricsSummary } from '@/hooks/usePerformanceMetrics';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, Search, Download, AlertTriangle, Info, XCircle, AlertOctagon, RefreshCw, Wifi, Clock, Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Activity, Search, Download, AlertTriangle, Info, XCircle, AlertOctagon, RefreshCw, Wifi, Clock, Loader2, Gauge, Zap, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -61,6 +63,7 @@ export default function Observability() {
   const { data: agents } = useAgents();
   const { data: alerts } = useAlerts();
   const { data: events, isLoading: eventsLoading, refetch, isRefetching } = useAuditEvents();
+  const { summary: metricsSummary, isLoading: metricsLoading } = useMetricsSummary(60);
   
   const [filter, setFilter] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<string | null>(null);
@@ -158,7 +161,73 @@ export default function Observability() {
           </div>
         </div>
 
-        {/* Event log */}
+        {/* Performance Metrics */}
+        <div className="glass-panel rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Gauge className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Edge Function Performance (Last 60 min)</h2>
+          </div>
+          
+          {metricsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : metricsSummary.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Gauge className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p>No metrics recorded yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {metricsSummary.map((metric) => (
+                <div key={metric.functionName} className="flex items-center gap-4 p-3 rounded-lg bg-muted/30">
+                  <div className="w-40 flex-shrink-0">
+                    <p className="font-mono text-sm font-medium truncate">{metric.functionName}</p>
+                    <p className="text-xs text-muted-foreground">{metric.totalCalls} calls</p>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-muted-foreground">Success Rate</span>
+                      <span className={cn(
+                        "text-xs font-mono font-semibold",
+                        metric.successRate >= 99 ? "text-success" : 
+                        metric.successRate >= 95 ? "text-warning" : "text-destructive"
+                      )}>
+                        {metric.successRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={metric.successRate} 
+                      className="h-1.5"
+                    />
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-xs">Avg</p>
+                      <p className="font-mono font-semibold">{metric.avgLatencyMs}ms</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-xs">P95</p>
+                      <p className={cn(
+                        "font-mono font-semibold",
+                        metric.p95LatencyMs > 1000 ? "text-warning" : ""
+                      )}>
+                        {metric.p95LatencyMs}ms
+                      </p>
+                    </div>
+                    {metric.errorCount > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        {metric.errorCount} errors
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="glass-panel rounded-xl p-4">
           <div className="flex items-center justify-between mb-4 gap-4">
             <div className="relative flex-1 max-w-md">
