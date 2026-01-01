@@ -105,51 +105,84 @@ export function BracketOrderTicket({ onClose, defaultInstrument = 'BTC/USDT' }: 
   const maxPrice = Math.max(...priceLevels.map(l => l.price).filter(p => p > 0));
   const priceRange = maxPrice - minPrice || 1;
 
-  // Submit bracket order
+  // Submit bracket order - routes through OMS edge function for safety checks
   const submitBracket = useMutation({
     mutationFn: async () => {
       if (!bookId) throw new Error('Please select a book');
       if (!slNum) throw new Error('Stop loss is required');
       if (!tpNum) throw new Error('Take profit is required');
 
-      // Create entry order
-      const { data: entryOrder, error: entryError } = await supabase
-        .from('orders')
-        .insert({
-          book_id: bookId,
-          instrument,
-          side,
-          size: sizeNum,
-          price: useMarketEntry ? null : entryNum,
-          status: 'open',
-        })
-        .select()
-        .single();
+      // CRITICAL: Route through live-trading edge function to enforce OMS safety checks
+      // Entry order
+      const { data: entryResult, error: entryError } = await supabase.functions.invoke('live-trading', {
+        body: {
+          action: 'place_order',
+          order: {
+            bookId,
+            instrument,
+            side,
+            size: sizeNum,
+            price: useMarketEntry ? undefined : entryNum,
+            orderType: useMarketEntry ? 'market' : 'limit',
+            venue: 'coinbase',
+            stopLoss: slNum,
+            takeProfit: tpNum,
+          },
+        },
+      });
 
       if (entryError) throw entryError;
+      
+      if (entryResult?.rejected) {
+        throw new Error(entryResult.error || 'Order rejected by risk controls');
+      }
+      
+      if (!entryResult?.success) {
+        throw new Error(entryResult?.error || 'Entry order failed');
+      }
 
-      // Create stop loss order (opposite side)
+      // Stop loss order (opposite side) - also goes through OMS
       const slSide = side === 'buy' ? 'sell' : 'buy';
-      await supabase.from('orders').insert({
-        book_id: bookId,
-        instrument,
-        side: slSide,
-        size: sizeNum,
-        price: slNum,
-        status: 'open',
+      const { error: slError, data: slResult } = await supabase.functions.invoke('live-trading', {
+        body: {
+          action: 'place_order',
+          order: {
+            bookId,
+            instrument,
+            side: slSide,
+            size: sizeNum,
+            price: slNum,
+            orderType: 'limit',
+            venue: 'coinbase',
+          },
+        },
       });
 
-      // Create take profit order (opposite side)
-      await supabase.from('orders').insert({
-        book_id: bookId,
-        instrument,
-        side: slSide,
-        size: sizeNum,
-        price: tpNum,
-        status: 'open',
+      if (slError || slResult?.rejected) {
+        console.warn('Stop loss order failed:', slError || slResult?.error);
+      }
+
+      // Take profit order (opposite side) - also goes through OMS
+      const { error: tpError, data: tpResult } = await supabase.functions.invoke('live-trading', {
+        body: {
+          action: 'place_order',
+          order: {
+            bookId,
+            instrument,
+            side: slSide,
+            size: sizeNum,
+            price: tpNum,
+            orderType: 'limit',
+            venue: 'coinbase',
+          },
+        },
       });
 
-      return entryOrder;
+      if (tpError || tpResult?.rejected) {
+        console.warn('Take profit order failed:', tpError || tpResult?.error);
+      }
+
+      return entryResult;
     },
     onSuccess: () => {
       toast.success('Bracket order submitted', {

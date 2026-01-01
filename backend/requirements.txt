@@ -12,8 +12,9 @@ python-dotenv==1.0.1
 redis==5.0.1
 aioredis==2.0.1
 
-# HTTP client - let pip resolve version conflict
-httpx
+# HTTP client
+httpx>=0.27.0
+aiohttp>=3.9.0
 websockets==12.0
 
 # Crypto exchange libraries
@@ -48,5 +49,6 @@ arch==6.3.0
 yfinance==0.2.28
 ta==0.11.0
 
-# FreqTrade integration
--e C:/Users/ccana/Documents/augment-projects/freqtrade-analysis
+# FreqTrade integration (install separately if needed)
+# See: https://github.com/freqtrade/freqtrade
+# pip install freqtrade

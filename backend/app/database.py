@@ -9,6 +9,48 @@ from app.config import settings
 logger = structlog.get_logger()
 
 _supabase_client: Client | None = None
+_db_initialized: bool = False
+
+
+async def init_db():
+    """
+    Initialize the database connection.
+    Creates Supabase client and validates connection.
+    """
+    global _db_initialized
+    
+    try:
+        # Get or create the client
+        client = get_supabase()
+        
+        # Validate connection with a simple query
+        result = client.table("global_settings").select("id").limit(1).execute()
+        
+        _db_initialized = True
+        logger.info("database_initialized", status="connected")
+        
+    except Exception as e:
+        logger.error("database_initialization_failed", error=str(e))
+        raise
+
+
+async def close_db():
+    """
+    Close the database connection.
+    Cleans up resources on shutdown.
+    """
+    global _supabase_client, _db_initialized
+    
+    try:
+        # Supabase client doesn't require explicit closing
+        # but we reset state for clean restarts
+        _supabase_client = None
+        _db_initialized = False
+        
+        logger.info("database_closed")
+        
+    except Exception as e:
+        logger.error("database_close_failed", error=str(e))
 
 
 def get_supabase() -> Client:

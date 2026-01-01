@@ -49,6 +49,24 @@ class Settings:
         self.app_name = APP_NAME
         self.app_version = APP_VERSION
         self.debug = DEBUG
+        
+        # Environment settings (required by main.py)
+        self.ENVIRONMENT = os.getenv("ENV", "development")
+        self.DEBUG = DEBUG
+        
+        # CORS and host settings
+        self.ALLOWED_ORIGINS = [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "https://amvakxshlojoshdfcqos.lovableproject.com",
+            "https://amvakxshlojoshdfcqos.lovable.app",
+        ]
+        self.ALLOWED_HOSTS = [
+            "localhost",
+            "127.0.0.1",
+            "amvakxshlojoshdfcqos.lovableproject.com",
+            "amvakxshlojoshdfcqos.lovable.app",
+        ]
 
 # Global settings instance
 settings = Settings()

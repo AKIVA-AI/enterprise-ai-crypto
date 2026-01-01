@@ -445,9 +445,61 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
+    // CRITICAL: Authenticate user before any trading operation
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Missing or invalid authorization header' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Invalid or expired token' 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    // CRITICAL: Verify user has trading permissions (admin, cio, or trader role)
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['admin', 'cio', 'trader']);
+    
+    if (!roleData || roleData.length === 0) {
+      console.log(`Unauthorized trading attempt by user ${user.id} (${user.email})`);
+      
+      await supabase.from('audit_events').insert({
+        action: 'unauthorized_trading_attempt',
+        resource_type: 'order',
+        user_id: user.id,
+        user_email: user.email,
+        severity: 'warning',
+      });
+      
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Insufficient permissions. Trading requires Admin, CIO, or Trader role.' 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const { action, order, orderId } = await req.json();
     
-    console.log(`Live trading request: ${action}`);
+    console.log(`Live trading request: ${action} by user ${user.email}`);
     
     switch (action) {
       case 'place_order': {

@@ -123,26 +123,40 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
   const bookCapital = selectedBook?.capital_allocated || 100000;
   const maxRiskAmount = (bookCapital * riskPercent[0]) / 100;
 
-  // Submit order mutation
+  // Submit order mutation - routes through OMS edge function for safety checks
   const submitOrder = useMutation({
     mutationFn: async () => {
       if (!bookId) throw new Error('Please select a book');
       
-      const { data, error } = await supabase
-        .from('orders')
-        .insert({
-          book_id: bookId,
-          instrument,
-          side,
-          size: sizeNum,
-          price: orderType === 'limit' ? priceNum : null,
-          status: 'open',
-          strategy_id: strategyId || null,
-        })
-        .select()
-        .single();
+      // CRITICAL: Route through live-trading edge function to enforce OMS safety checks
+      // This prevents bypassing kill switch, risk limits, and other controls
+      const { data, error } = await supabase.functions.invoke('live-trading', {
+        body: {
+          action: 'place_order',
+          order: {
+            bookId,
+            instrument,
+            side,
+            size: sizeNum,
+            price: orderType === 'limit' ? priceNum : undefined,
+            orderType: orderType === 'market' ? 'market' : 'limit',
+            venue: venues[0]?.name || 'coinbase', // Use first available venue
+            strategyId: strategyId || undefined,
+          },
+        },
+      });
       
       if (error) throw error;
+      
+      // Handle OMS rejection (safety check failures)
+      if (data?.rejected) {
+        throw new Error(data.error || 'Order rejected by risk controls');
+      }
+      
+      if (!data?.success) {
+        throw new Error(data?.error || 'Order submission failed');
+      }
+      
       return data;
     },
     onSuccess: () => {
