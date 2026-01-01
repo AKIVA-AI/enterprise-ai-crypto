@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { 
   Activity, 
   Database, 
@@ -20,12 +19,11 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { 
   useSystemHealth, 
-  runHealthChecks, 
+  useRunHealthChecks,
   CRITICAL_HEALTH_COMPONENTS,
   type HealthStatus,
   type SystemHealthComponent,
 } from '@/hooks/useSystemHealth';
-import { supabase } from '@/integrations/supabase/client';
 
 const COMPONENT_CONFIG: Record<string, {
   label: string;
@@ -147,33 +145,7 @@ function HealthComponentCard({ component }: { component: SystemHealthComponent }
 
 export function SystemHealthPanel() {
   const { data: health, isLoading, refetch } = useSystemHealth();
-  const [isRunningChecks, setIsRunningChecks] = useState(false);
-  
-  const runChecks = async () => {
-    setIsRunningChecks(true);
-    try {
-      const results = await runHealthChecks();
-      
-      // Persist results to DB
-      for (const result of results) {
-        await supabase
-          .from('system_health')
-          .upsert({
-            component: result.component,
-            status: result.status,
-            details: result.details as unknown as Record<string, unknown>,
-            error_message: result.error_message,
-            last_check_at: result.last_check_at,
-          } as never, { onConflict: 'component' });
-      }
-      
-      refetch();
-    } catch (error) {
-      console.error('Health check failed:', error);
-    } finally {
-      setIsRunningChecks(false);
-    }
-  };
+  const { mutate: runChecks, isPending: isRunningChecks } = useRunHealthChecks();
   
   // Run health checks on mount
   useEffect(() => {
@@ -206,7 +178,7 @@ export function SystemHealthPanel() {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={runChecks}
+              onClick={() => runChecks()}
               disabled={isRunningChecks}
               className="gap-1"
             >

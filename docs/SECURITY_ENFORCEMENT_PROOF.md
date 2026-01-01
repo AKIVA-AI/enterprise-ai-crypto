@@ -234,14 +234,44 @@ CREATE POLICY "Admin/CIO can manage global settings"
 ON global_settings FOR ALL 
 USING (has_any_role(auth.uid(), ARRAY['admin', 'cio']));
 
--- Example: System health is read-only for most users
-CREATE POLICY "Anyone can view system health" 
-ON system_health FOR SELECT USING (true);
+-- CRITICAL: system_health is READ-ONLY for all clients
+-- Only service role (edge functions) can write
+CREATE POLICY "Authenticated users can view system health" 
+ON system_health FOR SELECT TO authenticated USING (true);
 
--- Writes require elevated privileges
-CREATE POLICY "System can update health" 
-ON system_health FOR ALL USING (true);  -- Service role only
+CREATE POLICY "Anon can view system health" 
+ON system_health FOR SELECT TO anon USING (true);
+
+-- NO INSERT/UPDATE/DELETE policies for authenticated/anon roles
+-- Service role bypasses RLS, so edge functions can still write
 ```
+
+### Health Check Write Path
+
+Health checks are now enforced via Edge Function:
+
+**Location:** `supabase/functions/health-check/index.ts`
+
+```typescript
+// Uses service role to write health results
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
+// Client UI calls this edge function instead of writing directly
+await supabaseAdmin.from('system_health').upsert({
+  component: result.component,
+  status: result.status,
+  // ...
+});
+```
+
+**Proof:**
+- Clients can only SELECT from `system_health`
+- Clients cannot INSERT/UPDATE/DELETE health records
+- Health check writes go through Edge Function with service role
+- An attacker cannot mark critical components as "healthy" to bypass gating
 
 ---
 
@@ -250,11 +280,12 @@ ON system_health FOR ALL USING (true);  -- Service role only
 | Attack | Mitigation |
 |--------|------------|
 | Bypass kill switch from UI | Edge function checks server-side |
-| Fake system health | `system_health` table protected by RLS |
+| Fake system health | `system_health` is RLS read-only for clients; writes via service role only |
+| Mark component healthy to bypass gate | Client cannot write to `system_health`; Edge Function uses service role |
 | Modify strategy lifecycle | Only authorized roles can update |
 | Send orders with fake prices | Server resolves prices independently |
 | Skip safety checks | All checks mandatory before order creation |
-| Inject malicious strategy ID | Strategy verified against DB |
+| Inject malicious strategy ID | Strategy verified against DB; fake UUIDs rejected |
 
 ---
 
