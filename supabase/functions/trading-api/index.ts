@@ -47,6 +47,54 @@ serve(async (req) => {
       }
     }
 
+    // SECURITY: Authenticate user for write operations
+    const isWriteOperation = path === 'place-order' || body.action === 'place_order';
+    let userId: string | null = null;
+    
+    if (isWriteOperation) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Authentication required for trading operations' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Verify user has trading permissions
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'cio', 'trader']);
+      
+      if (!roleData || roleData.length === 0) {
+        console.log(`Unauthorized trading attempt by user ${user.id}`);
+        await supabase.from('audit_events').insert({
+          action: 'unauthorized_trading_attempt',
+          resource_type: 'order',
+          user_id: user.id,
+          user_email: user.email,
+          severity: 'warning',
+        });
+        return new Response(JSON.stringify({ error: 'Insufficient permissions for trading' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      userId = user.id;
+    }
+
     // Handle detect_region action for server-side geo detection using MaxMind GeoLite2
     if (body.action === 'detect_region') {
       // Get client IP from headers
@@ -245,7 +293,11 @@ serve(async (req) => {
           .eq('is_open', true)
           .single();
 
-        const isReducingPosition = existingPosition && existingPosition.side !== side;
+        // CRITICAL: Reducing means opposite side AND size <= existing position size
+        // A flip (e.g., closing long and going short) is NOT reducing
+        const isReducingPosition = existingPosition && 
+          existingPosition.side !== side && 
+          size <= (existingPosition.size || 0);
 
         // Enforce reduce-only mode
         if (settings?.reduce_only_mode || book.status === 'reduce_only') {
@@ -286,7 +338,16 @@ serve(async (req) => {
 
         // Calculate notional with RESOLVED price (never 0)
         const notional = size * resolvedPrice;
-        const newExposure = Number(book.current_exposure) + notional;
+        
+        // CRITICAL: Side-aware exposure calculation
+        // Buys ADD to exposure, sells SUBTRACT (reduce exposure)
+        // For existing positions, closing reduces exposure
+        let exposureDelta = notional;
+        if (side === 'sell' || isReducingPosition) {
+          exposureDelta = -notional; // Sells reduce exposure
+        }
+        
+        const newExposure = Number(book.current_exposure) + exposureDelta;
         const maxExposure = Number(book.capital_allocated) * 2; // 2x leverage max
 
         // Skip exposure check for reducing positions
@@ -296,7 +357,8 @@ serve(async (req) => {
             error: 'Order would exceed exposure limits',
             current_exposure: book.current_exposure,
             max_exposure: maxExposure,
-            requested_notional: notional
+            requested_notional: notional,
+            exposure_delta: exposureDelta
           }), { status: 403, headers: corsHeaders });
         }
 

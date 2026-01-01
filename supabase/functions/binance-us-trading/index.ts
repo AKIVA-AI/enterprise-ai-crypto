@@ -122,11 +122,62 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    
     const apiKey = Deno.env.get('BINANCE_US_API_KEY');
     const apiSecret = Deno.env.get('BINANCE_US_API_SECRET');
     
     const { action, params = {} } = await req.json();
     console.log(`[Binance.US] Action: ${action}`, params);
+
+    // SECURITY: Authenticate user for write operations
+    const writeActions = ['place_order', 'cancel_order'];
+    if (writeActions.includes(action)) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ success: false, error: 'Authentication required for trading operations' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !user) {
+        return new Response(JSON.stringify({ success: false, error: 'Invalid or expired token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Verify user has trading permissions
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'cio', 'trader']);
+      
+      if (!roleData || roleData.length === 0) {
+        console.log(`[Binance.US] Unauthorized trading attempt by user ${user.id}`);
+        await supabase.from('audit_events').insert({
+          action: 'unauthorized_trading_attempt',
+          resource_type: 'binance_us_order',
+          user_id: user.id,
+          user_email: user.email,
+          severity: 'warning',
+        });
+        return new Response(JSON.stringify({ success: false, error: 'Insufficient permissions for trading' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log(`[Binance.US] Authenticated trading request from ${user.email}`);
+    }
 
     let result;
     const hasCredentials = Boolean(apiKey && apiSecret);

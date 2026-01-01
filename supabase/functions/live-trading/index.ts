@@ -167,10 +167,14 @@ async function runSafetyChecks(
           .eq('is_open', true)
           .single();
         
-        const isReducing = position && position.side !== order.side;
+        // CRITICAL: Reducing means opposite side AND size <= existing position size
+        // A flip (e.g., closing long and going short) is NOT reducing
+        const isReducing = position && 
+          position.side !== order.side && 
+          order.size <= (position.size || 0);
         
         if (!isReducing) {
-          return { passed: false, reason: 'System is in reduce-only mode - only position-closing trades allowed' };
+          return { passed: false, reason: 'System is in reduce-only mode - only position-closing trades allowed (order size must not exceed position size)' };
         }
       }
       
@@ -253,15 +257,19 @@ async function runSafetyChecks(
       if (data.status === 'reduce_only') {
         const { data: position } = await supabase
           .from('positions')
-          .select('side')
+          .select('side, size')
           .eq('book_id', order.bookId)
           .eq('instrument', order.instrument)
           .eq('is_open', true)
           .single();
         
-        const isReducing = position && position.side !== order.side;
+        // CRITICAL: Reducing means opposite side AND size <= existing position size
+        const isReducing = position && 
+          position.side !== order.side && 
+          order.size <= (position.size || 0);
+          
         if (!isReducing) {
-          return { passed: false, reason: 'Book is in reduce-only mode' };
+          return { passed: false, reason: 'Book is in reduce-only mode (order size must not exceed position size)' };
         }
       }
       

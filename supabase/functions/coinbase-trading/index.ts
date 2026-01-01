@@ -557,6 +557,52 @@ serve(async (req) => {
     const action = body.action || pathSegment;
     console.log(`[Coinbase] Action: ${action}`);
 
+    // SECURITY: Authenticate user for write operations (orders, cancellations)
+    const writeActions = ['place-order', 'place_order', 'cancel-order', 'cancel_order'];
+    if (writeActions.includes(action)) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Authentication required for trading operations' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // Verify user has trading permissions
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'cio', 'trader']);
+      
+      if (!roleData || roleData.length === 0) {
+        console.log(`[Coinbase] Unauthorized trading attempt by user ${user.id}`);
+        await supabase.from('audit_events').insert({
+          action: 'unauthorized_trading_attempt',
+          resource_type: 'coinbase_order',
+          user_id: user.id,
+          user_email: user.email,
+          severity: 'warning',
+        });
+        return new Response(JSON.stringify({ error: 'Insufficient permissions for trading' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log(`[Coinbase] Authenticated trading request from ${user.email}`);
+    }
+
     switch (action) {
       case 'status': {
         // Check if Coinbase is configured and connected
