@@ -582,7 +582,7 @@ serve(async (req) => {
       case 'klines': {
         const symbol = url.searchParams.get('symbol') || body.symbol as string;
         const interval = url.searchParams.get('interval') || body.interval as string || '1h';
-        
+
         if (!symbol) {
           return new Response(JSON.stringify({ error: 'symbol parameter required' }), {
             status: 400,
@@ -603,71 +603,115 @@ serve(async (req) => {
           });
         }
 
-        // CoinGecko OHLC endpoint supports: 1, 7, 14, 30, 90, 180, 365, max days
-        // Map our timeframes to appropriate days parameter
-        // NOTE: CoinGecko OHLC granularity depends on days:
-        //   1-2 days = 30 min candles
-        //   3-30 days = 4 hour candles  
-        //   31+ days = 4 day candles
-        const daysMap: Record<string, number> = {
-          '1h': 1,    // Returns 30 min candles (close enough for 1h view)
-          '4h': 14,   // Returns 4 hour candles
-          '1d': 90,   // Returns 4 day candles, but more data points
-          '1w': 180,  // Returns 4 day candles
+        // NOTE: CoinGecko's /ohlc endpoint has coarse, days-dependent granularity (30m / 4h / 4d).
+        // To keep our timeframes accurate (1h/4h/1d/1w), we fetch market_chart and aggregate into
+        // fixed buckets server-side.
+        const intervalMsMap: Record<string, number> = {
+          '1h': 60 * 60 * 1000,
+          '4h': 4 * 60 * 60 * 1000,
+          '1d': 24 * 60 * 60 * 1000,
+          '1w': 7 * 24 * 60 * 60 * 1000,
         };
-        const days = daysMap[interval] || 7;
 
-        // Use OHLC endpoint for proper candlestick data
-        const ohlcUrl = `${COINGECKO_BASE_URL}/coins/${coinId}/ohlc?vs_currency=usd&days=${days}`;
-        console.log(`[MarketData] CoinGecko OHLC fetch for ${symbol} (${interval}, ${days} days)`);
-        
-        const response = await rateLimitedFetch(ohlcUrl);
+        // Window sizing: enough history for each view without overfetching.
+        const daysMap: Record<string, number | string> = {
+          '1h': 2,
+          '4h': 14,
+          '1d': 180,
+          '1w': 365,
+        };
+
+        const bucketMs = intervalMsMap[interval] || intervalMsMap['1h'];
+        const days = daysMap[interval] ?? 7;
+
+        const chartUrl = `${COINGECKO_BASE_URL}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
+        console.log(`[MarketData] CoinGecko market_chart fetch for ${symbol} (${interval}, days=${days})`);
+
+        const response = await rateLimitedFetch(chartUrl);
         if (!response.ok) {
-          console.error(`[MarketData] CoinGecko OHLC API error: ${response.status}`);
-          throw new Error(`CoinGecko OHLC API error: ${response.status}`);
+          console.error(`[MarketData] CoinGecko market_chart API error: ${response.status}`);
+          throw new Error(`CoinGecko market_chart API error: ${response.status}`);
         }
 
-        const ohlcData = await response.json();
+        const data = await response.json();
         const latency = Date.now() - startTime;
-        
-        // CoinGecko OHLC format: [timestamp, open, high, low, close]
-        const candles = (ohlcData || []).map((c: [number, number, number, number, number]) => ({
-          time: c[0],      // timestamp in ms
-          open: c[1],      // open price
-          high: c[2],      // high price
-          low: c[3],       // low price
-          close: c[4],     // close price
-          volume: 0,       // CoinGecko OHLC doesn't include volume
-        }));
 
-        // Fetch volume data separately from market_chart endpoint
-        try {
-          const volumeUrl = `${COINGECKO_BASE_URL}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
-          const volumeResponse = await rateLimitedFetch(volumeUrl);
-          if (volumeResponse.ok) {
-            const volumeData = await volumeResponse.json();
-            const volumes = volumeData.total_volumes || [];
-            
-            // Match volumes to candles by closest timestamp
-            candles.forEach((candle: any) => {
-              const closestVolume = volumes.reduce((closest: [number, number] | null, v: [number, number]) => {
-                if (!closest) return v;
-                return Math.abs(v[0] - candle.time) < Math.abs(closest[0] - candle.time) ? v : closest;
-              }, null);
-              if (closestVolume) {
-                candle.volume = closestVolume[1] / (volumes.length || 1); // Approximate per-candle volume
-              }
-            });
-          }
-        } catch (volumeErr) {
-          console.warn('[MarketData] Failed to fetch volume data:', volumeErr);
-          // Continue without volume - candles still valid
+        const prices: [number, number][] = (data?.prices || []) as [number, number][];
+        const volumes: [number, number][] = (data?.total_volumes || []) as [number, number][];
+
+        if (!prices.length) {
+          await logMetric(supabase, 'market-data', 'klines', latency, true, undefined, { symbol, interval, candleCount: 0 });
+          return new Response(JSON.stringify({
+            symbol: symbol.toUpperCase(),
+            interval,
+            candles: [],
+            source: 'coingecko',
+            latencyMs: latency,
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
-        await logMetric(supabase, 'market-data', 'klines', latency, true, undefined, { 
-          symbol, 
+        // Aggregate into OHLC buckets
+        const buckets = new Map<number, {
+          time: number;
+          open: number;
+          high: number;
+          low: number;
+          close: number;
+          volumeSum: number;
+          volumeCount: number;
+        }>();
+
+        for (let i = 0; i < prices.length; i++) {
+          const [ts, price] = prices[i];
+          if (typeof ts !== 'number' || typeof price !== 'number') continue;
+
+          const bucketTime = Math.floor(ts / bucketMs) * bucketMs;
+          const volumeValue = typeof volumes?.[i]?.[1] === 'number' ? volumes[i][1] : 0;
+
+          const existing = buckets.get(bucketTime);
+          if (!existing) {
+            buckets.set(bucketTime, {
+              time: bucketTime,
+              open: price,
+              high: price,
+              low: price,
+              close: price,
+              volumeSum: volumeValue,
+              volumeCount: volumeValue ? 1 : 0,
+            });
+            continue;
+          }
+
+          existing.close = price;
+          if (price > existing.high) existing.high = price;
+          if (price < existing.low) existing.low = price;
+
+          if (volumeValue) {
+            existing.volumeSum += volumeValue;
+            existing.volumeCount += 1;
+          }
+        }
+
+        const candles = [...buckets.values()]
+          .sort((a, b) => a.time - b.time)
+          .map((c) => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            // Market_chart volumes aren't per-candle volumes. We use an average per bucket to keep a stable scale.
+            volume: c.volumeCount > 0 ? (c.volumeSum / c.volumeCount) : 0,
+          }))
+          .slice(-500);
+
+        await logMetric(supabase, 'market-data', 'klines', latency, true, undefined, {
+          symbol,
           interval,
-          candleCount: candles.length 
+          candleCount: candles.length,
+          days,
         });
 
         return new Response(JSON.stringify({
@@ -680,6 +724,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
 
       case 'health': {
         return new Response(JSON.stringify({
