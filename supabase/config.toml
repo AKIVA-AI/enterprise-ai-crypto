@@ -61,7 +61,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.cross-exchange-arbitrage]
-verify_jwt = true
+verify_jwt = false
 
 [functions.ai-trading-copilot]
 verify_jwt = false
