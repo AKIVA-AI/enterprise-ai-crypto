@@ -1,8 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { encode as base64Encode, decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
-import * as ed from "https://esm.sh/@noble/ed25519@2.1.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,10 +85,8 @@ function detectKeyType(secret: string): 'es256' | 'legacy' {
   return 'legacy';
 }
 
-// Parse SEC1 EC private key from DER format
-function parseEC256PrivateKey(keyData: string): Uint8Array {
-  let derBytes: Uint8Array;
-  
+// Parse SEC1 EC private key and extract d, x, y for JWK
+function parseEC256PrivateKeyJWK(keyData: string): { d: Uint8Array; x: Uint8Array; y: Uint8Array } {
   // Normalize the key data - handle various escape sequences and newlines
   let normalizedKey = keyData
     .replace(/\\n/g, '')  // Remove escaped newlines
@@ -98,61 +95,67 @@ function parseEC256PrivateKey(keyData: string): Uint8Array {
     .replace(/\s/g, '')   // Remove all whitespace
     .trim();
   
+  let derBytes: Uint8Array;
+  
   // Check if it's PEM format
-  if (normalizedKey.includes('-----BEGIN')) {
+  if (normalizedKey.includes('-----BEGIN') || normalizedKey.includes('BEGINECPRIVATEKEY')) {
+    // Extract just the base64 content, removing all PEM headers/footers
     const pemContent = normalizedKey
+      .replace(/-----BEGINECPRIVATEKEY-----/g, '')
+      .replace(/-----ENDECPRIVATEKEY-----/g, '')
+      .replace(/-----BEGINPRIVATEKEY-----/g, '')
+      .replace(/-----ENDPRIVATEKEY-----/g, '')
       .replace(/-----BEGIN EC PRIVATE KEY-----/g, '')
       .replace(/-----END EC PRIVATE KEY-----/g, '')
       .replace(/-----BEGIN PRIVATE KEY-----/g, '')
       .replace(/-----END PRIVATE KEY-----/g, '')
-      .replace(/\s/g, '');
-    const binary = atob(pemContent);
-    derBytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      derBytes[i] = binary.charCodeAt(i);
-    }
+      .replace(/-/g, '');  // Remove any remaining dashes
+    
+    derBytes = base64Decode(pemContent);
   } else {
     // Handle base64 (might be URL-safe variant)
-    let base64Data = normalizedKey.replace(/\s/g, '');
-    // Convert URL-safe base64 to standard base64
+    let base64Data = normalizedKey;
     base64Data = base64Data.replace(/-/g, '+').replace(/_/g, '/');
-    // Add padding if needed
     const paddingNeeded = (4 - base64Data.length % 4) % 4;
     base64Data = base64Data + '='.repeat(paddingNeeded);
-    
-    console.log('[Coinbase] parseEC256: base64 length:', base64Data.length, 'sample:', base64Data.substring(0, 40));
-    
-    // Try-catch with detailed error
-    try {
-      const binary = atob(base64Data);
-      derBytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        derBytes[i] = binary.charCodeAt(i);
-      }
-    } catch (e) {
-      // Find the invalid character
-      const validBase64 = /^[A-Za-z0-9+/]*=*$/;
-      const invalidChars = base64Data.split('').filter(c => !validBase64.test(c));
-      console.error('[Coinbase] Invalid base64 chars found:', JSON.stringify(invalidChars.slice(0, 10)));
-      throw e;
-    }
+    derBytes = base64Decode(base64Data);
   }
   
-  console.log('[Coinbase] DER bytes length:', derBytes.length, 'first bytes:', Array.from(derBytes.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+  console.log('[Coinbase] DER bytes length:', derBytes.length, 'first bytes:', Array.from(derBytes.slice(0, 15)).map(b => b.toString(16).padStart(2, '0')).join(' '));
   
   // Parse SEC1 ECPrivateKey structure
-  // SEQUENCE { version INTEGER, privateKey OCTET STRING, [0] parameters, [1] publicKey }
-  // The private key is typically at offset 7 for a 32-byte key
-  // Look for the OCTET STRING (0x04) followed by length (0x20 = 32)
+  // SEQUENCE { version INTEGER (1), privateKey OCTET STRING (32 bytes), [0] parameters OID, [1] publicKey BIT STRING (65 bytes) }
+  
+  // Find the private key (32 bytes after 04 20)
+  let d: Uint8Array | null = null;
+  let publicKeyBytes: Uint8Array | null = null;
+  
   for (let i = 0; i < derBytes.length - 33; i++) {
-    if (derBytes[i] === 0x04 && derBytes[i + 1] === 0x20) {
-      const privateKey = derBytes.slice(i + 2, i + 2 + 32);
-      console.log('[Coinbase] Found 32-byte private key at offset', i);
-      return privateKey;
+    // Look for OCTET STRING with length 32 (0x04 0x20)
+    if (derBytes[i] === 0x04 && derBytes[i + 1] === 0x20 && d === null) {
+      d = derBytes.slice(i + 2, i + 2 + 32);
+      console.log('[Coinbase] Found private key (d) at offset', i);
+    }
+    
+    // Look for BIT STRING with length 66 (0x03 0x42 0x00 0x04) containing uncompressed public key
+    if (derBytes[i] === 0x03 && derBytes[i + 1] === 0x42 && derBytes[i + 2] === 0x00 && derBytes[i + 3] === 0x04) {
+      publicKeyBytes = derBytes.slice(i + 4, i + 4 + 64); // x (32) + y (32)
+      console.log('[Coinbase] Found public key at offset', i);
     }
   }
   
-  throw new Error('Could not parse EC private key from DER format');
+  if (!d) {
+    throw new Error('Could not find private key (d) in SEC1 structure');
+  }
+  
+  if (!publicKeyBytes) {
+    throw new Error('Could not find public key (x, y) in SEC1 structure');
+  }
+  
+  const x = publicKeyBytes.slice(0, 32);
+  const y = publicKeyBytes.slice(32, 64);
+  
+  return { d, x, y };
 }
 
 // Generate JWT token for Coinbase CDP API using ES256 (ECDSA P-256)
@@ -165,8 +168,19 @@ async function generateES256JWT(
 ): Promise<string> {
   console.log('[Coinbase] Generating ES256 JWT for CDP API');
   
-  // Parse the EC private key
-  const privateKeyBytes = parseEC256PrivateKey(apiKeySecret);
+  // Parse the EC private key and extract JWK components
+  const { d, x, y } = parseEC256PrivateKeyJWK(apiKeySecret);
+  
+  // Create JWK for import
+  const jwk = {
+    kty: 'EC',
+    crv: 'P-256',
+    x: base64UrlEncode(x),
+    y: base64UrlEncode(y),
+    d: base64UrlEncode(d),
+  };
+  
+  console.log('[Coinbase] JWK created, x length:', x.length, 'y length:', y.length, 'd length:', d.length);
   
   // Generate nonce
   const nonce = crypto.randomUUID().replace(/-/g, '');
@@ -195,39 +209,10 @@ async function generateES256JWT(
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
   const message = `${headerB64}.${payloadB64}`;
   
-  // Import the EC private key for signing
-  // We need to construct a proper JWK or import raw key
-  // P-256 private keys are 32 bytes
-  const privateKeyJwk = {
-    kty: 'EC',
-    crv: 'P-256',
-    d: base64UrlEncode(privateKeyBytes),
-    // We need x and y for import, but we can derive them or use a different approach
-  };
-  
-  // Try to import as raw EC private key using PKCS#8 format
-  // First, we need to wrap the raw key in PKCS#8 structure
-  const pkcs8Prefix = new Uint8Array([
-    0x30, 0x41, // SEQUENCE, length 65
-    0x02, 0x01, 0x00, // INTEGER version = 0
-    0x30, 0x13, // SEQUENCE (AlgorithmIdentifier)
-    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID 1.2.840.10045.2.1 (ecPublicKey)
-    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, // OID 1.2.840.10045.3.1.7 (P-256)
-    0x04, 0x27, // OCTET STRING, length 39
-    0x30, 0x25, // SEQUENCE, length 37
-    0x02, 0x01, 0x01, // INTEGER version = 1
-    0x04, 0x20, // OCTET STRING, length 32 (private key follows)
-  ]);
-  
-  // Construct PKCS#8 key
-  const pkcs8Key = new Uint8Array(pkcs8Prefix.length + 32);
-  pkcs8Key.set(pkcs8Prefix);
-  pkcs8Key.set(privateKeyBytes, pkcs8Prefix.length);
-  
   try {
     const cryptoKey = await crypto.subtle.importKey(
-      'pkcs8',
-      pkcs8Key.buffer,
+      'jwk',
+      jwk,
       { name: 'ECDSA', namedCurve: 'P-256' },
       false,
       ['sign']
@@ -240,21 +225,55 @@ async function generateES256JWT(
       messageBytes
     );
     
-    // Convert DER signature to raw R||S format (64 bytes)
+    // Web Crypto returns raw R||S format for ECDSA (64 bytes for P-256)
     const signatureBytes = new Uint8Array(signatureArrayBuffer);
-    const signatureB64 = base64UrlEncode(signatureBytes);
+    console.log('[Coinbase] Signature length:', signatureBytes.length);
     
+    const signatureB64 = base64UrlEncode(signatureBytes);
     const jwt = `${message}.${signatureB64}`;
     console.log('[Coinbase] ES256 JWT generated successfully');
     
     return jwt;
   } catch (importError) {
-    console.error('[Coinbase] PKCS#8 import failed, trying SEC1:', importError);
-    
-    // Try using the full DER as SEC1 format via a different approach
-    // We'll use the @noble/secp256k1 library instead
+    console.error('[Coinbase] JWK import failed:', importError);
     throw new Error(`EC key import failed: ${importError instanceof Error ? importError.message : 'Unknown error'}`);
   }
+}
+
+// Convert DER-encoded ECDSA signature to raw R||S format
+function derSignatureToRaw(der: Uint8Array): Uint8Array {
+  // DER format: 30 [len] 02 [r-len] [r] 02 [s-len] [s]
+  let offset = 2; // Skip 30 and total length
+  
+  // Read R
+  if (der[offset] !== 0x02) throw new Error('Expected INTEGER for R');
+  offset++;
+  const rLen = der[offset++];
+  let rStart = offset;
+  // Skip leading zero if present
+  if (der[rStart] === 0x00 && rLen === 33) {
+    rStart++;
+  }
+  const r = der.slice(rStart, offset + rLen);
+  offset += rLen;
+  
+  // Read S
+  if (der[offset] !== 0x02) throw new Error('Expected INTEGER for S');
+  offset++;
+  const sLen = der[offset++];
+  let sStart = offset;
+  // Skip leading zero if present
+  if (der[sStart] === 0x00 && sLen === 33) {
+    sStart++;
+  }
+  const s = der.slice(sStart, offset + sLen);
+  
+  // Pad to 32 bytes each
+  const raw = new Uint8Array(64);
+  raw.set(r.slice(Math.max(0, r.length - 32)), 32 - Math.min(32, r.length));
+  raw.set(s.slice(Math.max(0, s.length - 32)), 64 - Math.min(32, s.length));
+  
+  return raw;
 }
 // Legacy HMAC signature for old-style API keys
 async function generateLegacySignature(
