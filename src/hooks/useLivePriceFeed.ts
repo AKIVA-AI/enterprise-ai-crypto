@@ -37,9 +37,17 @@ const fromBinanceSymbol = (symbol: string): string => {
   return upper;
 };
 
+interface FetchResult {
+  prices: Map<string, LivePrice>;
+  source: string;
+  latencyMs: number;
+}
+
 // REST API fallback using Edge Function proxy (avoids CORS issues)
-async function fetchPricesREST(symbols: string[]): Promise<Map<string, LivePrice>> {
+async function fetchPricesREST(symbols: string[]): Promise<FetchResult> {
   const prices = new Map<string, LivePrice>();
+  let source = 'unknown';
+  let latencyMs = 0;
   
   try {
     // Use our Edge Function proxy to fetch market data
@@ -52,8 +60,11 @@ async function fetchPricesREST(symbols: string[]): Promise<Map<string, LivePrice
     
     if (error) {
       console.warn('[LivePriceFeed] Edge function error:', error);
-      return prices;
+      return { prices, source: 'error', latencyMs: 0 };
     }
+    
+    source = data?.source || 'coingecko';
+    latencyMs = data?.latencyMs || 0;
     
     if (data?.tickers) {
       for (const ticker of data.tickers) {
@@ -70,18 +81,20 @@ async function fetchPricesREST(symbols: string[]): Promise<Map<string, LivePrice
           timestamp: ticker.timestamp,
         });
       }
-      console.log(`[LivePriceFeed] Proxy fetched ${prices.size} prices`);
+      console.log(`[LivePriceFeed] Proxy fetched ${prices.size} prices from ${source} in ${latencyMs}ms`);
     }
   } catch (error) {
     console.error('[LivePriceFeed] Proxy error:', error);
   }
   
-  return prices;
+  return { prices, source, latencyMs };
 }
 
 export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOptions) {
   const [prices, setPrices] = useState<Map<string, LivePrice>>(new Map());
   const [usingFallback, setUsingFallback] = useState(false);
+  const [dataSource, setDataSource] = useState<string>('');
+  const [apiLatency, setApiLatency] = useState<number>(0);
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const wsFailCountRef = useRef(0);
 
@@ -148,9 +161,11 @@ export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOp
     
     // Start REST polling immediately and also when WS fails
     const pollPrices = async () => {
-      const newPrices = await fetchPricesREST(symbols);
-      if (newPrices.size > 0) {
-        setPrices(newPrices);
+      const result = await fetchPricesREST(symbols);
+      if (result.prices.size > 0) {
+        setPrices(result.prices);
+        setDataSource(result.source);
+        setApiLatency(result.latencyMs);
       }
     };
     
@@ -184,6 +199,15 @@ export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOp
     wsState.connect();
   }, [wsState]);
 
+  const forceRefresh = useCallback(async () => {
+    const result = await fetchPricesREST(symbols);
+    if (result.prices.size > 0) {
+      setPrices(result.prices);
+      setDataSource(result.source);
+      setApiLatency(result.latencyMs);
+    }
+  }, [symbols]);
+
   return {
     prices,
     isConnected: wsState.isConnected || usingFallback,
@@ -193,9 +217,12 @@ export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOp
     latencyMs: wsState.latencyMs,
     lastConnectedAt: wsState.lastConnectedAt,
     usingFallback,
+    dataSource,
+    apiLatency,
     getPrice,
     getAllPrices,
     connect,
+    forceRefresh,
     disconnect: wsState.disconnect,
     resetReconnect: wsState.resetReconnectAttempts,
   };

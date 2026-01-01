@@ -103,7 +103,10 @@ export default function Markets() {
     reconnectAttempts,
     latencyMs,
     usingFallback,
-    connect: reconnectPriceFeed 
+    dataSource,
+    apiLatency,
+    connect: reconnectPriceFeed,
+    forceRefresh,
   } = useLivePriceFeed({
     symbols: TRACKED_SYMBOLS,
     enabled: true,
@@ -191,12 +194,34 @@ export default function Markets() {
                   <TooltipContent>
                     <p>Last update: {new Date(latestTimestamp).toLocaleTimeString()}</p>
                     <p className="text-xs text-muted-foreground">
-                      Source: {usingFallback ? 'REST API' : 'WebSocket'}
+                      Source: {dataSource || (usingFallback ? 'REST API' : 'WebSocket')}
                     </p>
+                    {apiLatency > 0 && (
+                      <p className="text-xs text-muted-foreground">Latency: {apiLatency}ms</p>
+                    )}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
+            
+            {/* API Source Badge */}
+            {dataSource && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                {dataSource === 'coingecko' ? 'CoinGecko Pro' : dataSource}
+              </Badge>
+            )}
+            
+            {/* Manual Refresh Button */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-7 gap-1.5"
+              onClick={forceRefresh}
+              disabled={isConnecting}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", isConnecting && "animate-spin")} />
+              Refresh
+            </Button>
           </div>
           <Sheet open={isTradeTicketOpen} onOpenChange={setIsTradeTicketOpen}>
             <SheetTrigger asChild>

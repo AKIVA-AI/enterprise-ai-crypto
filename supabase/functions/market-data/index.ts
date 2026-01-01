@@ -346,11 +346,17 @@ serve(async (req) => {
         // Empty body is fine
       }
       
-      // For POST requests with symbols in body, default to ticker endpoint
-      if ((path === 'market-data' || path === 'v1') && body.symbols) {
-        path = 'ticker';
-      } else if ((path === 'market-data' || path === 'v1') && body.symbol) {
-        path = 'price';
+      // For POST requests, check endpoint or infer from body params
+      if (path === 'market-data' || path === 'v1') {
+        if (body.endpoint) {
+          path = body.endpoint as string;
+        } else if (body.symbols) {
+          path = 'ticker';
+        } else if (body.symbol && body.interval) {
+          path = 'klines';
+        } else if (body.symbol) {
+          path = 'price';
+        }
       }
     }
 
@@ -493,7 +499,7 @@ serve(async (req) => {
 
       case 'klines': {
         const symbol = url.searchParams.get('symbol') || body.symbol as string;
-        const interval = url.searchParams.get('interval') || '1h';
+        const interval = url.searchParams.get('interval') || body.interval as string || '1h';
         
         if (!symbol) {
           return new Response(JSON.stringify({ error: 'symbol parameter required' }), {
@@ -521,8 +527,8 @@ serve(async (req) => {
         };
         const days = daysMap[interval] || 1;
 
-        const chartUrl = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
-        console.log(`[MarketData] CoinGecko chart fetch: ${chartUrl}`);
+        const chartUrl = `${COINGECKO_BASE_URL}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
+        console.log(`[MarketData] CoinGecko chart fetch for ${symbol} (${interval})`);
         
         const response = await rateLimitedFetch(chartUrl);
         if (!response.ok) {

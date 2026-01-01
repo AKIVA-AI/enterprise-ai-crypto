@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   createChart, 
   IChartApi, 
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TradingViewChartProps {
   symbol?: string;
@@ -22,12 +23,10 @@ interface TradingViewChartProps {
 }
 
 const TIMEFRAMES = [
-  { label: '1m', value: '1' },
-  { label: '5m', value: '5' },
-  { label: '15m', value: '15' },
-  { label: '1H', value: '60' },
-  { label: '4H', value: '240' },
-  { label: '1D', value: 'D' },
+  { label: '1H', value: '1h', interval: '1h' },
+  { label: '4H', value: '4h', interval: '4h' },
+  { label: '1D', value: '1d', interval: '1d' },
+  { label: '1W', value: '1w', interval: '1w' },
 ];
 
 const SYMBOLS = [
@@ -41,12 +40,44 @@ const SYMBOLS = [
   'LINK-USDT',
 ];
 
-// Generate realistic OHLC data
-function generateCandlestickData(basePrice: number, numCandles: number = 200): CandlestickData<Time>[] {
+// Convert symbol format for API
+function toApiSymbol(symbol: string): string {
+  return symbol.replace('-', '').toUpperCase();
+}
+
+// Fetch kline data from edge function
+async function fetchKlineData(symbol: string, interval: string): Promise<CandlestickData<Time>[]> {
+  try {
+    const apiSymbol = toApiSymbol(symbol);
+    const { data, error } = await supabase.functions.invoke('market-data', {
+      body: { symbol: apiSymbol, interval, endpoint: 'klines' },
+      method: 'POST',
+    });
+    
+    if (error || !data?.candles) {
+      console.warn('[Chart] Failed to fetch klines:', error);
+      return [];
+    }
+    
+    return data.candles.map((c: any) => ({
+      time: Math.floor(c.time / 1000) as Time,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+  } catch (err) {
+    console.error('[Chart] Kline fetch error:', err);
+    return [];
+  }
+}
+
+// Generate fallback OHLC data when API fails
+function generateCandlestickData(basePrice: number, numCandles: number = 100): CandlestickData<Time>[] {
   const data: CandlestickData<Time>[] = [];
   let currentPrice = basePrice;
   const now = Math.floor(Date.now() / 1000);
-  const candleInterval = 3600; // 1 hour
+  const candleInterval = 3600;
 
   for (let i = numCandles; i >= 0; i--) {
     const time = (now - i * candleInterval) as Time;
@@ -85,14 +116,14 @@ function generateVolumeData(candleData: CandlestickData<Time>[]): { time: Time; 
 }
 
 const BASE_PRICES: Record<string, number> = {
-  'BTC-USDT': 98500,
-  'ETH-USDT': 3450,
-  'SOL-USDT': 185,
-  'ARB-USDT': 1.25,
-  'OP-USDT': 2.15,
-  'AVAX-USDT': 42,
-  'MATIC-USDT': 0.95,
-  'LINK-USDT': 23,
+  'BTC-USDT': 87000,
+  'ETH-USDT': 2980,
+  'SOL-USDT': 125,
+  'ARB-USDT': 0.80,
+  'OP-USDT': 1.50,
+  'AVAX-USDT': 12,
+  'MATIC-USDT': 0,
+  'LINK-USDT': 12,
 };
 
 export function TradingViewChart({ 
@@ -109,11 +140,12 @@ export function TradingViewChart({
   const volumeSeriesRef = useRef<ReturnType<IChartApi['addSeries']> | null>(null);
   
   const [currentSymbol, setCurrentSymbol] = useState(symbol);
-  const [timeframe, setTimeframe] = useState('60');
+  const [timeframe, setTimeframe] = useState('1h');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<number>(0);
   const [chartError, setChartError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Initialize chart
   useEffect(() => {
@@ -217,23 +249,37 @@ export function TradingViewChart({
   useEffect(() => {
     if (!candlestickSeriesRef.current || !volumeSeriesRef.current) return;
 
-    const basePrice = BASE_PRICES[currentSymbol] || 100;
-    const candleData = generateCandlestickData(basePrice);
-    const volumeData = generateVolumeData(candleData);
+    const loadData = async () => {
+      setIsLoading(true);
+      
+      // Try to fetch real data from API
+      let candleData = await fetchKlineData(currentSymbol, timeframe);
+      
+      // Fall back to generated data if API fails
+      if (candleData.length === 0) {
+        const basePrice = BASE_PRICES[currentSymbol] || 100;
+        candleData = generateCandlestickData(basePrice);
+      }
+      
+      const volumeData = generateVolumeData(candleData);
 
-    candlestickSeriesRef.current.setData(candleData);
-    volumeSeriesRef.current.setData(volumeData);
+      candlestickSeriesRef.current?.setData(candleData);
+      volumeSeriesRef.current?.setData(volumeData);
 
-    // Set last price and change
-    if (candleData.length >= 2) {
-      const last = candleData[candleData.length - 1];
-      const prev = candleData[candleData.length - 2];
-      setLastPrice(last.close);
-      setPriceChange(((last.close - prev.close) / prev.close) * 100);
-    }
+      // Set last price and change
+      if (candleData.length >= 2) {
+        const last = candleData[candleData.length - 1];
+        const prev = candleData[candleData.length - 2];
+        setLastPrice(last.close);
+        setPriceChange(((last.close - prev.close) / prev.close) * 100);
+      }
 
-    // Fit content
-    chartRef.current?.timeScale().fitContent();
+      // Fit content
+      chartRef.current?.timeScale().fitContent();
+      setIsLoading(false);
+    };
+    
+    loadData();
   }, [currentSymbol, timeframe]);
 
   // Real-time updates
@@ -270,15 +316,24 @@ export function TradingViewChart({
     onSymbolChange?.(value);
   };
 
-  const handleRefresh = () => {
-    const basePrice = BASE_PRICES[currentSymbol] || 100;
-    const candleData = generateCandlestickData(basePrice);
+  const handleRefresh = useCallback(async () => {
+    if (!candlestickSeriesRef.current || !volumeSeriesRef.current) return;
+    
+    setIsLoading(true);
+    let candleData = await fetchKlineData(currentSymbol, timeframe);
+    
+    if (candleData.length === 0) {
+      const basePrice = BASE_PRICES[currentSymbol] || 100;
+      candleData = generateCandlestickData(basePrice);
+    }
+    
     const volumeData = generateVolumeData(candleData);
     
     candlestickSeriesRef.current?.setData(candleData);
     volumeSeriesRef.current?.setData(volumeData);
     chartRef.current?.timeScale().fitContent();
-  };
+    setIsLoading(false);
+  }, [currentSymbol, timeframe]);
 
   return (
     <div className={cn(
@@ -333,8 +388,8 @@ export function TradingViewChart({
           </div>
 
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh}>
-              <RefreshCw className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={isLoading}>
+              <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
             </Button>
             <Button 
               variant="ghost" 
