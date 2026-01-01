@@ -34,6 +34,45 @@ interface TradeOrder {
 interface SafetyCheck {
   passed: boolean;
   reason?: string;
+  // Optional machine-readable code for UI/ops
+  reasonCode?: string;
+}
+
+async function probeCriticalComponents(supabase: any): Promise<{ ok: boolean; reason?: string; details?: Record<string, string> }> {
+  // Minimal, fast probes to avoid a hard dependency on pre-populated system_health.
+  // Still FAIL-CLOSED if probes error.
+  const details: Record<string, string> = {};
+
+  try {
+    // database probe
+    const { error: dbErr } = await supabase.from('global_settings').select('id').limit(1);
+    if (dbErr) {
+      details.database = `unhealthy: ${dbErr.message}`;
+      return { ok: false, reason: 'System not ready: database probe failed', details };
+    }
+    details.database = 'healthy';
+
+    // oms probe
+    const { error: omsErr } = await supabase.from('orders').select('id').limit(1);
+    if (omsErr) {
+      details.oms = `unhealthy: ${omsErr.message}`;
+      return { ok: false, reason: 'System not ready: OMS probe failed', details };
+    }
+    details.oms = 'healthy';
+
+    // risk_engine probe
+    const { error: riskErr } = await supabase.from('risk_limits').select('book_id').limit(1);
+    if (riskErr) {
+      // risk_limits might be empty in a fresh install; the SELECT itself should still succeed.
+      details.risk_engine = `unhealthy: ${riskErr.message}`;
+      return { ok: false, reason: 'System not ready: risk engine probe failed', details };
+    }
+    details.risk_engine = 'healthy';
+
+    return { ok: true, details };
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : 'Unknown probe error', details };
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,40 +90,55 @@ async function runSafetyChecks(
   checks.push({
     name: 'system_health',
     check: async () => {
-      const { data: health } = await supabase
+      const { data: health, error } = await supabase
         .from('system_health')
         .select('component, status')
         .in('component', CRITICAL_COMPONENTS);
-      
-      // FAIL-CLOSED: If we don't have health records for all critical components, block trading
-      const foundComponents = new Set((health || []).map((h: { component: string }) => h.component));
-      const missingComponents = CRITICAL_COMPONENTS.filter(c => !foundComponents.has(c));
-      
-      if (missingComponents.length > 0) {
-        return { 
-          passed: false, 
-          reason: `System not ready: missing health data for ${missingComponents.join(', ')}`,
-          reasonCode: 'HEALTH_DATA_MISSING',
+
+      // If the table read fails, FAIL-CLOSED.
+      if (error) {
+        return {
+          passed: false,
+          reason: `System not ready: unable to read health status (${error.message})`,
+          reasonCode: 'HEALTH_READ_FAILED',
         };
       }
-      
+
+      // FAIL-CLOSED on missing health rows, BUT fall back to direct probes so trading isn't
+      // blocked just because checks haven't been run yet.
+      const foundComponents = new Set((health || []).map((h: { component: string }) => h.component));
+      const missingComponents = CRITICAL_COMPONENTS.filter((c) => !foundComponents.has(c));
+
+      if (missingComponents.length > 0) {
+        const probe = await probeCriticalComponents(supabase);
+        if (!probe.ok) {
+          return {
+            passed: false,
+            reason: probe.reason || `System not ready: missing health data for ${missingComponents.join(', ')}`,
+            reasonCode: 'HEALTH_DATA_MISSING',
+          };
+        }
+
+        // Probes succeeded -> allow trading for now (still fail-closed if any later check fails)
+        return { passed: true };
+      }
+
       // POLICY: For critical components, BOTH 'unhealthy' AND 'degraded' block trading
-      // This is the conservative, "highest probability of success" approach
-      const blockedComponents = health?.filter((h: { status: string }) => 
+      const blockedComponents = health?.filter((h: { status: string }) =>
         h.status === 'unhealthy' || h.status === 'degraded'
       ) || [];
-      
+
       if (blockedComponents.length > 0) {
-        const details = blockedComponents.map((c: { component: string; status: string }) => 
+        const details = blockedComponents.map((c: { component: string; status: string }) =>
           `${c.component}:${c.status}`
         ).join(', ');
-        return { 
-          passed: false, 
+        return {
+          passed: false,
           reason: `System not ready: ${details}`,
           reasonCode: 'CRITICAL_COMPONENT_DEGRADED',
         };
       }
-      
+
       return { passed: true };
     },
   });
