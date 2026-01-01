@@ -390,7 +390,7 @@ export default function Settings() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-muted-foreground text-xs">Database</Label>
-                  <p className="font-mono text-sm">Lovable Cloud (Postgres)</p>
+                  <p className="font-mono text-sm">Supabase (Postgres)</p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-muted-foreground text-xs">Realtime</Label>
@@ -401,7 +401,7 @@ export default function Settings() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-muted-foreground text-xs">Auth Provider</Label>
-                  <p className="font-mono text-sm">Lovable Cloud Auth</p>
+                  <p className="font-mono text-sm">Supabase Auth</p>
                 </div>
               </div>
             </CardContent>
