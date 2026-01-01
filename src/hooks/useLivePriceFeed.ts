@@ -131,6 +131,23 @@ export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOp
     }
   }, []);
 
+  const handleWsConnect = useCallback(() => {
+    console.log('[LivePriceFeed] Connected to Binance WebSocket');
+    wsFailCountRef.current = 0;
+    setUsingFallback(false);
+  }, []);
+
+  const handleWsDisconnect = useCallback(() => {
+    console.log('[LivePriceFeed] Disconnected from Binance WebSocket');
+    wsFailCountRef.current++;
+
+    // Switch to REST fallback after 3 failed attempts
+    if (wsFailCountRef.current >= 3) {
+      console.log('[LivePriceFeed] Switching to REST API fallback');
+      setUsingFallback(true);
+    }
+  }, []);
+
   const wsState = useWebSocketManager({
     url: wsUrl,
     enabled: enabled && symbols.length > 0 && !usingFallback,
@@ -138,21 +155,8 @@ export function useLivePriceFeed({ symbols, enabled = true }: UseLivePriceFeedOp
     initialBackoffMs: 1000,
     maxBackoffMs: 5000,
     onMessage: handleMessage,
-    onConnect: () => {
-      console.log('[LivePriceFeed] Connected to Binance WebSocket');
-      wsFailCountRef.current = 0;
-      setUsingFallback(false);
-    },
-    onDisconnect: () => {
-      console.log('[LivePriceFeed] Disconnected from Binance WebSocket');
-      wsFailCountRef.current++;
-      
-      // Switch to REST fallback after 3 failed attempts
-      if (wsFailCountRef.current >= 3) {
-        console.log('[LivePriceFeed] Switching to REST API fallback');
-        setUsingFallback(true);
-      }
-    },
+    onConnect: handleWsConnect,
+    onDisconnect: handleWsDisconnect,
   });
 
   // REST API fallback polling
