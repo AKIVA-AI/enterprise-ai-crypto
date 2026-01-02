@@ -39,8 +39,8 @@ async function simulateHyperliquidOrder(order: HyperliquidOrder): Promise<OrderR
   await new Promise(resolve => setTimeout(resolve, 5 + Math.random() * 10));
   
   const basePrice = parseFloat(order.price);
-  const slippage = order.orderType.hasOwnProperty('market') 
-    ? (Math.random() - 0.5) * 0.001 * basePrice 
+  const slippage = Object.prototype.hasOwnProperty.call(order.orderType, 'market')
+    ? (Math.random() - 0.5) * 0.001 * basePrice
     : 0;
   
   const filledPrice = basePrice + (order.isBuy ? slippage : -slippage);
