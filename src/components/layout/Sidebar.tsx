@@ -79,16 +79,19 @@ export function Sidebar() {
     >
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+        <div className="flex h-16 items-center border-b border-sidebar-border px-2">
           {!collapsed && (
-            <div className="flex items-center gap-1">
+            <div className="flex-1 flex items-center justify-center gap-1">
               <span className="font-semibold text-sidebar-foreground tracking-tight">enterprise crypto</span>
               <span className="text-primary font-bold text-lg">.</span>
             </div>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground"
+            className={cn(
+              "p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground",
+              collapsed && "mx-auto"
+            )}
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
