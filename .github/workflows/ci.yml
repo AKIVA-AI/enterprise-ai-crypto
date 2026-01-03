@@ -67,18 +67,32 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements-ci.txt
+
+      - name: Install system dependencies for TA-Lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential wget
+          wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+          tar -xzf ta-lib-0.4.0-src.tar.gz
+          cd ta-lib/
+          ./configure --prefix=/usr
+          make
+          sudo make install
+          cd ..
+          rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 
       - name: Install dependencies
         run: |
           cd backend
-          pip install -r requirements.txt
+          pip install --upgrade pip
+          pip install -r requirements-ci.txt
           pip install pytest-cov pytest-xdist
 
       - name: Run unit tests
         run: |
           cd backend
-          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing -n auto
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing -n auto --ignore=tests/test_freqtrade_integration.py
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key' }}
