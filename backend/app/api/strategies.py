@@ -1,11 +1,21 @@
 """
 API routes for strategy management.
+
+Production-ready FreqTrade strategy API.
 """
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/strategies", tags=["strategies"])
+
+
+# Check FreqTrade availability at import time
+try:
+    from app.freqtrade.strategy_manager import StrategyManager, is_freqtrade_available
+    FREQTRADE_AVAILABLE = is_freqtrade_available()
+except ImportError:
+    FREQTRADE_AVAILABLE = False
 
 
 class BacktestRequest(BaseModel):
@@ -26,41 +36,37 @@ class StrategySignalRequest(BaseModel):
     timeframe: str = "5m"
 
 
+@router.get("/status")
+async def get_freqtrade_status():
+    """Get FreqTrade system status."""
+    return {
+        "freqtrade_available": FREQTRADE_AVAILABLE,
+        "message": "FreqTrade ready for production" if FREQTRADE_AVAILABLE else "FreqTrade not installed",
+    }
+
+
 @router.get("/")
 async def list_strategies():
-    """List all available strategies."""
+    """List all available FreqTrade strategies."""
     try:
-        from app.freqtrade.strategy_manager import StrategyManager
-        
         manager = StrategyManager()
         discovered = manager.discover_strategies()
         loaded = manager.load_all_strategies()
-        
+
         return {
+            "freqtrade_available": FREQTRADE_AVAILABLE,
             "discovered": discovered,
             "loaded": loaded,
             "strategies": manager.list_strategies()
         }
     except Exception as e:
-        # Return built-in strategies
         return {
-            "discovered": ["AkivaTrendStrategy", "AkivaMomentumStrategy"],
+            "freqtrade_available": FREQTRADE_AVAILABLE,
+            "discovered": [],
             "loaded": 0,
-            "strategies": [
-                {
-                    "name": "AkivaTrendStrategy",
-                    "description": "Trend-following strategy using EMA crossovers",
-                    "timeframe": "5m",
-                    "risk_level": "medium",
-                },
-                {
-                    "name": "AkivaMomentumStrategy",
-                    "description": "Momentum strategy using RSI and MACD",
-                    "timeframe": "15m",
-                    "risk_level": "medium-high",
-                }
-            ],
-            "error": str(e)
+            "strategies": [],
+            "error": str(e),
+            "hint": "Install FreqTrade: pip install freqtrade"
         }
 
 
@@ -68,15 +74,13 @@ async def list_strategies():
 async def get_strategy_details(strategy_name: str):
     """Get details for a specific strategy."""
     try:
-        from app.freqtrade.strategy_manager import StrategyManager
-        
         manager = StrategyManager()
         manager.load_strategy(strategy_name)
         info = manager.get_strategy_info(strategy_name)
-        
+
         if not info:
             raise HTTPException(status_code=404, detail="Strategy not found")
-        
+
         return {
             "name": info.name,
             "class_name": info.class_name,
@@ -86,6 +90,27 @@ async def get_strategy_details(strategy_name: str):
             "trailing_stop": info.trailing_stop,
             "can_short": info.can_short,
             "use_freqai": info.use_freqai,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{strategy_name}/validate")
+async def validate_strategy(strategy_name: str):
+    """Validate a strategy for production readiness."""
+    try:
+        manager = StrategyManager()
+        if not manager.load_strategy(strategy_name):
+            raise HTTPException(status_code=404, detail="Strategy not found or failed to load")
+
+        validation = manager.validate_strategy(strategy_name)
+
+        return {
+            "strategy_name": strategy_name,
+            "production_ready": validation["valid"] and not validation["warnings"],
+            "validation": validation,
         }
     except HTTPException:
         raise

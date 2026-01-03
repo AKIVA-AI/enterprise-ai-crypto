@@ -2,10 +2,12 @@
 FreqTrade Strategy Manager - Strategy Lifecycle Management
 
 Manages FreqTrade-compatible strategies:
-- Loading and validation
+- Loading and validation (requires IStrategy inheritance)
 - Runtime execution
 - Performance tracking
 - Hot reloading
+
+IMPORTANT: Strategies MUST inherit from freqtrade.strategy.IStrategy
 """
 
 import logging
@@ -14,8 +16,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import importlib.util
+import sys
 
 logger = logging.getLogger(__name__)
+
+# Try to import IStrategy for proper validation
+try:
+    from freqtrade.strategy import IStrategy
+    FREQTRADE_AVAILABLE = True
+except ImportError:
+    FREQTRADE_AVAILABLE = False
+    IStrategy = None
+    logger.warning("FreqTrade not installed - strategy validation will be limited")
 
 
 @dataclass
@@ -94,15 +106,28 @@ class StrategyManager:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             
-            # Find strategy class (class that inherits from IStrategy)
+            # Find strategy class (MUST inherit from IStrategy if FreqTrade available)
             strategy_class = None
             for name, obj in vars(module).items():
-                if isinstance(obj, type) and hasattr(obj, 'minimal_roi'):
-                    strategy_class = obj
-                    break
-            
+                if not isinstance(obj, type):
+                    continue
+
+                # If FreqTrade is available, require IStrategy inheritance
+                if FREQTRADE_AVAILABLE:
+                    if issubclass(obj, IStrategy) and obj is not IStrategy:
+                        strategy_class = obj
+                        logger.info(f"Found valid IStrategy subclass: {name}")
+                        break
+                else:
+                    # Fallback: check for required attributes
+                    if hasattr(obj, 'minimal_roi') and hasattr(obj, 'populate_indicators'):
+                        strategy_class = obj
+                        logger.warning(f"FreqTrade not available - loaded {name} without IStrategy validation")
+                        break
+
             if not strategy_class:
-                logger.error(f"No valid strategy class found in {strategy_name}")
+                logger.error(f"No valid IStrategy subclass found in {strategy_name}")
+                logger.error("Strategies MUST inherit from freqtrade.strategy.IStrategy")
                 return False
             
             # Instantiate and store
@@ -198,5 +223,52 @@ class StrategyManager:
             "strategy_dir": str(self.strategy_dir),
             "loaded_strategies": len(self._strategies),
             "strategies": self.list_strategies(),
+            "freqtrade_available": FREQTRADE_AVAILABLE,
         }
+
+    def validate_strategy(self, strategy_name: str) -> Dict[str, Any]:
+        """Validate a strategy for production readiness."""
+        validation_results = {
+            "strategy_name": strategy_name,
+            "valid": False,
+            "errors": [],
+            "warnings": [],
+        }
+
+        strategy = self.get_strategy(strategy_name)
+        if not strategy:
+            validation_results["errors"].append("Strategy not loaded")
+            return validation_results
+
+        # Check required attributes
+        required_attrs = [
+            "minimal_roi", "stoploss", "timeframe",
+            "populate_indicators", "populate_entry_trend", "populate_exit_trend"
+        ]
+
+        for attr in required_attrs:
+            if not hasattr(strategy, attr):
+                validation_results["errors"].append(f"Missing required attribute: {attr}")
+
+        # Check IStrategy inheritance
+        if FREQTRADE_AVAILABLE:
+            if not isinstance(strategy, IStrategy):
+                validation_results["errors"].append("Strategy does not inherit from IStrategy")
+
+        # Warnings for production
+        if not hasattr(strategy, "startup_candle_count"):
+            validation_results["warnings"].append("Missing startup_candle_count - may cause issues")
+
+        if getattr(strategy, "stoploss", 0) > -0.05:
+            validation_results["warnings"].append("Stoploss may be too tight for production")
+
+        if not validation_results["errors"]:
+            validation_results["valid"] = True
+
+        return validation_results
+
+
+def is_freqtrade_available() -> bool:
+    """Check if FreqTrade is properly installed."""
+    return FREQTRADE_AVAILABLE
 
