@@ -108,44 +108,48 @@ describe('KillSwitchPanel', () => {
   describe('Kill Switch Activation', () => {
     it('should show confirmation dialog when KILL button clicked', async () => {
       renderPanel();
-      
+
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /KILL/i })).toBeInTheDocument();
       });
-      
+
       const killButton = screen.getByRole('button', { name: /KILL/i });
       fireEvent.click(killButton);
-      
+
       await waitFor(() => {
-        expect(screen.getByText(/ACTIVATE KILL SWITCH/i)).toBeInTheDocument();
+        expect(screen.getByText((content, element) => {
+          return element?.textContent?.includes('Activate Kill Switch') || false;
+        })).toBeInTheDocument();
       });
     });
 
     it('should show warning message in confirmation dialog', async () => {
       renderPanel();
-      
+
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /KILL/i })).toBeInTheDocument();
       });
-      
+
       const killButton = screen.getByRole('button', { name: /KILL/i });
       fireEvent.click(killButton);
-      
+
       await waitFor(() => {
-        expect(screen.getByText(/immediately halt ALL trading activity/i)).toBeInTheDocument();
+        expect(screen.getByText((content, element) => {
+          return element?.textContent?.includes('immediately halt ALL trading activity') || false;
+        })).toBeInTheDocument();
       });
     });
 
     it('should have cancel button in confirmation dialog', async () => {
       renderPanel();
-      
+
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /KILL/i })).toBeInTheDocument();
       });
-      
+
       const killButton = screen.getByRole('button', { name: /KILL/i });
       fireEvent.click(killButton);
-      
+
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
       });
@@ -155,26 +159,28 @@ describe('KillSwitchPanel', () => {
   describe('Security Features', () => {
     it('should require 2FA for activation', async () => {
       renderPanel();
-      
+
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /KILL/i })).toBeInTheDocument();
       });
-      
+
       // Click KILL button
       const killButton = screen.getByRole('button', { name: /KILL/i });
       fireEvent.click(killButton);
-      
+
       // Confirm in dialog
       await waitFor(() => {
-        expect(screen.getByText(/ACTIVATE KILL SWITCH/i)).toBeInTheDocument();
+        expect(screen.getByText((content, element) => {
+          return element?.textContent?.includes('Activate Kill Switch') || false;
+        })).toBeInTheDocument();
       });
-      
+
       const confirmButton = screen.getByRole('button', { name: /ACTIVATE KILL SWITCH/i });
       fireEvent.click(confirmButton);
-      
+
       // 2FA dialog should appear
       await waitFor(() => {
-        expect(screen.getByText(/2FA/i)).toBeInTheDocument();
+        expect(screen.getByText(/two-factor verification/i)).toBeInTheDocument();
       });
     });
   });
