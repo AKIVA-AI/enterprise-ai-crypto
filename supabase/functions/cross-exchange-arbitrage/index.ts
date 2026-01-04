@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  getSecureCorsHeaders,
+  validateAuth,
+  rateLimitMiddleware,
+  RATE_LIMITS
+} from "../_shared/security.ts";
 
 interface PriceData {
   exchange: string;
@@ -576,11 +577,27 @@ function checkDailyReset() {
 }
 
 serve(async (req) => {
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Authenticate and rate limit
+    const authHeader = req.headers.get('Authorization');
+    const { user } = await validateAuth(supabase, authHeader);
+
+    if (user) {
+      const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.arbitrage, corsHeaders);
+      if (rateLimitResponse) return rateLimitResponse;
+    }
+
     const { action, params = {} } = await req.json();
     console.log(`[Arbitrage] Action: ${action}`, params);
 

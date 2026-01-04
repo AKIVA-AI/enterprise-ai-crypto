@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-tv-secret',
-};
+import { getSecureCorsHeaders, RATE_LIMITS, rateLimitMiddleware, validateAuth } from "../_shared/security.ts";
 
 interface TradingViewAlert {
   // Standard TradingView fields
@@ -39,6 +35,9 @@ interface TradingViewAlert {
 }
 
 serve(async (req) => {
+  // TradingView webhook needs to accept external origin, but uses secret validation
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

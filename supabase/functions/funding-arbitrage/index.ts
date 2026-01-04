@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  getSecureCorsHeaders,
+  validateAuth,
+  rateLimitMiddleware,
+  RATE_LIMITS
+} from "../_shared/security.ts";
 
 interface FundingOpportunity {
   symbol: string;
@@ -34,6 +35,8 @@ interface ArbitrageExecution {
 }
 
 serve(async (req) => {
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -42,6 +45,14 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Validate auth and apply rate limiting
+    const authHeader = req.headers.get('Authorization');
+    const { user } = await validateAuth(supabase, authHeader);
+    if (user) {
+      const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.arbitrage, corsHeaders);
+      if (rateLimitResponse) return rateLimitResponse;
+    }
 
     // Parse body ONCE - this is critical as the body can only be consumed once in Deno
     const body = await req.json();

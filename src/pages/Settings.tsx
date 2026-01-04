@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { NotificationChannelManager } from '@/components/settings/NotificationChannelManager';
 import { UserRoleManager } from '@/components/settings/UserRoleManager';
+import { ExchangeAPIManager } from '@/components/intelligence/ExchangeAPIManager';
 import {
   Settings as SettingsIcon, 
   Server, 
@@ -366,6 +367,9 @@ export default function Settings() {
             </Alert>
           </CardContent>
         </Card>
+
+        {/* Exchange API Keys */}
+        <ExchangeAPIManager />
 
         {/* User Role Management */}
         <UserRoleManager />

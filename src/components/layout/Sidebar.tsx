@@ -6,7 +6,6 @@ import {
   LineChart,
   Crosshair,
   Shield,
-  Rocket,
   Wallet,
   Activity,
   Settings,
@@ -21,25 +20,36 @@ import {
   ArrowLeftRight,
   Repeat,
   Radio,
+  Search,
+  Target,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
+// Navigation organized by function for Coinbase Advanced trading
 const navigation = [
+  // Core Trading
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Trade', href: '/trade', icon: Repeat },
-  { name: 'Markets', href: '/markets', icon: BarChart3 },
-  { name: 'Arbitrage', href: '/arbitrage', icon: ArrowLeftRight },
-  { name: 'Engine', href: '/engine', icon: Cpu },
-  { name: 'Analytics', href: '/analytics', icon: LineChart },
-  { name: 'Agents', href: '/agents', icon: Bot },
-  { name: 'Strategies', href: '/strategies', icon: Activity },
-  { name: 'Execution', href: '/execution', icon: Crosshair },
+  { name: 'Screener', href: '/screener', icon: Search },
   { name: 'Positions', href: '/positions', icon: Briefcase },
+
+  // Analysis
+  { name: 'Markets', href: '/markets', icon: BarChart3 },
+  { name: 'Analytics', href: '/analytics', icon: LineChart },
+  { name: 'Strategies', href: '/strategies', icon: Target },
+
+  // Automation
+  { name: 'Engine', href: '/engine', icon: Cpu },
+  { name: 'Agents', href: '/agents', icon: Bot },
+  { name: 'Execution', href: '/execution', icon: Crosshair },
+
+  // Risk & Operations
   { name: 'Risk', href: '/risk', icon: Shield },
-  { name: 'Meme Ventures', href: '/launch', icon: Rocket },
   { name: 'Treasury', href: '/treasury', icon: Wallet },
   { name: 'Operations', href: '/operations', icon: Radio },
+
+  // System
   { name: 'Observability', href: '/observability', icon: Activity },
   { name: 'Audit Log', href: '/audit', icon: History },
   { name: 'System Status', href: '/status', icon: CircleCheck },

@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getSecureCorsHeaders, RATE_LIMITS, rateLimitMiddleware, validateAuth } from "../_shared/security.ts";
 
 /**
  * Macro Indicators Edge Function
- * 
+ *
  * Fetches macro economic indicators from FRED that influence crypto markets:
  * - Federal Funds Rate (DFF)
  * - CPI Inflation (CPIAUCSL)
@@ -11,11 +12,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * - 10-Year Treasury Yield (DGS10)
  * - Dollar Index proxy via EUR/USD
  */
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 const FRED_API_KEY = Deno.env.get('FRED_API_KEY');
 const FRED_BASE_URL = 'https://api.stlouisfed.org/fred/series/observations';
@@ -36,6 +32,8 @@ interface MacroRequest {
 }
 
 serve(async (req) => {
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

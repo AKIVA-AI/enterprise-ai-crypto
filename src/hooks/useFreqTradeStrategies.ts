@@ -73,6 +73,36 @@ export function useFreqTradeSignal(strategyName: string, pair: string) {
 // Available FreqTrade strategies (static list for UI)
 export const FREQTRADE_STRATEGIES = [
   {
+    name: 'AlphaTrendHMA',
+    description: 'AlphaTrend indicator with Hull Moving Average confirmation - adaptive trend following',
+    indicators: ['AlphaTrend', 'HMA', 'ATR', 'MFI'],
+    timeframe: '15m',
+    expectedReturn: '15-30%',
+    canShort: false, // US compliance - spot only
+    hyperoptable: true,
+    params: 7,
+  },
+  {
+    name: 'AlphaTrendVWMA',
+    description: 'AlphaTrend with Volume Weighted MA - volume-confirmed trend entries',
+    indicators: ['AlphaTrend', 'VWMA', 'ATR', 'MFI'],
+    timeframe: '15m',
+    expectedReturn: '15-25%',
+    canShort: false,
+    hyperoptable: true,
+    params: 7,
+  },
+  {
+    name: 'ATSSLHybrid',
+    description: 'Advanced AT + SSL Channel hybrid with Keltner bands - professional grade multi-variant',
+    indicators: ['AlphaTrend', 'SSL', 'Keltner', 'ATR'],
+    timeframe: '15m',
+    expectedReturn: '20-40%',
+    canShort: false,
+    hyperoptable: true,
+    params: 13,
+  },
+  {
     name: 'RSIMomentumStrategy',
     description: 'RSI-based momentum strategy with trend confirmation',
     indicators: ['RSI', 'EMA', 'MACD'],

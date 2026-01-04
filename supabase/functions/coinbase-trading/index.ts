@@ -2,24 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode, decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
-
-// SECURITY: Restrict CORS to known origins
-const ALLOWED_ORIGINS = [
-  'https://amvakxshlojoshdfcqos.lovableproject.com',
-  'https://amvakxshlojoshdfcqos.lovable.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
-function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('origin') || '';
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
-}
+import {
+  getSecureCorsHeaders,
+  rateLimitMiddleware,
+  RATE_LIMITS
+} from "../_shared/security.ts";
 
 // Coinbase Advanced Trade API base URL
 const COINBASE_API_URL = 'https://api.coinbase.com';
@@ -517,8 +504,8 @@ async function getProducts(credentials: CoinbaseCredentials): Promise<any> {
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -532,10 +519,10 @@ serve(async (req) => {
     // Get Coinbase credentials
     const apiKey = Deno.env.get('COINBASE_API_KEY');
     const apiSecret = Deno.env.get('COINBASE_API_SECRET');
-    
+
     const hasCredentials = apiKey && apiSecret;
-    const credentials: CoinbaseCredentials | null = hasCredentials 
-      ? { apiKey, apiSecret } 
+    const credentials: CoinbaseCredentials | null = hasCredentials
+      ? { apiKey, apiSecret }
       : null;
 
     const url = new URL(req.url);
@@ -567,9 +554,15 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      
+
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+      // Rate limit trading operations (30/min per user)
+      if (user) {
+        const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.trading, corsHeaders);
+        if (rateLimitResponse) return rateLimitResponse;
+      }
       
       if (authError || !user) {
         return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {

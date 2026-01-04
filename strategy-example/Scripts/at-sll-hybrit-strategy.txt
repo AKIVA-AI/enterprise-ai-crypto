@@ -1,0 +1,455 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Deep Govind
+
+//@version=6
+strategy('AT SSL - Mustafa Deger-MASTER', overlay = true,process_orders_on_close = true,calc_on_every_tick = true,default_qty_value  = 2)
+
+
+StraType =input.string("V1","Strategy",options = ["V1","V2","V3","V4"],inline = "v")
+
+isV1 = StraType == "V1"
+isV2 = StraType == "V2"
+isV3 = StraType == "V3"
+isV4 = StraType == "V4"
+
+ 
+float SL_Input_p  = na
+float TG_Input_p  = na
+
+float SL_Input_pm  = na
+float TG_Input_p2  = na
+
+// if isV1
+//     grv1 = "================ V1 ==============="
+//     SL_Input_p := input.float(0.3,"StopLoss %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+//     TG_Input_p := input.float(0.6,"Target %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+if isV2
+    grv1 = "================ V2 ==============="
+    SL_Input_p := input.float(0.3,"StopLoss %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+    TG_Input_p := input.float(0.6,"Target %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+if isV3
+    grv1 = "================ V3 ==============="
+    SL_Input_p := input.float(0.3,"StopLoss %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+    TG_Input_p := input.float(0.6,"Target %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+if isV4
+    grv1 = "================ V4 ==============="
+    SL_Input_p := input.float(0.3,"StopLoss %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+    TG_Input_p := input.float(0.6,"Target 1 %",minval = 0 ,step = 0.5,inline = "sl1",group = grv1)*0.01*close
+    TG_Input_p2 := input.float(0.6,"Target 2 %",minval = 0 ,step = 0.5,inline = "sl1",group = grv1)*0.01*close
+    SL_Input_pm := input.float(0.15,"StopLoss Move %",minval = 0 ,step = 0.5,inline = "sl",group = grv1)*0.01*close
+
+
+show_Baseline = input(title = 'Show Baseline', defval = true)  
+// show_SSL1 = input(title='Show SSL1', defval=false)
+// show_atr = input(title='Show ATR bands', defval=true)
+//ATR
+atrlen = input(14, 'ATR Period')
+mult = input.float(1, 'ATR Multi', step = 0.1)
+smoothing = input.string(title = 'ATR Smoothing', defval = 'WMA', options = ['RMA', 'SMA', 'EMA', 'WMA'])
+
+ma_function(source, atrlen) =>
+    if smoothing == 'RMA'
+        ta.rma(source, atrlen)
+    else
+        if smoothing == 'SMA'
+            ta.sma(source, atrlen)
+        else
+            if smoothing == 'EMA'
+                ta.ema(source, atrlen)
+            else
+                ta.wma(source, atrlen)
+atr_slen = ma_function(ta.tr(true), atrlen)
+////ATR Up/Low Bands
+upper_band = atr_slen * mult + close
+lower_band = close - atr_slen * mult
+
+////BASELINE / SSL1 / SSL2 / EXIT MOVING AVERAGE VALUES
+maType = input.string(title = 'SSL1 / Baseline Type', defval = 'HMA', options = ['SMA', 'EMA', 'DEMA', 'TEMA', 'LSMA', 'WMA', 'MF', 'VAMA', 'TMA', 'HMA', 'JMA', 'Kijun v2', 'EDSMA', 'McGinley'])
+len = input(title = 'SSL1 / Baseline Length', defval = 60)
+
+SSL2Type = input.string(title = 'SSL2 / Continuation Type', defval = 'JMA', options = ['SMA', 'EMA', 'DEMA', 'TEMA', 'WMA', 'MF', 'VAMA', 'TMA', 'HMA', 'JMA', 'McGinley'])
+len2 = input(title = 'SSL 2 Length', defval = 5)
+//
+SSL3Type = input.string(title = 'EXIT Type', defval = 'HMA', options = ['DEMA', 'TEMA', 'LSMA', 'VAMA', 'TMA', 'HMA', 'JMA', 'Kijun v2', 'McGinley', 'MF'])
+len3 = input(title = 'EXIT Length', defval = 15)
+src = input(title = 'Source', defval = close)
+
+//
+tema(src, len) =>
+    ema1 = ta.ema(src, len)
+    ema2 = ta.ema(ema1, len)
+    ema3 = ta.ema(ema2, len)
+    3 * ema1 - 3 * ema2 + ema3
+kidiv = input.int(defval = 1, maxval = 4, title = 'Kijun MOD Divider')
+
+jurik_phase = input(title = '* Jurik (JMA) Only - Phase', defval = 3)
+jurik_power = input(title = '* Jurik (JMA) Only - Power', defval = 1)
+volatility_lookback = input(10, title = '* Volatility Adjusted (VAMA) Only - Volatility lookback length')
+//MF
+beta = input.float(0.8, minval = 0, maxval = 1, step = 0.1, title = 'Modular Filter, General Filter Only - Beta')
+feedback = input(false, title = 'Modular Filter Only - Feedback')
+z = input.float(0.5, title = 'Modular Filter Only - Feedback Weighting', step = 0.1, minval = 0, maxval = 1)
+//EDSMA
+ssfLength = input.int(title = 'EDSMA - Super Smoother Filter Length', minval = 1, defval = 20)
+ssfPoles = input.int(title = 'EDSMA - Super Smoother Filter Poles', defval = 2, options = [2, 3])
+
+//----
+
+//EDSMA
+get2PoleSSF(src, length) =>
+    PI = 2 * math.asin(1)
+    arg = math.sqrt(2) * PI / length
+    a1 = math.exp(-arg)
+    b1 = 2 * a1 * math.cos(arg)
+    c2 = b1
+    c3 = -math.pow(a1, 2)
+    c1 = 1 - c2 - c3
+
+    ssf = 0.0
+    ssf := c1 * src + c2 * nz(ssf[1]) + c3 * nz(ssf[2])
+    ssf
+
+get3PoleSSF(src, length) =>
+    PI = 2 * math.asin(1)
+
+    arg = PI / length
+    a1 = math.exp(-arg)
+    b1 = 2 * a1 * math.cos(1.738 * arg)
+    c1 = math.pow(a1, 2)
+
+    coef2 = b1 + c1
+    coef3 = -(c1 + b1 * c1)
+    coef4 = math.pow(c1, 2)
+    coef1 = 1 - coef2 - coef3 - coef4
+
+    ssf = 0.0
+    ssf := coef1 * src + coef2 * nz(ssf[1]) + coef3 * nz(ssf[2]) + coef4 * nz(ssf[3])
+    ssf
+
+ma(type, src, len) =>
+    float result = 0
+    if type == 'TMA'
+        result := ta.sma(ta.sma(src, math.ceil(len / 2)), math.floor(len / 2) + 1)
+        result
+    if type == 'MF'
+        ts = 0.
+        b = 0.
+        c = 0.
+        os = 0.
+        //----
+        alpha = 2 / (len + 1)
+        a = feedback ? z * src + (1 - z) * nz(ts[1], src) : src
+        //----
+        b := a > alpha * a + (1 - alpha) * nz(b[1], a) ? a : alpha * a + (1 - alpha) * nz(b[1], a)
+        c := a < alpha * a + (1 - alpha) * nz(c[1], a) ? a : alpha * a + (1 - alpha) * nz(c[1], a)
+        os := a == b ? 1 : a == c ? 0 : os[1]
+        //----
+        upper = beta * b + (1 - beta) * c
+        lower = beta * c + (1 - beta) * b
+        ts := os * upper + (1 - os) * lower
+        result := ts
+        result
+    if type == 'LSMA'
+        result := ta.linreg(src, len, 0)
+        result
+    if type == 'SMA' // Simple
+        result := ta.sma(src, len)
+        result
+    if type == 'EMA' // Exponential
+        result := ta.ema(src, len)
+        result
+    if type == 'DEMA' // Double Exponential
+        e = ta.ema(src, len)
+        result := 2 * e - ta.ema(e, len)
+        result
+    if type == 'TEMA' // Triple Exponential
+        e = ta.ema(src, len)
+        result := 3 * (e - ta.ema(e, len)) + ta.ema(ta.ema(e, len), len)
+        result
+    if type == 'WMA' // Weighted
+        result := ta.wma(src, len)
+        result
+    if type == 'VAMA' // Volatility Adjusted
+        /// Copyright © 2019 to present, Joris Duyck (JD)
+        mid = ta.ema(src, len)
+        dev = src - mid
+        vol_up = ta.highest(dev, volatility_lookback)
+        vol_down = ta.lowest(dev, volatility_lookback)
+        result := mid + math.avg(vol_up, vol_down)
+        result
+    if type == 'HMA' // Hull
+        result := ta.wma(2 * ta.wma(src, len / 2) - ta.wma(src, len), math.round(math.sqrt(len)))
+        result
+    if type == 'JMA' // Jurik
+        /// Copyright © 2018 Alex Orekhov (everget)
+        /// Copyright © 2017 Jurik Research and Consulting.
+        phaseRatio = jurik_phase < -100 ? 0.5 : jurik_phase > 100 ? 2.5 : jurik_phase / 100 + 1.5
+        beta = 0.45 * (len - 1) / (0.45 * (len - 1) + 2)
+        alpha = math.pow(beta, jurik_power)
+        jma = 0.0
+        e0 = 0.0
+        e0 := (1 - alpha) * src + alpha * nz(e0[1])
+        e1 = 0.0
+        e1 := (src - e0) * (1 - beta) + beta * nz(e1[1])
+        e2 = 0.0
+        e2 := (e0 + phaseRatio * e1 - nz(jma[1])) * math.pow(1 - alpha, 2) + math.pow(alpha, 2) * nz(e2[1])
+        jma := e2 + nz(jma[1])
+        result := jma
+        result
+    if type == 'Kijun v2'
+        kijun = math.avg(ta.lowest(len), ta.highest(len)) //, (open + close)/2)
+        conversionLine = math.avg(ta.lowest(len / kidiv), ta.highest(len / kidiv))
+        delta = (kijun + conversionLine) / 2
+        result := delta
+        result
+    if type == 'McGinley'
+        mg = 0.0
+        mg := na(mg[1]) ? ta.ema(src, len) : mg[1] + (src - mg[1]) / (len * math.pow(src / mg[1], 4))
+        result := mg
+        result
+    if type == 'EDSMA'
+
+        zeros = src - nz(src[2])
+        avgZeros = (zeros + zeros[1]) / 2
+
+        // Ehlers Super Smoother Filter 
+        ssf = ssfPoles == 2 ? get2PoleSSF(avgZeros, ssfLength) : get3PoleSSF(avgZeros, ssfLength)
+
+        // Rescale filter in terms of Standard Deviations
+        stdev = ta.stdev(ssf, len)
+        scaledFilter = stdev != 0 ? ssf / stdev : 0
+
+        alpha = 5 * math.abs(scaledFilter) / len
+
+        edsma = 0.0
+        edsma := alpha * src + (1 - alpha) * nz(edsma[1])
+        result := edsma
+        result
+    result
+
+///SSL 1 and SSL2
+emaHigh = ma(maType, high, len)
+emaLow = ma(maType, low, len)
+
+maHigh = ma(SSL2Type, high, len2)
+maLow = ma(SSL2Type, low, len2)
+
+///EXIT
+ExitHigh = ma(SSL3Type, high, len3)
+ExitLow = ma(SSL3Type, low, len3)
+
+///Keltner Baseline Channel
+BBMC = ma(maType, close, len)
+useTrueRange = input(true)
+multy = input.float(0.2, step = 0.05, title = 'Base Channel Multiplier')
+Keltma = ma(maType, src, len)
+range_1 = useTrueRange ? ta.tr : high - low
+rangema = ta.ema(range_1, len)
+upperk = Keltma + rangema * multy
+lowerk = Keltma - rangema * multy
+
+//Baseline Violation Candle
+// open_pos = open * 1
+// close_pos = close * 1
+// difference = math.abs(close_pos - open_pos)
+// atr_violation = difference > atr_slen
+// InRange = upper_band > BBMC and lower_band < BBMC
+// candlesize_violation = atr_violation and InRange
+// plotshape(candlesize_violation, color=color.new(color.white, 0), size=size.tiny, style=shape.diamond, location=location.top, title='Candle Size > 1xATR')
+
+
+//SSL1 VALUES
+Hlv = int(na)
+Hlv := close > emaHigh ? 1 : close < emaLow ? -1 : Hlv[1]
+sslDown = Hlv < 0 ? emaHigh : emaLow
+
+//SSL2 VALUES
+Hlv2 = int(na)
+Hlv2 := close > maHigh ? 1 : close < maLow ? -1 : Hlv2[1]
+sslDown2 = Hlv2 < 0 ? maHigh : maLow
+
+//EXIT VALUES
+Hlv3 = int(na)
+Hlv3 := close > ExitHigh ? 1 : close < ExitLow ? -1 : Hlv3[1]
+// sslExit = Hlv3 < 0 ? ExitHigh : ExitLow
+// base_cross_Long = ta.crossover(close, sslExit)
+// base_cross_Short = ta.crossover(sslExit, close)
+// codiff = base_cross_Long ? 1 : base_cross_Short ? -1 : na
+
+//COLORS
+show_color_bar = input(title = 'Color Bars', defval = true)
+color_bar = close > upperk ? #00c3ff : close < lowerk ? #ff0062 : color.gray
+// color_ssl1 = close > sslDown ? #00c3ff : close < sslDown ? #ff0062 : na
+
+//PLOTS
+// plotarrow(codiff, colorup=color.new(#00c3ff, 20), colordown=color.new(#ff0062, 20), title='Exit Arrows', maxheight=20, offset=0)
+// p1 = plot(show_Baseline  ? BBMC : na, color = color_bar, linewidth = 4, title = 'MA Baseline')
+// DownPlot = plot(show_SSL1 ? sslDown : na, title='SSL1', linewidth=3, color=color_ssl1, transp=10)
+// barcolor(show_color_bar ? color_bar : na)
+up_channel = plot(show_Baseline ? upperk : na, color = color_bar, title = 'Baseline Upper Channel')
+low_channel = plot(show_Baseline ? lowerk : na, color = color_bar, title = 'Basiline Lower Channel')
+// fill(up_channel, low_channel, color = close > upperk ? #00c3ff1b : close < lowerk ? #ff00621c : color.rgb(120, 123, 134, 96))
+
+////SSL2 Continiuation from ATR
+// atr_crit = input.float(0.9, step=0.1, title='Continuation ATR Criteria')
+
+// upper_half = atr_slen * atr_crit + close
+// lower_half = close - atr_slen * atr_crit
+// buy_inatr = lower_half < sslDown2
+// sell_inatr = upper_half > sslDown2
+// sell_cont = close < BBMC and close < sslDown2
+// buy_cont = close > BBMC and close > sslDown2
+// sell_atr = sell_inatr and sell_cont
+// buy_atr = buy_inatr and buy_cont
+// atr_fill = buy_atr ? color.green : sell_atr ? color.purple : color.white
+// LongPlot = plot(sslDown2, title='SSL2', linewidth=2, color=atr_fill, style=plot.style_circles, transp=0)
+// u = plot(show_atr ? upper_band : na, '+ATR', color=color.new(color.white, 80))
+// l = plot(show_atr ? lower_band : na, '-ATR', color=color.new(color.white, 80))
+
+// //ALERTS
+// alertcondition(ta.crossover(close, sslDown), title='SSL Cross Alert', message='SSL1 has crossed.')
+// alertcondition(ta.crossover(close, sslDown2), title='SSL2 Cross Alert', message='SSL2 has crossed.')
+// alertcondition(sell_atr, title='Sell Continuation', message='Sell Continuation.')
+// alertcondition(buy_atr, title='Buy Continuation', message='Buy Continuation.')
+// alertcondition(ta.crossover(close, sslExit), title='Exit Sell', message='Exit Sell Alert.')
+// alertcondition(ta.crossover(sslExit, close), title='Exit Buy', message='Exit Buy Alert.')
+// alertcondition(ta.crossover(close, upperk), title='Baseline Buy Entry', message='Base Buy Alert.')
+// alertcondition(ta.crossover(lowerk, close), title='Baseline Sell Entry', message='Base Sell Alert.')
+
+
+isSSLGreen = close > upperk
+isSSLRed = close < lowerk
+
+
+
+ 
+grat = "=========== AlphaTrend ============"
+
+coeff = input.float(1, 'Multiplier', step = 0.1,group = grat)
+AP = input(14, 'Common Period',group = grat)
+ATR = ta.sma(ta.tr, AP)
+srcat = input(close,group = grat)
+showsignalsk = input(title = 'Show Signals?', defval = true,group = grat)
+novolumedata = input(title = 'Change calculation (no volume data)?', defval = false,group = grat)
+upT = low - ATR * coeff
+downT = high + ATR * coeff
+AlphaTrend = 0.0
+AlphaTrend := (novolumedata ? ta.rsi(srcat, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
+
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+k1 = plot(AlphaTrend, color = color.new(#0022FC, 0), linewidth = 1)
+k2 = plot(AlphaTrend[2], color = color.new(#FC0400, 0), linewidth = 1)
+
+// fill(k1, k2, color = color1)
+
+buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
+sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
+
+
+K1 = ta.barssince(buySignalk)
+K2 = ta.barssince(sellSignalk)
+O1 = ta.barssince(buySignalk[1])
+O2 = ta.barssince(sellSignalk[1])
+
+// plotshape(buySignalk and showsignalsk and O1 > K2 ? AlphaTrend[2] * 0.9999 : na, title = 'BUY', text = 'BUY', location = location.absolute, style = shape.labelup, size = size.tiny, color = color.new(#0022FC, 0), textcolor = color.new(color.white, 0),display = display.none)
+
+// plotshape(sellSignalk and showsignalsk and O2 > K1 ? AlphaTrend[2] * 1.0001 : na, title = 'SELL', text = 'SELL', location = location.absolute, style = shape.labeldown, size = size.tiny, color = color.new(color.maroon, 0), textcolor = color.new(color.white, 0),display = display.none)
+
+
+// alertcondition(buySignalk and O1 > K2, title = 'Potential BUY Alarm', message = 'BUY SIGNAL!')
+// alertcondition(sellSignalk and O2 > K1, title = 'Potential SELL Alarm', message = 'SELL SIGNAL!')
+
+// alertcondition(buySignalk[1] and O1[1] > K2, title = 'Confirmed BUY Alarm', message = 'BUY SIGNAL APPROVED!')
+// alertcondition(sellSignalk[1] and O2[1] > K1, title = 'Confirmed SELL Alarm', message = 'SELL SIGNAL APPROVED!')
+
+
+
+// alertcondition(ta.cross(close, AlphaTrend), title = 'Price Cross Alert', message = 'Price - AlphaTrend Crossing!')
+// alertcondition(ta.crossover(low, AlphaTrend), title = 'Candle CrossOver Alarm', message = 'LAST BAR is ABOVE ALPHATREND')
+// alertcondition(ta.crossunder(high, AlphaTrend), title = 'Candle CrossUnder Alarm', message = 'LAST BAR is BELOW ALPHATREND!')
+
+// alertcondition(ta.cross(close[1], AlphaTrend[1]), title = 'Price Cross Alert After Bar Close', message = 'Price - AlphaTrend Crossing!')
+// alertcondition(ta.crossover(low[1], AlphaTrend[1]), title = 'Candle CrossOver Alarm After Bar Close', message = 'LAST BAR is ABOVE ALPHATREND!')
+// alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title = 'Candle CrossUnder Alarm After Bar Close', message = 'LAST BAR is BELOW ALPHATREND!')
+
+isATBuy = AlphaTrend > AlphaTrend[1]
+isATSell = AlphaTrend < AlphaTrend[1]
+
+// bgcolor(isATBuy ? color.green : na)
+// if //sellSignalk   and O2 > K1 and 
+//     isATBuySell := -1
+// if buySignalk   and O1 > K2
+//     isATBuySell := 1
+
+var isVld = 0
+
+
+isBuy = isATBuy and isSSLGreen and isVld <= 0 and strategy.position_size <= 0 and barstate.isconfirmed
+isSell = isATSell and isSSLRed  and isVld >= 0  and strategy.position_size >= 0  and barstate.isconfirmed
+
+
+if not isSSLRed and not isSSLGreen //(isATBuy and not isATBuy[1]) or (isATSell and not isATSell[1])
+    isVld := 0
+
+if isBuy  
+    isVld :=1
+    strategy.close("Sell","Close")
+if isSell 
+    strategy.close("Buy","Close")
+    isVld :=-1
+
+if isV1
+ 
+    if isATSell
+        strategy.close("Buy","Close")
+    if isATBuy
+        strategy.close("Sell","Close")
+
+    if isBuy  
+        strategy.entry("Buy",strategy.long)
+    if isSell 
+        strategy.entry("Sell",strategy.short)
+    
+
+if isV3 
+
+    if isBuy  
+        strategy.entry("Buy",strategy.long)
+        strategy.exit("Exit","Buy",limit = close + TG_Input_p,stop = close - SL_Input_p,comment_loss = "SL",comment_profit = "TP")
+    if isSell 
+        strategy.entry("Sell",strategy.short)
+        strategy.exit("Exit","Sell",limit = close - TG_Input_p,stop = close + SL_Input_p,comment_loss = "SL",comment_profit = "TP")
+ 
+if isV2
+    if isBuy
+        strategy.entry("Buy",strategy.long)
+        strategy.exit("Exit1","Buy",limit = close + TG_Input_p,stop = close - SL_Input_p,qty_percent = 50,comment_loss = "SL",comment_profit = "TP")
+        strategy.exit("Exit2","Buy",limit = 99999999,stop = close - SL_Input_p,qty_percent = 100,comment_loss = "SL",comment_profit = "TP")
+    if isSell 
+        strategy.entry("Sell",strategy.short)
+        strategy.exit("Exit1","Sell",limit = close - TG_Input_p, stop = close + SL_Input_p,qty_percent = 50,comment_loss = "SL",comment_profit = "TP")
+        strategy.exit("Exit2","Sell",limit = 0, stop = close + SL_Input_p,qty_percent = 100,comment_loss = "SL",comment_profit = "TP")
+
+if isV4
+    var float tp2i = na
+    var float en2i = na
+    if isBuy
+        strategy.entry("Buy",strategy.long)
+        tp2i := close + TG_Input_p2
+        en2i := close
+        strategy.exit("Exit1","Buy",limit = close + TG_Input_p,stop = close - SL_Input_p,qty_percent = 50,comment_loss = "SL1",comment_profit = "TP1")
+        strategy.exit("Exit2","Buy",limit = tp2i,stop = close - SL_Input_p,qty_percent = 100,comment_loss = "SL1",comment_profit = "TP1")
+    if isSell 
+        strategy.entry("Sell",strategy.short)
+        tp2i := close - TG_Input_p2
+        en2i := close
+        strategy.exit("Exit1","Sell",limit = close - TG_Input_p, stop = close + SL_Input_p,qty_percent = 50,comment_loss = "SL1",comment_profit = "TP1")
+        strategy.exit("Exit2","Sell",limit = tp2i, stop = close + SL_Input_p,qty_percent = 100,comment_loss = "SL1",comment_profit = "TP1")
+
+    if not na(tp2i) and strategy.closedtrades != strategy.closedtrades[1] and strategy.closedtrades.exit_comment(strategy.closedtrades -1) == "TP1"
+        if strategy.position_size > 0 
+            tp2i := na
+            strategy.exit("Exit2","Buy",limit = tp2i,stop = en2i - SL_Input_pm,qty_percent = 100,comment_loss = "SLM",comment_profit = "TP2")
+        if strategy.position_size < 0
+            strategy.exit("Exit2","Sell",limit = tp2i, stop = en2i + SL_Input_pm,qty_percent = 100,comment_loss = "SLM",comment_profit = "TP2")
+            tp2i := na

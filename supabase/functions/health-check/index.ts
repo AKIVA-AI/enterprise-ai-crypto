@@ -1,9 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getSecureCorsHeaders, RATE_LIMITS, rateLimitMiddleware, validateAuth } from "../_shared/security.ts";
 
 // Canonical component IDs - must match src/lib/schemas.ts
 const CRITICAL_HEALTH_COMPONENTS = ['oms', 'risk_engine', 'database'] as const;
@@ -19,7 +16,9 @@ interface HealthCheckResult {
   last_check_at: string;
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });

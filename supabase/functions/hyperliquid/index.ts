@@ -1,9 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  getSecureCorsHeaders,
+  validateAuth,
+  rateLimitMiddleware,
+  RATE_LIMITS
+} from "../_shared/security.ts";
 
 interface HyperliquidOrder {
   asset: number;
@@ -82,7 +84,9 @@ async function fetchMarketData(symbol: string): Promise<{
   };
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -91,10 +95,19 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const hyperliquidPrivateKey = Deno.env.get('HYPERLIQUID_PRIVATE_KEY');
-    
+
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Validate auth and apply rate limiting for trading operations
+    const authHeader = req.headers.get('Authorization');
+    const { user } = await validateAuth(supabase, authHeader);
+    if (user) {
+      const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.trading, corsHeaders);
+      if (rateLimitResponse) return rateLimitResponse;
+    }
+
     const { action, ...params } = await req.json();
-    
+
     console.log(`HyperLiquid request: ${action}`);
     
     switch (action) {

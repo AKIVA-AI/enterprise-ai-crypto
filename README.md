@@ -1,437 +1,157 @@
-# enterprise crypto.
+# AKIVA AI Crypto
 
-> **Institutional-grade cryptocurrency trading system** with advanced risk management, quantitative strategies, and enterprise security.
+> **Institutional-grade crypto trading platform** combining enterprise risk management with battle-tested algorithmic execution.
 
-[![Production Ready](https://img.shields.io/badge/Production-Ready-green.svg)](https://github.com/enterprise-crypto)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](docker-compose.yml)
-[![FreqTrade Enhanced](https://img.shields.io/badge/FreqTrade-Enhanced-blue.svg)](FREQTRADE_INTEGRATION_README.md)
+[![FreqTrade](https://img.shields.io/badge/FreqTrade-Enhanced-blue.svg)](docs/SYSTEM_OVERVIEW.md)
+[![Coinbase Futures](https://img.shields.io/badge/Coinbase-Futures-green.svg)](docs/COINBASE_SETUP_GUIDE.md)
 
-## 🔥 FreqTrade Integration - Enterprise Enhancement
+## What Is This?
 
-**🚀 QUANTUM LEAP IN CAPABILITIES** - Our platform now leverages FreqTrade's battle-tested infrastructure:
+A **dual-engine trading platform** that gives you:
 
-- **🤖 Advanced ML Models**: XGBoost, LightGBM, TensorFlow, PyTorch integration
-- **📡 99.9% Uptime**: Multi-exchange WebSocket infrastructure with automatic failover
-- **📈 10x Faster Backtesting**: Professional analytics with Sharpe/Sortino/Calmar ratios
-- **⚙️ Enterprise Configuration**: JSON Schema validation and secure credential management
-- **🔧 Production ML Ops**: Model versioning, continual learning, performance monitoring
+1. **Enterprise Backend** - Multi-agent AI, risk controls, compliance, audit trails
+2. **FreqTrade Engine** - Battle-tested strategies, backtesting, live trading
+3. **Professional Dashboard** - Real-time monitoring and control
 
-**See [FreqTrade Integration Details](FREQTRADE_INTEGRATION_README.md) for complete technical documentation.**
+**📖 [Read the full System Overview →](docs/SYSTEM_OVERVIEW.md)**
 
-## 📊 Overview
+### Risk & Compliance
 
-This is a **production-grade hedge fund trading platform** that transforms institutional-grade trading capabilities into a modern, scalable system. Built with enterprise security, advanced risk management, and AI-powered quantitative strategies.
+- **Kill Switch** - Emergency stop all trading instantly
+- **Position Limits** - Configurable max position sizes
+- **Daily Loss Limits** - Automatic trading halt on drawdown
+- **Full Audit Trail** - Every decision logged and traceable
+- **Role-Based Access** - Admin, Trader, Viewer roles
 
-### 🎯 Key Features
+### Trading Engine (FreqTrade)
 
-#### **Risk Management (Institutional Standard)**
-- ✅ **Multi-Method VaR**: Historical, Parametric, Monte Carlo (99.9% confidence)
-- ✅ **Portfolio Optimization**: Black-Litterman model with Modern Portfolio Theory
-- ✅ **Stress Testing**: Historical crisis scenarios (2008, COVID, Crypto Winter)
-- ✅ **Risk Attribution**: Factor-based risk decomposition
-- ✅ **Liquidity-Adjusted VaR**: Market impact cost modeling
+- **WhaleFlowScalper** - Optimized momentum/volume strategy
+- **Coinbase Advanced Futures** - US-friendly leverage trading
+- **Backtesting** - Full historical testing with analytics
+- **Hyperopt** - Automated parameter optimization
+- **Multi-Exchange** - Coinbase, Kraken, Binance support
 
-#### **Quantitative Strategies (AI-Powered)**
-- 🤖 **Machine Learning Models**: LSTM, Gradient Boosting, Random Forest, ARIMA
-- 📈 **Statistical Arbitrage**: Cointegration-based pairs trading
-- 🎯 **Momentum Strategies**: Time-series, cross-sectional, absolute momentum
-- 📊 **Performance Analytics**: Sharpe/Sortino/Calmar ratios, win rates
+### Dashboard
 
-#### **Smart Execution (Ultra-Low Latency)**
-- ⚡ **Intelligent Order Routing**: Multi-venue optimization (Binance, Coinbase, Kraken)
-- 🎛️ **Algorithmic Execution**: TWAP/VWAP/POV/Iceberg/Adaptive algorithms
-- 📈 **Market Impact Modeling**: Almgren-Chriss framework
-- ⭐ **Execution Quality**: ISQ scoring, slippage analysis, timing risk
+- **Real-Time Monitoring** - Live positions, P&L, alerts
+- **Strategy Control** - Start/stop strategies from UI
+- **Risk Visualization** - VaR, exposure, drawdown charts
+- **Decision Traces** - See why trades were blocked/executed
 
-#### **Real-Time Intelligence**
-- 🌐 **Multi-Source Data**: CoinGecko, CoinMarketCap, exchange APIs
-- 📡 **WebSocket Streaming**: Real-time price/order book feeds with failover
-- 🐋 **Whale Detection**: Large transaction monitoring and analysis
-- 💬 **Sentiment Analysis**: Social media, news, and on-chain sentiment
+## Quick Start
 
-#### **Enterprise Security & Compliance**
-- 🔐 **Multi-Role Access**: Admin/CIO/Trader/Research/Ops/Auditor/Viewer
-- 📋 **Audit Trails**: Immutable logging with user tracking
-- 📑 **SEC Reporting**: Form PF, CPO-PQR automation frameworks
-- 🚨 **Risk Monitoring**: Automated alerts and limit enforcement
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- **Docker & Docker Compose** (latest versions)
-- **Git** (for cloning)
-- **4GB RAM** minimum (8GB recommended)
-- **SSL Certificate** (for production)
-
-### 1. Clone & Setup
+### Option 1: FreqTrade Only (Simplest)
 
 ```bash
-# Clone the repository
-git clone https://github.com/AKIVA-AI/akiva-ai-crypto.git
-cd akiva-ai-crypto
+# Install FreqTrade (if not already)
+pip install freqtrade
 
-# Copy environment configuration
-cp .env.example .env
-
-# Edit .env with your production values
-nano .env  # Configure API keys, database credentials, etc.
+# Run in dry-run mode
+python run_bot.py trade --config user_data/config_coinbase.json --strategy WhaleFlowScalper --dry-run
 ```
 
-### 2. Configure Environment
-
-Edit `.env` with your production values:
+### Option 2: Full Platform
 
 ```bash
-# Required: Supabase Configuration
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+# Terminal 1: Backend
+cd backend && pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 
-# Required: Market Data APIs
-COINGECKO_API_KEY=your-coingecko-key
-CMC_API_KEY=your-cmc-key
-BINANCE_API_KEY=your-binance-key
+# Terminal 2: FreqTrade
+python run_bot.py trade --config user_data/config_coinbase.json --strategy WhaleFlowScalper --dry-run
 
-# Optional: Trading APIs (use with extreme caution)
-BINANCE_TRADING_KEY=your-trading-key
-BINANCE_TRADING_SECRET=your-trading-secret
+# Terminal 3: Frontend
+npm install && npm run dev
 ```
 
-### 3. Deploy to Production
+### Option 3: Docker
 
 ```bash
-# Make deployment script executable
-chmod +x deploy.sh
-
-# Deploy to production (includes health checks and backups)
-./deploy.sh production
-
-# Or deploy to staging
-./deploy.sh staging
+docker-compose up -d
 ```
 
-### 4. Access Your Platform
+## Configuration
 
-After successful deployment:
+Add your Coinbase API credentials:
 
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Monitoring**: http://localhost:9090 (Prometheus)
-- **Dashboards**: http://localhost:3001 (Grafana)
-- **Logs**: http://localhost:5601 (Kibana)
-
-## 🏗️ Architecture
-
-### System Components
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      enterprise crypto.                      │
-├─────────────────────────────────────────────────────────────┤
-│  🌐 Frontend (React/TypeScript)    🔧 Backend (FastAPI)      │
-│  🗄️ Database (Supabase/PostgreSQL)  ⚡ Cache (Redis)         │
-│  📊 Monitoring (Prometheus/Grafana) 📝 Logging (ELK Stack) │
-├─────────────────────────────────────────────────────────────┤
-│  🏛️ Risk Engine        🤖 Quant Strategies    ⚡ Smart Router │
-│  📈 Market Data       🔍 Analytics         🛡️ Security      │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Services Architecture
-
-- **API Backend**: FastAPI with async endpoints, WebSocket support
-- **Frontend**: React/TypeScript with real-time dashboards
-- **Database**: Supabase (primary) + PostgreSQL (local backup)
-- **Cache**: Redis for high-performance data caching
-- **Monitoring**: Prometheus metrics, Grafana dashboards
-- **Logging**: ELK stack for centralized log management
-
-## 🔧 Configuration
-
-### Environment Variables
-
-See `.env.example` for complete configuration options. Key settings:
-
-#### Database & Cache
-```bash
-SUPABASE_URL=https://your-project.supabase.co
-DATABASE_URL=postgresql://user:pass@localhost:5432/db
-REDIS_URL=redis://localhost:6379
-```
-
-#### Market Data APIs
-```bash
-COINGECKO_API_KEY=your-key
-CMC_API_KEY=your-key
-BINANCE_API_KEY=your-key
-```
-
-#### Security
-```bash
-JWT_SECRET_KEY=your-super-secure-key
-ALLOWED_ORIGINS=["https://yourdomain.com"]
-```
-
-#### Risk Limits
-```bash
-MAX_PORTFOLIO_VAR=0.05
-MAX_DAILY_LOSS=0.02
-MAX_POSITION_SIZE=0.1
-```
-
-## 📊 API Documentation
-
-### Core Endpoints
-
-#### Risk Management
-```bash
-GET  /api/v1/risk/var/{book_id}           # Portfolio VaR calculation
-POST /api/v1/risk/optimize/{book_id}      # Portfolio optimization
-GET  /api/v1/risk/stress-test/{book_id}   # Stress testing
-GET  /api/v1/risk/attribution/{book_id}   # Risk attribution
-```
-
-#### Trading Strategies
-```bash
-GET  /api/v1/strategies/ml-signals        # ML trading signals
-GET  /api/v1/strategies/pairs             # Statistical arbitrage pairs
-GET  /api/v1/strategies/momentum          # Momentum signals
-POST /api/v1/strategies/backtest          # Strategy backtesting
-```
-
-#### Market Data
-```bash
-GET  /api/v1/market/prices/{instrument}   # Current prices
-GET  /api/v1/market/orderbook/{instrument} # Order book data
-GET  /api/v1/market/whales               # Whale transactions
-GET  /api/v1/market/sentiment/{instrument} # Market sentiment
-```
-
-#### Execution
-```bash
-POST /api/v1/execution/route              # Smart order routing
-POST /api/v1/execution/algorithmic        # Algorithmic execution
-GET  /api/v1/execution/quality/{order_id} # Execution quality metrics
-```
-
-### Authentication
-
-All API endpoints require JWT authentication:
-
-```bash
-# Login to get JWT token
-POST /auth/login
+```json
 {
-  "email": "trader@hedgefund.com",
-  "password": "secure-password"
+  "exchange": {
+    "name": "coinbase",
+    "key": "YOUR_API_KEY",
+    "secret": "YOUR_API_SECRET"
+  }
 }
-
-# Use token in subsequent requests
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 ```
 
-## 🛡️ Security Features
+## Project Structure
 
-### Multi-Role Access Control
-- **Admin**: Full system access, user management
-- **CIO**: Strategy oversight, risk monitoring
-- **Trader**: Order execution, position management
-- **Research**: Strategy development, backtesting
-- **Operations**: System monitoring, compliance
-- **Auditor**: Read-only access, audit logs
-- **Viewer**: Dashboard access only
+```
+akiva-ai-crypto/
+├── backend/           # Python FastAPI backend
+├── src/               # React frontend
+├── user_data/         # FreqTrade configs & strategies
+│   ├── strategies/    # Trading strategies
+│   └── config_*.json  # Exchange configs
+├── run_bot.py         # Custom FreqTrade launcher
+└── docs/              # Documentation
+```
 
-### Enterprise Security
-- JWT-based authentication with refresh tokens
-- Row-level security (RLS) in database
-- Encrypted data transmission (HTTPS/TLS)
-- Audit logging with immutable trails
-- Rate limiting and DDoS protection
-- Multi-factor authentication support
+## Documentation
 
-## 📈 Monitoring & Analytics
+| Document | Description |
+|----------|-------------|
+| [System Overview](docs/SYSTEM_OVERVIEW.md) | How the system works |
+| [Architecture](docs/ARCHITECTURE.md) | Technical architecture |
+| [Manifesto](docs/MANIFESTO.md) | Core values and philosophy |
+| [Coinbase Setup](docs/COINBASE_SETUP_GUIDE.md) | Exchange configuration |
+| [Deployment](docs/DEPLOYMENT_GUIDE.md) | Production deployment |
+| [Strategies](docs/WhaleFlowScalper_STRATEGY.md) | Strategy documentation |
 
-### Real-Time Dashboards
-- **Risk Dashboard**: VaR, stress tests, risk attribution
-- **Performance Dashboard**: P&L, Sharpe ratios, drawdowns
-- **Execution Dashboard**: Order routing, slippage analysis
-- **Market Dashboard**: Real-time prices, sentiment, volume
+## Environment Variables
 
-### Alerting System
-- Risk limit breaches
-- Strategy performance deviations
-- System health issues
-- Market anomaly detection
+Copy `.env.example` to `.env` and configure:
 
-### Reporting
-- SEC Form PF compliance reports
-- CPO-PQR regulatory filings
-- Performance attribution reports
-- Risk factor analysis
-
-## 🚀 Deployment Options
-
-### Docker Compose (Recommended)
 ```bash
-# Single-command production deployment
-./deploy.sh production
+# Supabase (for dashboard persistence)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-key
 
-# Includes: API, Frontend, Database, Redis, Monitoring, Logging
+# API endpoint for frontend
+VITE_API_URL=http://localhost:8000/api
 ```
 
-### Cloud Deployment
+## Development
 
-#### AWS
 ```bash
-# ECS Fargate deployment
-aws ecs create-cluster --cluster-name hedge-fund-cluster
-# ... (full AWS deployment configuration)
+# Run tests
+npm test                    # Frontend tests
+cd backend && pytest        # Backend tests
+
+# Lint
+npm run lint               # Frontend
+black backend/             # Backend
 ```
 
-#### Kubernetes
-```bash
-# Deploy to Kubernetes cluster
-kubectl apply -f k8s/
-```
+## Contributing
 
-### Manual Deployment
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md). We accept:
 
-# Frontend
-npm install
-npm run build
-npm run preview
-```
+- Bug fixes, documentation, tests
+- UI/UX improvements
+- New strategies (must include backtests)
 
-## 🔧 Development
+We reject anything that weakens risk controls.
 
-### Local Development Setup
-```bash
-# Install dependencies
-pip install -r backend/requirements.txt
-npm install
+## License
 
-# Start development servers
-docker-compose -f docker-compose.dev.yml up -d
+MIT License - see [LICENSE](LICENSE)
 
-# Run backend
-cd backend && uvicorn app.main:app --reload
+## Disclaimer
 
-# Run frontend (new terminal)
-npm run dev
-```
-
-### Testing
-```bash
-# Backend tests
-cd backend && pytest
-
-# Frontend tests
-npm test
-
-# Integration tests
-docker-compose -f docker-compose.test.yml up --abort-on-container-exit
-```
-
-### Code Quality
-```bash
-# Linting
-black backend/  # Python formatting
-eslint src/     # JavaScript/TypeScript linting
-
-# Type checking
-mypy backend/   # Python types
-tsc --noEmit    # TypeScript types
-```
-
-## 📚 Documentation
-
-### Architecture & Design
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and component relationships
-- **[Manifesto](docs/MANIFESTO.md)** - Our core values: safety, transparency, profitability
-- **[Agent Responsibility Matrix](docs/AGENT_RESPONSIBILITY_MATRIX.md)** - Multi-agent system authority boundaries
-- **[Why We Don't Always Trade](docs/WHY_WE_DONT_ALWAYS_TRADE.md)** - Philosophy of trade selectivity
-
-### Production & Operations
-- **[Production Checklist](docs/PRODUCTION_CHECKLIST.md)** - Go-live verification process
-- **[Incident Response Runbook](docs/INCIDENT_RESPONSE_RUNBOOK.md)** - Emergency procedures
-- **[Security Enforcement Proof](docs/SECURITY_ENFORCEMENT_PROOF.md)** - Server-side safety guarantees
-- **[Audit Findings Report](docs/AUDIT_FINDINGS_REPORT.md)** - Full system audit results
-
-### Development
-- **[Contributing Guidelines](docs/CONTRIBUTING.md)** - How to contribute safely
-- **[Code of Ethics](CODE_OF_ETHICS.md)** - Ethical commitments
-- **API Docs**: http://localhost:8000/docs (Swagger UI)
-
-### Strategy Development
-- **[Signal Sources Architecture](docs/SIGNAL_SOURCES_ARCHITECTURE.md)** - How signals are generated
-- **[Python Engine Architecture](docs/PYTHON_ENGINE_ARCHITECTURE.md)** - Backend strategy engine
-
-### Deployment
-- **[Northflank Deployment](docs/NORTHFLANK_DEPLOYMENT.md)** - Cloud deployment guide
-- **[Python Agent Deployment](docs/PYTHON_AGENT_DEPLOYMENT.md)** - Agent deployment
-
-## 🤝 Contributing
-
-We welcome contributions that strengthen safety, improve transparency, and enhance reliability.
-
-**Before contributing:**
-1. Read the **[Manifesto](docs/MANIFESTO.md)** to understand our values
-2. Review the **[Contributing Guidelines](docs/CONTRIBUTING.md)**
-3. Check the **[Code of Ethics](CODE_OF_ETHICS.md)**
-
-**What we accept:** Bug fixes, docs, tests, observability, UI improvements  
-**What we reject:** Anything that weakens risk controls, bypasses safety gates, or adds hidden risks
-
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for full guidelines.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Important Disclaimer
-
-**This software is for institutional use only. Cryptocurrency trading involves substantial risk of loss and is not suitable for every investor. Past performance does not guarantee future results.**
-
-### Regulatory Compliance
-- SEC-registered investment advisers only
-- Form PF and CPO-PQR reporting required
-- KYC/AML compliance mandatory
-- Risk management systems must be certified
-
-### Production Requirements
-- Minimum $20M AUM for hedge fund compliance
-- Independent risk management oversight
-- Third-party audit requirements
-- Regulatory filing obligations
-
-## 🆘 Support
-
-### Documentation
-- 📖 [API Documentation](http://localhost:8000/docs)
-- 📚 [Architecture Guide](docs/architecture.md)
-- 🛡️ [Security Handbook](docs/security.md)
-
-### Community
-- 💬 [Discord Community](https://discord.gg/hedge-fund-platform)
-- 📧 [Email Support](support@hedgefundplatform.com)
-- 🐛 [Issue Tracker](https://github.com/AKIVA-AI/akiva-ai-crypto/issues)
-
-### Enterprise Support
-- 📞 24/7 Technical Support
-- 🎯 Dedicated Account Manager
-- 🚀 Custom Development Services
-- 📊 Advanced Training Programs
+**Trading cryptocurrency involves substantial risk of loss.** This software is provided as-is. Always use dry-run mode first. Never trade with money you can't afford to lose.
 
 ---
 
-**Built for institutional excellence. Powered by advanced quantitative methods.**
-
-*enterprise crypto. — Next generation cryptocurrency trading technology.*
+*AKIVA AI - Institutional trading, simplified.*

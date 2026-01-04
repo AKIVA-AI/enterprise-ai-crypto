@@ -9,9 +9,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { 
-  Key, 
+import {
+  Key,
   Plus,
   Shield,
   CheckCircle2,
@@ -21,19 +22,9 @@ import {
   EyeOff,
   RefreshCw,
   Trash2,
-  Settings2,
+  Loader2,
 } from 'lucide-react';
-import { toast } from 'sonner';
-
-interface ExchangeConfig {
-  id: string;
-  name: string;
-  exchange: string;
-  apiKey: string;
-  isConnected: boolean;
-  permissions: string[];
-  lastSynced?: Date;
-}
+import { useExchangeKeys } from '@/hooks/useExchangeKeys';
 
 const EXCHANGES = [
   { id: 'coinbase', name: 'Coinbase Advanced', icon: '🔵', recommended: true, usCompliant: true },
@@ -41,6 +32,8 @@ const EXCHANGES = [
   { id: 'binance', name: 'Binance', icon: '🟡', usCompliant: false, warning: 'Not available in US' },
   { id: 'bybit', name: 'Bybit', icon: '🟠', usCompliant: false, warning: 'Not available in US' },
   { id: 'okx', name: 'OKX', icon: '⚫', usCompliant: false, warning: 'Not available in US' },
+  { id: 'mexc', name: 'MEXC', icon: '🔷', usCompliant: false, warning: 'Not available in US' },
+  { id: 'hyperliquid', name: 'Hyperliquid', icon: '💎', usCompliant: true },
 ];
 
 const PERMISSION_OPTIONS = [
@@ -50,10 +43,12 @@ const PERMISSION_OPTIONS = [
 ];
 
 export function ExchangeAPIManager() {
+  const { keys, isLoading, addKey, deleteKey, validateKey, maskKey } = useExchangeKeys();
+
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [newConfig, setNewConfig] = useState({
-    name: '',
+    label: '',
     exchange: '',
     apiKey: '',
     apiSecret: '',
@@ -61,69 +56,30 @@ export function ExchangeAPIManager() {
     permissions: ['read'],
   });
 
-  // Pre-configured exchanges via Lovable Cloud secrets
-  const [configs, setConfigs] = useState<ExchangeConfig[]>([
-    {
-      id: 'coinbase-cloud',
-      name: 'Coinbase Advanced (Cloud)',
-      exchange: 'coinbase',
-      apiKey: '****configured',
-      isConnected: true,
-      permissions: ['read', 'trade'],
-      lastSynced: new Date(),
-    },
-    {
-      id: 'kraken-cloud',
-      name: 'Kraken (Cloud)',
-      exchange: 'kraken',
-      apiKey: '****configured',
-      isConnected: true,
-      permissions: ['read', 'trade'],
-      lastSynced: new Date(),
-    },
-    {
-      id: 'binance-cloud',
-      name: 'Binance Data Feed',
-      exchange: 'binance',
-      apiKey: '****configured',
-      isConnected: true,
-      permissions: ['read'],
-      lastSynced: new Date(),
-    },
-  ]);
-
-  const handleAddConfig = () => {
-    if (!newConfig.name || !newConfig.exchange || !newConfig.apiKey) {
-      toast.error('Please fill all required fields');
+  const handleAddConfig = async () => {
+    if (!newConfig.label || !newConfig.exchange || !newConfig.apiKey || !newConfig.apiSecret) {
       return;
     }
 
-    const config: ExchangeConfig = {
-      id: crypto.randomUUID(),
-      name: newConfig.name,
+    await addKey.mutateAsync({
       exchange: newConfig.exchange,
-      apiKey: `****${newConfig.apiKey.slice(-4)}`,
-      isConnected: true,
+      label: newConfig.label,
+      apiKey: newConfig.apiKey,
+      apiSecret: newConfig.apiSecret,
+      passphrase: newConfig.passphrase || undefined,
       permissions: newConfig.permissions,
-      lastSynced: new Date(),
-    };
+    });
 
-    setConfigs(prev => [...prev, config]);
     setShowAddDialog(false);
-    setNewConfig({ name: '', exchange: '', apiKey: '', apiSecret: '', passphrase: '', permissions: ['read'] });
-    toast.success('Exchange API key added successfully');
+    setNewConfig({ label: '', exchange: '', apiKey: '', apiSecret: '', passphrase: '', permissions: ['read'] });
   };
 
-  const handleRemoveConfig = (id: string) => {
-    setConfigs(prev => prev.filter(c => c.id !== id));
-    toast.success('API key removed');
+  const handleRemoveConfig = async (id: string) => {
+    await deleteKey.mutateAsync(id);
   };
 
-  const handleTestConnection = (id: string) => {
-    const config = configs.find(c => c.id === id);
-    if (config) {
-      toast.success(`Connection to ${config.name} verified`);
-    }
+  const handleTestConnection = async (id: string) => {
+    await validateKey.mutateAsync(id);
   };
 
   const getExchangeInfo = (exchangeId: string) => {
@@ -205,8 +161,8 @@ export function ExchangeAPIManager() {
                   <Label>Label</Label>
                   <Input
                     placeholder="e.g., Main Trading Account"
-                    value={newConfig.name}
-                    onChange={(e) => setNewConfig(prev => ({ ...prev, name: e.target.value }))}
+                    value={newConfig.label}
+                    onChange={(e) => setNewConfig(prev => ({ ...prev, label: e.target.value }))}
                   />
                 </div>
 
@@ -280,9 +236,17 @@ export function ExchangeAPIManager() {
                   </div>
                 </div>
 
-                <Button className="w-full" onClick={handleAddConfig}>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Add Securely
+                <Button
+                  className="w-full"
+                  onClick={handleAddConfig}
+                  disabled={addKey.isPending || !newConfig.label || !newConfig.exchange || !newConfig.apiKey || !newConfig.apiSecret}
+                >
+                  {addKey.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Shield className="h-4 w-4 mr-2" />
+                  )}
+                  {addKey.isPending ? 'Adding...' : 'Add Securely'}
                 </Button>
               </div>
             </DialogContent>
@@ -290,45 +254,57 @@ export function ExchangeAPIManager() {
         </div>
       </CardHeader>
       <CardContent>
-        <Alert className="mb-4 border-success/50 bg-success/5">
-          <CheckCircle2 className="h-4 w-4 text-success" />
-          <AlertDescription className="text-success">
-            <strong>Cloud Configured:</strong> Exchange API keys are securely stored in Lovable Cloud.
-            Coinbase and Kraken are ready for trading.
-          </AlertDescription>
-        </Alert>
+        {keys.length > 0 && (
+          <Alert className="mb-4 border-success/50 bg-success/5">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            <AlertDescription className="text-success">
+              <strong>Keys Stored:</strong> Your exchange API keys are encrypted and stored securely in your account.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : (
         <ScrollArea className="h-[300px]">
-          {configs.length > 0 ? (
+          {keys.length > 0 ? (
             <div className="space-y-3">
-              {configs.map((config) => {
-                const exchange = getExchangeInfo(config.exchange);
-                const isCloudConfig = config.id.includes('cloud');
+              {keys.map((keyData) => {
+                const exchange = getExchangeInfo(keyData.exchange);
                 return (
                   <div
-                    key={config.id}
+                    key={keyData.id}
                     className={cn(
                       "p-4 rounded-lg bg-card/50 border space-y-3",
-                      isCloudConfig ? "border-success/30" : "border-border/30"
+                      keyData.is_validated ? "border-success/30" : "border-border/30"
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{exchange.icon}</span>
                         <div>
-                          <h4 className="font-semibold">{config.name}</h4>
+                          <h4 className="font-semibold">{keyData.label}</h4>
                           <p className="text-sm text-muted-foreground">{exchange.name}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isCloudConfig ? (
+                        {keyData.is_validated ? (
                           <Badge variant="outline" className="gap-1 border-success/50 text-success">
                             <CheckCircle2 className="h-3 w-3" />
-                            Cloud
+                            Verified
+                          </Badge>
+                        ) : keyData.validation_error ? (
+                          <Badge variant="outline" className="gap-1 border-destructive/50 text-destructive">
+                            <XCircle className="h-3 w-3" />
+                            Failed
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="gap-1 border-warning/50 text-warning">
                             <AlertTriangle className="h-3 w-3" />
-                            Local Only
+                            Not Verified
                           </Badge>
                         )}
                       </div>
@@ -336,13 +312,13 @@ export function ExchangeAPIManager() {
 
                     <div className="flex items-center gap-2">
                       <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                        {config.apiKey}
+                        {maskKey(keyData.api_key_encrypted)}
                       </code>
                       <div className="flex flex-wrap gap-1">
-                        {config.permissions.map((perm) => (
-                          <Badge 
-                            key={perm} 
-                            variant="outline" 
+                        {keyData.permissions.map((perm) => (
+                          <Badge
+                            key={perm}
+                            variant="outline"
                             className={cn(
                               "text-xs",
                               perm === 'withdraw' && "border-destructive text-destructive"
@@ -356,27 +332,29 @@ export function ExchangeAPIManager() {
 
                     <div className="flex items-center justify-between pt-2 border-t border-border/30">
                       <span className="text-xs text-muted-foreground">
-                        Last synced: {config.lastSynced ? new Date(config.lastSynced).toLocaleString() : 'Never'}
+                        {keyData.last_validated_at
+                          ? `Validated: ${new Date(keyData.last_validated_at).toLocaleString()}`
+                          : `Added: ${new Date(keyData.created_at).toLocaleString()}`}
                       </span>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleTestConnection(config.id)}
+                          onClick={() => handleTestConnection(keyData.id)}
+                          disabled={validateKey.isPending}
                         >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <Settings2 className="h-3 w-3" />
+                          {validateKey.isPending ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
-                          onClick={() => handleRemoveConfig(config.id)}
+                          onClick={() => handleRemoveConfig(keyData.id)}
+                          disabled={deleteKey.isPending}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -394,6 +372,7 @@ export function ExchangeAPIManager() {
             </div>
           )}
         </ScrollArea>
+        )}
       </CardContent>
     </Card>
   );

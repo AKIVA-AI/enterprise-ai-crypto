@@ -1,22 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-// SECURITY: Restrict CORS to known origins
-const ALLOWED_ORIGINS = [
-  'https://amvakxshlojoshdfcqos.lovableproject.com',
-  'https://amvakxshlojoshdfcqos.lovable.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-];
-
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Vary': 'Origin',
-  };
-}
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  getSecureCorsHeaders,
+  validateAuth,
+  rateLimitMiddleware,
+  RATE_LIMITS
+} from "../_shared/security.ts";
 
 interface TradeOrder {
   bookId: string;
@@ -496,10 +485,9 @@ async function simulateFill(order: TradeOrder): Promise<{
   };
 }
 
-Deno.serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  
+serve(async (req) => {
+  const corsHeaders = getSecureCorsHeaders(req.headers.get('Origin'));
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -508,31 +496,24 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
-    
+
     // CRITICAL: Authenticate user before any trading operation
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Missing or invalid authorization header' 
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const { user, error: authError } = await validateAuth(supabase, authHeader);
+
     if (authError || !user) {
-      return new Response(JSON.stringify({ 
-        success: false, 
-        error: 'Invalid or expired token' 
+      return new Response(JSON.stringify({
+        success: false,
+        error: authError || 'Invalid or expired token'
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Rate limit: 30 trading operations per minute per user
+    const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.trading, corsHeaders);
+    if (rateLimitResponse) return rateLimitResponse;
     
     // CRITICAL: Verify user has trading permissions (admin, cio, or trader role)
     const { data: roleData } = await supabase
