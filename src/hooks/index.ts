@@ -126,6 +126,9 @@ export { useUnifiedPortfolio } from './useUnifiedPortfolio';
 export { useIsMobile } from './use-mobile';
 export { useToast } from './use-toast';
 
+// Backtesting
+export * from './useBacktestResults';
+
 // ============================================================================
 // LEGACY HOOKS (Deprecated - use unified versions)
 // ============================================================================

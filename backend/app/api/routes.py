@@ -3,7 +3,7 @@ API Routes - Combined router for all API endpoints
 """
 from fastapi import APIRouter
 
-from . import trading, risk, venues, meme, system, agents, arbitrage, market, strategies, websocket, screener
+from . import trading, risk, venues, meme, system, agents, arbitrage, market, strategies, websocket, screener, backtest
 
 # Create main API router
 api_router = APIRouter()
@@ -19,6 +19,7 @@ api_router.include_router(arbitrage.router)
 api_router.include_router(market.router)
 api_router.include_router(strategies.router)
 api_router.include_router(screener.router)
+api_router.include_router(backtest.router)
 
 # WebSocket router (separate prefix, no auth middleware)
 ws_router = websocket.router
