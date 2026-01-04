@@ -140,6 +140,14 @@ class RiskEngine:
             reasons.append(f"Asset concentration at {concentration:.0f}%")
         else:
             checks_passed.append("concentration")
+
+        # Spot arbitrage-specific checks
+        arb_result = await self._check_spot_arb_limits(intent)
+        if arb_result:
+            checks_failed.append("spot_arb_limits")
+            reasons.append(arb_result)
+        else:
+            checks_passed.append("spot_arb_limits")
         
         # Determine decision
         if checks_failed:
@@ -234,6 +242,47 @@ class RiskEngine:
         concentration_pct = (total_exposure / book.capital_allocated) * 100
         
         return concentration_pct
+
+    async def _check_spot_arb_limits(self, intent: TradeIntent) -> Optional[str]:
+        metadata = intent.metadata or {}
+        if metadata.get("strategy_type") != "spot_arb":
+            return None
+
+        if intent.target_exposure_usd > self.config.max_notional_per_arb:
+            return f"Spot arb notional exceeds limit {self.config.max_notional_per_arb}"
+
+        tenant_id = metadata.get("tenant_id")
+        if not tenant_id:
+            return "Missing tenant scope for spot arb intent"
+
+        latency_score = metadata.get("latency_score")
+        if latency_score and latency_score > self.config.latency_shock_ms:
+            return "Latency shock breaker triggered"
+
+        try:
+            supabase = get_supabase()
+            open_intents = supabase.table("multi_leg_intents").select("id", count="exact").eq(
+                "tenant_id", tenant_id
+            ).eq("status", "open").execute()
+            if open_intents.count and open_intents.count >= self.config.max_open_arbs:
+                return "Max open arb intents reached"
+
+            total_notional = supabase.table("multi_leg_intents").select("legs_json").eq(
+                "tenant_id", tenant_id
+            ).eq("status", "open").execute()
+            notional_sum = 0.0
+            for row in total_notional.data:
+                plan = row.get("legs_json", {})
+                if "notional_usd" in plan:
+                    notional_sum += float(plan.get("notional_usd", 0))
+            if notional_sum > self.config.max_total_arb_notional:
+                return "Total arb notional exceeds limit"
+
+        except Exception as e:
+            logger.error("spot_arb_limits_check_failed", error=str(e))
+            return "Spot arb limit check failed"
+
+        return None
     
     async def activate_circuit_breaker(
         self,

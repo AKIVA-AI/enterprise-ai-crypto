@@ -44,9 +44,26 @@ export function useCreateStrategy() {
   
   return useMutation({
     mutationFn: async (strategy: StrategyInsert) => {
+      let tenantId = strategy.tenant_id;
+      if (!tenantId) {
+        const { data: tenantRow, error: tenantError } = await supabase
+          .from('user_tenants')
+          .select('tenant_id')
+          .eq('is_default', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (tenantError) throw tenantError;
+        tenantId = tenantRow?.tenant_id ?? null;
+      }
+
+      if (!tenantId) {
+        throw new Error('No default tenant found for this user.');
+      }
+
       const { data, error } = await supabase
         .from('strategies')
-        .insert(strategy)
+        .insert({ ...strategy, tenant_id: tenantId })
         .select()
         .single();
       

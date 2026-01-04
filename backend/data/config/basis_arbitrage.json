@@ -1,0 +1,22 @@
+{
+  "strategy_name": "basis_cash_and_carry",
+  "book_type": "prop",
+  "spot_venue": "coinbase",
+  "deriv_venue": "bybit",
+  "instruments": ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "LINK-USD"],
+  "open_threshold_bps": 15.0,
+  "close_threshold_bps": 4.0,
+  "min_expected_return_bps": 8.0,
+  "max_spread_bps": 25.0,
+  "min_volume_24h": 500000,
+  "max_holding_minutes": 720,
+  "allow_reverse_carry": false,
+  "hedge_policy": {
+    "target_hedged_ratio": 1.0,
+    "tolerance_min": 0.98,
+    "tolerance_max": 1.02,
+    "max_time_between_legs_ms": 1500,
+    "max_leg_slippage_bps": 15.0,
+    "unwind_on_fail": true
+  }
+}

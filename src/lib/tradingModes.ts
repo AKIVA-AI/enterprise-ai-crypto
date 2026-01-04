@@ -55,7 +55,7 @@ export const VENUES: Record<string, VenueConfig> = {
   coinbase: {
     id: 'coinbase',
     name: 'Coinbase Advanced',
-    icon: '🔵',
+    icon: 'CB',
     modes: ['us', 'international'],
     capabilities: {
       spot: true,
@@ -72,7 +72,7 @@ export const VENUES: Record<string, VenueConfig> = {
   kraken: {
     id: 'kraken',
     name: 'Kraken',
-    icon: '🟣',
+    icon: 'KR',
     modes: ['us', 'international'],
     capabilities: {
       spot: true,
@@ -89,7 +89,7 @@ export const VENUES: Record<string, VenueConfig> = {
   binance_us: {
     id: 'binance_us',
     name: 'Binance.US',
-    icon: '🟡',
+    icon: 'BU',
     modes: ['us'],
     capabilities: {
       spot: true,
@@ -106,7 +106,7 @@ export const VENUES: Record<string, VenueConfig> = {
   binance: {
     id: 'binance',
     name: 'Binance',
-    icon: '🟡',
+    icon: 'BN',
     modes: ['international'],
     capabilities: {
       spot: true,
@@ -123,7 +123,7 @@ export const VENUES: Record<string, VenueConfig> = {
   bybit: {
     id: 'bybit',
     name: 'Bybit',
-    icon: '🟠',
+    icon: 'BY',
     modes: ['international'],
     capabilities: {
       spot: true,
@@ -140,7 +140,7 @@ export const VENUES: Record<string, VenueConfig> = {
   okx: {
     id: 'okx',
     name: 'OKX',
-    icon: '⚫',
+    icon: 'OX',
     modes: ['international'],
     capabilities: {
       spot: true,
@@ -157,7 +157,7 @@ export const VENUES: Record<string, VenueConfig> = {
   hyperliquid: {
     id: 'hyperliquid',
     name: 'HyperLiquid',
-    icon: '💧',
+    icon: 'HY',
     modes: ['international'],
     capabilities: {
       spot: false,

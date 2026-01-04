@@ -39,6 +39,13 @@ class ReconciliationService:
         """Register a venue adapter for reconciliation."""
         self._adapters[venue_name.lower()] = adapter
         self._mismatch_counts[venue_name.lower()] = 0
+
+    async def run_reconciliation(self) -> Dict[str, Dict]:
+        """Compatibility wrapper for engine runner."""
+        results = await self.reconcile_all()
+        await self._check_basis_hedge_ratio()
+        await self._check_spot_inventory_drift()
+        return results
     
     async def reconcile_all(self) -> Dict[str, Dict]:
         """
@@ -261,17 +268,170 @@ class ReconciliationService:
         )
         actions.append("audit_logged")
         
-        # If critical (3+ consecutive mismatches), trigger circuit breaker
+        # Protective actions based on severity
         if mismatch_count >= 3:
             await risk_engine.activate_circuit_breaker(
                 "recon_mismatch",
                 f"Consecutive reconciliation failures on {venue_name}",
             )
             actions.append("circuit_breaker_activated")
-            
-            # TODO: Consider setting affected books to reduce-only
+
+            affected_books = await self._resolve_affected_books(venue_name, position_mismatches)
+            if affected_books:
+                await self._set_books_reduce_only(affected_books, venue_name)
+                actions.append("books_reduce_only")
+
+        if mismatch_count >= 5:
+            affected_books = await self._resolve_affected_books(venue_name, position_mismatches)
+            for book_id in affected_books:
+                await risk_engine.activate_kill_switch(
+                    book_id=book_id,
+                    reason=f"Reconciliation mismatches exceeded threshold for {venue_name}",
+                )
+            if affected_books:
+                actions.append("kill_switch_activated")
         
         return actions
+
+    async def _resolve_affected_books(self, venue_name: str, position_mismatches: List[Dict]) -> List[UUID]:
+        """Resolve affected book IDs from mismatched positions."""
+        try:
+            supabase = get_supabase()
+            venue_id_result = supabase.table("venues").select("id").ilike("name", venue_name).single().execute()
+            if not venue_id_result.data:
+                return []
+            venue_id = venue_id_result.data["id"]
+
+            instruments = {m.get("instrument") for m in position_mismatches if m.get("instrument")}
+            if not instruments:
+                return []
+
+            result = supabase.table("positions").select("book_id").eq(
+                "venue_id", venue_id
+            ).in_("instrument", list(instruments)).execute()
+
+            return [UUID(row["book_id"]) for row in result.data if row.get("book_id")]
+        except Exception as e:
+            logger.error("affected_books_lookup_failed", error=str(e))
+            return []
+
+    async def _set_books_reduce_only(self, book_ids: List[UUID], venue_name: str):
+        """Set affected books to reduce-only and audit."""
+        from app.services.oms_execution import oms_service
+
+        for book_id in book_ids:
+            await oms_service.set_reduce_only(book_id, f"Reconciliation mismatches on {venue_name}")
+
+    async def _check_basis_hedge_ratio(self):
+        """Verify hedged ratio for basis strategy positions."""
+        tenant_id = settings.tenant_id
+        if not tenant_id:
+            return
+        try:
+            supabase = get_supabase()
+            result = supabase.table("strategy_positions").select(
+                "id, strategy_id, instrument_id, hedged_ratio"
+            ).eq("tenant_id", tenant_id).execute()
+
+            out_of_bounds = [
+                row for row in result.data
+                if row.get("hedged_ratio", 0) < 0.98 or row.get("hedged_ratio", 0) > 1.02
+            ]
+            if not out_of_bounds:
+                return
+
+            from app.services.oms_execution import oms_service
+
+            for row in out_of_bounds:
+                strategy_id = row.get("strategy_id")
+                strategy = supabase.table("strategies").select("book_id").eq(
+                    "id", strategy_id
+                ).single().execute()
+                book_id = strategy.data.get("book_id") if strategy.data else None
+                if not book_id:
+                    continue
+
+                await create_alert(
+                    title="Basis Hedge Ratio Mismatch",
+                    message=f"Hedged ratio out of bounds for strategy {strategy_id}",
+                    severity="warning",
+                    source="reconciliation",
+                    metadata={"strategy_id": strategy_id, "hedged_ratio": row.get("hedged_ratio")},
+                )
+                await audit_log(
+                    action="basis_hedge_ratio_mismatch",
+                    resource_type="strategy",
+                    resource_id=strategy_id,
+                    severity="warning",
+                    after_state={"hedged_ratio": row.get("hedged_ratio")},
+                    book_id=book_id,
+                )
+                await oms_service.set_reduce_only(UUID(book_id), "Basis hedged ratio out of bounds")
+
+        except Exception as e:
+            logger.error("basis_hedge_ratio_check_failed", error=str(e))
+
+    async def _check_spot_inventory_drift(self):
+        """Verify venue inventory against adapter balances."""
+        tenant_id = settings.tenant_id
+        if not tenant_id:
+            return
+        try:
+            supabase = get_supabase()
+            venues = supabase.table("venues").select("id, name").execute()
+            for venue in venues.data:
+                venue_id = venue["id"]
+                venue_name = venue["name"]
+                adapter = self._adapters.get(venue_name.lower())
+                if not adapter:
+                    continue
+                balances = await adapter.get_balance()
+                inventory_rows = supabase.table("venue_inventory").select(
+                    "id, instrument_id, available_qty"
+                ).eq("tenant_id", tenant_id).eq("venue_id", venue_id).execute()
+                if not inventory_rows.data:
+                    continue
+                instrument_rows = supabase.table("instruments").select(
+                    "id, common_symbol"
+                ).eq("tenant_id", tenant_id).eq("venue_id", venue_id).execute()
+                symbol_map = {row["id"]: row["common_symbol"] for row in instrument_rows.data}
+
+                for row in inventory_rows.data:
+                    symbol = symbol_map.get(row["instrument_id"])
+                    if not symbol:
+                        continue
+                    base = symbol.split("-")[0]
+                    balance = float(balances.get(base, 0))
+                    recorded = float(row.get("available_qty", 0))
+                    if recorded <= 0:
+                        continue
+                    diff_pct = abs(balance - recorded) / recorded * 100
+                    if diff_pct > 2.0:
+                        await create_alert(
+                            title="Spot Inventory Drift",
+                            message=f"{venue_name} {symbol} drift {diff_pct:.2f}%",
+                            severity="warning",
+                            source="reconciliation",
+                            metadata={"venue": venue_name, "symbol": symbol, "diff_pct": diff_pct},
+                        )
+                        await audit_log(
+                            action="spot_inventory_drift",
+                            resource_type="venue",
+                            resource_id=str(venue_id),
+                            severity="warning",
+                            after_state={"symbol": symbol, "diff_pct": diff_pct},
+                        )
+                        await self._set_all_books_reduce_only(f"Inventory drift on {venue_name}")
+        except Exception as e:
+            logger.error("spot_inventory_drift_check_failed", error=str(e))
+
+    async def _set_all_books_reduce_only(self, reason: str):
+        from app.services.oms_execution import oms_service
+
+        supabase = get_supabase()
+        books = supabase.table("books").select("id").execute()
+        for row in books.data:
+            await oms_service.set_reduce_only(UUID(row["id"]), reason)
     
     def reset_mismatch_count(self, venue_name: str):
         """Reset mismatch counter after successful recon."""

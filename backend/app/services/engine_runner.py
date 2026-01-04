@@ -25,6 +25,10 @@ from app.services.risk_engine import risk_engine
 from app.services.oms_execution import oms_service
 from app.services.reconciliation import recon_service
 from app.services.market_data import market_data_service
+from app.services.opportunity_scanner import opportunity_scanner
+from app.services.basis_opportunity_scanner import basis_opportunity_scanner
+from app.services.spot_arb_scanner import spot_arb_scanner
+from app.services.capital_allocator import capital_allocator_service
 
 logger = structlog.get_logger()
 
@@ -85,6 +89,7 @@ class EngineRunner:
         
         stats = {
             "cycle": self._cycle_count,
+            "opportunities_scanned": 0,
             "intents_generated": 0,
             "intents_approved": 0,
             "intents_rejected": 0,
@@ -99,9 +104,22 @@ class EngineRunner:
             # 2. Load books
             books = await self._load_books()
 
-            # 3. Generate strategy intents using FreqTrade
-            intents = await self._generate_freqtrade_intents(books)
+            # 3. Generate strategy intents using Opportunity Scanner
+            scanner_intents = await opportunity_scanner.generate_intents(books)
+            stats["opportunities_scanned"] = len(scanner_intents)
+            # 4. Generate strategy intents using FreqTrade (optional)
+            freqtrade_intents = await self._generate_freqtrade_intents(books)
+            # 5. Generate basis intents (cash-and-carry)
+            basis_intents = await basis_opportunity_scanner.generate_intents(books)
+            # 6. Generate spot arbitrage intents
+            spot_arb_intents = await spot_arb_scanner.generate_intents(books)
+            intents = scanner_intents + freqtrade_intents + basis_intents + spot_arb_intents
             stats["intents_generated"] = len(intents)
+
+            # 6. Run capital allocator and apply allocations
+            total_capital = sum(book.capital_allocated for book in books)
+            await capital_allocator_service.run_allocation(books, total_capital)
+            intents = capital_allocator_service.apply_allocations(intents)
             
             # 4. Risk check each intent
             for intent in intents:
@@ -251,8 +269,8 @@ class EngineRunner:
                 book_id=book.id,
                 instrument=instrument,
                 direction=side,
-                target_exposure=target_exposure,
-                max_loss=target_exposure * 0.02,  # 2% stop loss
+                target_exposure_usd=target_exposure,
+                max_loss_usd=target_exposure * 0.02,  # 2% stop loss
                 confidence=confidence,
                 metadata={
                     "source": "freqtrade",

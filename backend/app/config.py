@@ -45,6 +45,11 @@ class RiskConfig(BaseModel):
     max_correlation_exposure: float = 30.0
     circuit_breaker_latency_ms: int = 5000
     circuit_breaker_error_rate: float = 10.0
+    max_notional_per_arb: float = 50000.0
+    max_open_arbs: int = 5
+    max_total_arb_notional: float = 250000.0
+    max_venue_exposure_pct: float = 40.0
+    latency_shock_ms: int = 3000
 
 
 class Settings:
@@ -77,6 +82,7 @@ class Settings:
         self.supabase_url = os.getenv("SUPABASE_URL", "")
         self.supabase_service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
         self.supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", "")
+        self.tenant_id = os.getenv("TENANT_ID")
         
         # ========== Redis ==========
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -135,6 +141,11 @@ class Settings:
             max_correlation_exposure=float(os.getenv("MAX_CORRELATION_EXPOSURE", "30.0")),
             circuit_breaker_latency_ms=int(os.getenv("CIRCUIT_BREAKER_LATENCY_MS", "5000")),
             circuit_breaker_error_rate=float(os.getenv("CIRCUIT_BREAKER_ERROR_RATE", "10.0")),
+            max_notional_per_arb=float(os.getenv("MAX_NOTIONAL_PER_ARB", "50000")),
+            max_open_arbs=int(os.getenv("MAX_OPEN_ARBS", "5")),
+            max_total_arb_notional=float(os.getenv("MAX_TOTAL_ARB_NOTIONAL", "250000")),
+            max_venue_exposure_pct=float(os.getenv("MAX_VENUE_EXPOSURE_PCT", "40.0")),
+            latency_shock_ms=int(os.getenv("LATENCY_SHOCK_MS", "3000")),
         )
         
         # ========== External API Keys ==========

@@ -1,0 +1,60 @@
+{
+  "scanner": {
+    "top_k": 5,
+    "max_opportunities": 50
+  },
+  "strategies": [
+    {
+      "name": "spot_momentum_stack",
+      "type": "spot",
+      "enabled": true,
+      "universe": ["BTC-USD", "ETH-USD", "SOL-USD"],
+      "timeframes": {
+        "fast": "1m",
+        "medium": "15m",
+        "slow": "4h"
+      },
+      "min_confidence": 0.6,
+      "max_risk_per_trade": 0.01,
+      "expected_holding_minutes": 60,
+      "edge_model_inputs": ["spread_bps", "volatility_bps", "volume_24h"],
+      "data_requirements": ["best_bid_ask", "ohlcv"],
+      "venue_routing": ["coinbase"],
+      "book_type": "hedge",
+      "min_edge_bps": 8.0
+    },
+    {
+      "name": "futures_scalp_stack",
+      "type": "futures",
+      "enabled": true,
+      "universe": ["BTC-USD", "ETH-USD"],
+      "timeframes": {
+        "fast": "1m",
+        "medium": "5m",
+        "slow": "1h"
+      },
+      "min_confidence": 0.65,
+      "max_risk_per_trade": 0.01,
+      "expected_holding_minutes": 30,
+      "edge_model_inputs": ["spread_bps", "volatility_bps", "funding_rate_bps"],
+      "data_requirements": ["best_bid_ask", "ohlcv", "funding_rate"],
+      "venue_routing": ["coinbase"],
+      "book_type": "prop",
+      "min_edge_bps": 10.0
+    },
+    {
+      "name": "cross_venue_arb",
+      "type": "arbitrage",
+      "enabled": true,
+      "universe": ["BTC-USD", "ETH-USD"],
+      "min_confidence": 0.5,
+      "max_risk_per_trade": 0.005,
+      "expected_holding_minutes": 5,
+      "edge_model_inputs": ["spread_bps", "latency_ms"],
+      "data_requirements": ["best_bid_ask"],
+      "venue_routing": ["coinbase", "binance"],
+      "book_type": "prop",
+      "min_edge_bps": 5.0
+    }
+  ]
+}

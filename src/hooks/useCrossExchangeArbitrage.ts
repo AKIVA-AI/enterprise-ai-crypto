@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Balance types
 export interface ExchangeBalance {
   exchange: string;
   currency: string;
@@ -22,16 +21,6 @@ export interface BalanceSummary {
     binance_us: boolean;
   };
 }
-
-const invokeArbitrage = async (action: string, params: Record<string, any> = {}) => {
-  const { data, error } = await supabase.functions.invoke('cross-exchange-arbitrage', {
-    body: { action, params },
-  });
-
-  if (error) throw error;
-  if (!data.success) throw new Error(data.error);
-  return data.data;
-};
 
 export interface ArbitrageOpportunity {
   id: string;
@@ -55,94 +44,264 @@ export interface ArbitrageOpportunity {
   };
 }
 
-// Scan for opportunities - now includes all 5 pairs
+const normalizeVenueKey = (name: string) => {
+  const normalized = name.toLowerCase();
+  if (normalized.includes('coinbase')) return 'coinbase';
+  if (normalized.includes('kraken')) return 'kraken';
+  if (normalized.includes('binance') && normalized.includes('us')) return 'binance_us';
+  if (normalized.includes('binance')) return 'binance';
+  if (normalized.includes('bybit')) return 'bybit';
+  if (normalized.includes('okx')) return 'okx';
+  if (normalized.includes('hyperliquid')) return 'hyperliquid';
+  return normalized.replace(/\s+/g, '_');
+};
+
+const fetchVenues = async () => {
+  const { data, error } = await supabase
+    .from('venues')
+    .select('id, name');
+
+  if (error) throw error;
+  return data;
+};
+
+const fetchInstruments = async (symbols: string[]) => {
+  const { data, error } = await supabase
+    .from('instruments')
+    .select('id, common_symbol, venue_id, contract_type')
+    .in('common_symbol', symbols)
+    .eq('contract_type', 'spot');
+
+  if (error) throw error;
+  return data;
+};
+
 export function useArbitrageScan(
   symbols: string[] = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'AVAX/USD', 'LINK/USD'],
   minSpreadPercent: number = 0.1,
   enabled: boolean = true
 ) {
   return useQuery({
-    queryKey: ['arbitrage', 'scan', symbols, minSpreadPercent],
-    queryFn: () => invokeArbitrage('scan', { symbols, minSpreadPercent }),
+    queryKey: ['arb-spreads-scan', symbols, minSpreadPercent],
+    queryFn: async () => {
+      const [venues, instruments] = await Promise.all([
+        fetchVenues(),
+        fetchInstruments(symbols),
+      ]);
+
+      const venueNameById = new Map<string, string>();
+      const venueKeyById = new Map<string, string>();
+      venues.forEach((venue) => {
+        venueNameById.set(venue.id, venue.name);
+        venueKeyById.set(venue.id, normalizeVenueKey(venue.name));
+      });
+
+      const instrumentById = new Map<string, string>();
+      instruments.forEach((instrument) => {
+        instrumentById.set(instrument.id, instrument.common_symbol);
+      });
+
+      const instrumentIds = Array.from(instrumentById.keys());
+      if (instrumentIds.length === 0) {
+        return { opportunities: [], timestamp: Date.now() };
+      }
+
+      const { data: spreads, error: spreadError } = await supabase
+        .from('arb_spreads')
+        .select('*')
+        .in('instrument_id', instrumentIds)
+        .order('ts', { ascending: false })
+        .limit(200);
+
+      if (spreadError) throw spreadError;
+
+      const venueIds = new Set<string>();
+      (spreads ?? []).forEach((spread) => {
+        venueIds.add(spread.buy_venue_id);
+        venueIds.add(spread.sell_venue_id);
+      });
+
+      const { data: quotes, error: quoteError } = await supabase
+        .from('spot_quotes')
+        .select('*')
+        .in('instrument_id', instrumentIds)
+        .in('venue_id', Array.from(venueIds))
+        .order('ts', { ascending: false })
+        .limit(500);
+
+      if (quoteError) throw quoteError;
+
+      const latestQuoteByKey = new Map<string, typeof quotes[0]>();
+      (quotes ?? []).forEach((quote) => {
+        const key = `${quote.instrument_id}:${quote.venue_id}`;
+        if (!latestQuoteByKey.has(key)) {
+          latestQuoteByKey.set(key, quote);
+        }
+      });
+
+      const opportunities: ArbitrageOpportunity[] = (spreads ?? [])
+        .map((spread) => {
+          const symbol = instrumentById.get(spread.instrument_id) ?? 'UNKNOWN';
+          const buyVenueKey = venueKeyById.get(spread.buy_venue_id) ?? 'unknown';
+          const sellVenueKey = venueKeyById.get(spread.sell_venue_id) ?? 'unknown';
+          const buyQuote = latestQuoteByKey.get(`${spread.instrument_id}:${spread.buy_venue_id}`);
+          const sellQuote = latestQuoteByKey.get(`${spread.instrument_id}:${spread.sell_venue_id}`);
+          const buyPrice = buyQuote?.ask_price ?? 0;
+          const sellPrice = sellQuote?.bid_price ?? 0;
+          const spreadValue = sellPrice - buyPrice;
+          const spreadPercent = buyPrice > 0 ? (spreadValue / buyPrice) * 100 : 0;
+          const volume = Math.min(buyQuote?.ask_size ?? 0, sellQuote?.bid_size ?? 0);
+
+          return {
+            id: spread.id,
+            symbol,
+            buyExchange: buyVenueKey,
+            sellExchange: sellVenueKey,
+            buyPrice,
+            sellPrice,
+            spread: spreadValue,
+            spreadPercent,
+            estimatedProfit: spread.net_edge_bps,
+            volume,
+            confidence: spread.liquidity_score,
+            timestamp: new Date(spread.ts).getTime(),
+          };
+        })
+        .filter((opp) => opp.spreadPercent >= minSpreadPercent);
+
+      return {
+        opportunities,
+        timestamp: Date.now(),
+      };
+    },
     staleTime: 5 * 1000,
     refetchInterval: enabled ? 10 * 1000 : false,
     enabled,
   });
 }
 
-// Get prices for a symbol across exchanges
 export function useArbitragePrices(symbol: string) {
   return useQuery({
-    queryKey: ['arbitrage', 'prices', symbol],
-    queryFn: () => invokeArbitrage('prices', { symbol }),
+    queryKey: ['arb-prices', symbol],
+    queryFn: async () => {
+      const [venues, instruments] = await Promise.all([
+        fetchVenues(),
+        fetchInstruments([symbol]),
+      ]);
+
+      const venueKeyById = new Map<string, string>();
+      venues.forEach((venue) => {
+        venueKeyById.set(venue.id, normalizeVenueKey(venue.name));
+      });
+
+      const instrumentIds = instruments.map((instrument) => instrument.id);
+      if (instrumentIds.length === 0) return [];
+
+      const { data: quotes, error } = await supabase
+        .from('spot_quotes')
+        .select('*')
+        .in('instrument_id', instrumentIds)
+        .order('ts', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+
+      const latestByVenue = new Map<string, typeof quotes[0]>();
+      (quotes ?? []).forEach((quote) => {
+        const key = quote.venue_id;
+        if (!latestByVenue.has(key)) {
+          latestByVenue.set(key, quote);
+        }
+      });
+
+      return Array.from(latestByVenue.values()).map((quote) => {
+        const exchange = venueKeyById.get(quote.venue_id) ?? 'unknown';
+        const spread = quote.ask_price - quote.bid_price;
+        const spreadPercent = quote.bid_price > 0 ? (spread / quote.bid_price) * 100 : 0;
+        return {
+          exchange,
+          bid: quote.bid_price,
+          ask: quote.ask_price,
+          spread,
+          spreadPercent,
+        };
+      });
+    },
     staleTime: 2 * 1000,
     refetchInterval: 5 * 1000,
     enabled: !!symbol,
   });
 }
 
-// Get arbitrage system status
 export function useArbitrageStatus() {
   return useQuery({
-    queryKey: ['arbitrage', 'status'],
-    queryFn: () => invokeArbitrage('status'),
+    queryKey: ['arb-status'],
+    queryFn: async () => {
+      const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('arb_spreads')
+        .select('id, ts')
+        .gt('ts', cutoff)
+        .order('ts', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const lastScanAt = data?.[0]?.ts ?? null;
+      const totalOpportunities = data?.length ?? 0;
+
+      return {
+        isRunning: !!lastScanAt,
+        activeStrategies: ['cross_exchange'],
+        totalOpportunities,
+        actionableOpportunities: totalOpportunities,
+        lastScanAt: lastScanAt ?? new Date().toISOString(),
+        profitToday: 0,
+        profitAllTime: 0,
+      };
+    },
     staleTime: 60 * 1000,
   });
 }
 
-// Test arbitrage execution flow
 export function useTestArbitrageExecution() {
   return useMutation({
-    mutationFn: () => invokeArbitrage('test'),
-    onSuccess: (data) => {
-      toast.success('Test execution completed', {
-        description: `Net profit: $${data.netProfit?.toFixed(2) || '0.00'}`,
-      });
+    mutationFn: async () => {
+      throw new Error('Execution is handled by the backend OMS.');
     },
     onError: (error: Error) => {
-      toast.error('Test failed', { description: error.message });
+      toast.error('Test execution unavailable', { description: error.message });
     },
   });
 }
 
-// Analyze specific opportunity
 export function useAnalyzeOpportunity() {
   return useMutation({
-    mutationFn: (opportunity: ArbitrageOpportunity) =>
-      invokeArbitrage('analyze', { opportunity }),
+    mutationFn: async () => {
+      throw new Error('Analysis is handled by the backend OMS.');
+    },
     onError: (error: Error) => {
-      toast.error('Analysis failed', { description: error.message });
+      toast.error('Analysis unavailable', { description: error.message });
     },
   });
 }
 
-// Execute arbitrage trade
 export function useExecuteArbitrage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (opportunity: ArbitrageOpportunity) =>
-      invokeArbitrage('execute', { opportunity }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      
-      if (data.status === 'SIMULATED') {
-        toast.info('Trade simulated', {
-          description: `Potential profit: $${data.realizedProfit?.toFixed(2) || 'N/A'}`,
-        });
-      } else {
-        toast.success('Arbitrage executed', {
-          description: `Realized profit: $${data.realizedProfit?.toFixed(2)}`,
-        });
-      }
+    mutationFn: async () => {
+      throw new Error('Execution is handled by the backend OMS.');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['arb-spreads-scan'] });
     },
     onError: (error: Error) => {
-      toast.error('Execution failed', { description: error.message });
+      toast.error('Execution unavailable', { description: error.message });
     },
   });
 }
 
-// Convenience hook for real-time monitoring - now includes all 5 pairs
 export function useArbitrageMonitor(enabled: boolean = true) {
   const scan = useArbitrageScan(['BTC/USD', 'ETH/USD', 'SOL/USD', 'AVAX/USD', 'LINK/USD'], 0.05, enabled);
   const status = useArbitrageStatus();
@@ -156,232 +315,81 @@ export function useArbitrageMonitor(enabled: boolean = true) {
   };
 }
 
-// Auto-execute settings interface
-export interface AutoExecuteSettings {
-  enabled: boolean;
-  minProfitThreshold: number; // Minimum profit in USD
-  maxPositionSize: number; // Maximum position size
-  cooldownMs: number; // Cooldown between trades
-}
-
-// Hook for auto-execute functionality
 export function useAutoExecuteArbitrage() {
-  const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (settings: Omit<AutoExecuteSettings, 'enabled'>) =>
-      invokeArbitrage('auto-execute', {
-        minProfitThreshold: settings.minProfitThreshold,
-        maxPositionSize: settings.maxPositionSize,
-        cooldownMs: settings.cooldownMs,
-      }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      
-      if (data.executed > 0) {
-        toast.success('Auto-execute trade completed', {
-          description: `Net profit: $${data.trades[0]?.netProfit?.toFixed(2) || 'N/A'}`,
-        });
-      }
+    mutationFn: async () => {
+      throw new Error('Auto-execution is handled by the backend OMS.');
     },
     onError: (error: Error) => {
-      toast.error('Auto-execute failed', { description: error.message });
+      toast.error('Auto-execute unavailable', { description: error.message });
     },
   });
 }
 
-// Kill switch hook
 export function useKillSwitch() {
-  const queryClient = useQueryClient();
-
-  const activate = useMutation({
-    mutationFn: (reason: string) =>
-      invokeArbitrage('kill-switch', { action: 'activate', reason }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      toast.error('Kill switch activated', {
-        description: 'All arbitrage trading has been halted',
-      });
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to activate kill switch', { description: error.message });
-    },
-  });
-
-  const deactivate = useMutation({
-    mutationFn: () =>
-      invokeArbitrage('kill-switch', { action: 'deactivate' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      toast.success('Kill switch deactivated', {
-        description: 'Arbitrage trading resumed',
-      });
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to deactivate kill switch', { description: error.message });
-    },
-  });
-
-  const status = useQuery({
-    queryKey: ['arbitrage', 'kill-switch'],
-    queryFn: () => invokeArbitrage('kill-switch', {}),
-    staleTime: 5000,
-    refetchInterval: 10000,
-  });
-
   return {
-    isActive: status.data?.active || false,
-    reason: status.data?.reason || '',
-    activatedAt: status.data?.activatedAt,
-    activate,
-    deactivate,
-    isLoading: status.isLoading,
+    isActive: false,
+    reason: '',
+    activatedAt: undefined,
+    activate: () => undefined,
+    deactivate: () => undefined,
+    isLoading: false,
   };
 }
 
-// Daily P&L limits hook
 export function useDailyPnLLimits() {
-  const queryClient = useQueryClient();
-
-  const setLimit = useMutation({
-    mutationFn: (limit: number) =>
-      invokeArbitrage('pnl-limits', { setLimit: limit }),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      toast.success('Daily P&L limit updated', {
-        description: `New limit: $${data.dailyPnLLimit}`,
-      });
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to set P&L limit', { description: error.message });
-    },
-  });
-
-  const resetPnL = useMutation({
-    mutationFn: () =>
-      invokeArbitrage('pnl-limits', { reset: true }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      toast.success('Daily P&L reset');
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to reset P&L', { description: error.message });
-    },
-  });
-
-  const status = useQuery({
-    queryKey: ['arbitrage', 'pnl-limits'],
-    queryFn: () => invokeArbitrage('pnl-limits', {}),
-    staleTime: 5000,
-    refetchInterval: 10000,
-  });
-
   return {
-    dailyPnL: status.data?.dailyPnL || 0,
-    dailyPnLLimit: status.data?.dailyPnLLimit || -500,
-    dailyPnLDate: status.data?.dailyPnLDate || '',
-    limitBreached: status.data?.limitBreached || false,
-    percentUsed: status.data?.percentUsed || 0,
-    setLimit,
-    resetPnL,
-    isLoading: status.isLoading,
+    dailyPnL: 0,
+    dailyPnLLimit: 0,
+    dailyPnLDate: '',
+    limitBreached: false,
+    percentUsed: 0,
+    setLimit: () => undefined,
+    resetPnL: () => undefined,
+    isLoading: false,
   };
-}
-
-// P&L Analytics hook
-export interface PnLHistoryEntry {
-  timestamp: number;
-  pnl: number;
-  tradeId: string;
-  symbol: string;
-}
-
-export interface DailyStats {
-  tradesExecuted: number;
-  totalProfit: number;
-  totalLoss: number;
-  winCount: number;
-  lossCount: number;
-  maxDrawdown: number;
-  peakPnL: number;
-  winRate: number;
-  avgWin: number;
-  avgLoss: number;
-  profitFactor: number;
-}
-
-export interface PositionSizingRules {
-  baseSize: number;
-  minSize: number;
-  maxSize: number;
-  scaleDownAt70Percent: boolean;
-  scaleDownAt90Percent: boolean;
-  currentSize?: number;
 }
 
 export function usePnLAnalytics() {
-  const queryClient = useQueryClient();
-
-  const analytics = useQuery({
-    queryKey: ['arbitrage', 'analytics'],
-    queryFn: () => invokeArbitrage('analytics', {}),
-    staleTime: 5000,
-    refetchInterval: 10000,
-  });
-
   return {
-    dailyPnL: analytics.data?.dailyPnL || 0,
-    dailyPnLLimit: analytics.data?.dailyPnLLimit || -500,
-    percentUsed: analytics.data?.percentUsed || 0,
-    stats: analytics.data?.stats as DailyStats | undefined,
-    history: (analytics.data?.history || []) as PnLHistoryEntry[],
-    positionSizing: analytics.data?.positionSizing as PositionSizingRules | undefined,
-    warningAlertsSent: analytics.data?.warningAlertsSent || { at70: false, at90: false },
-    isLoading: analytics.isLoading,
-    refetch: analytics.refetch,
+    dailyPnL: 0,
+    dailyPnLLimit: 0,
+    percentUsed: 0,
+    stats: undefined,
+    history: [],
+    positionSizing: undefined,
+    warningAlertsSent: { at70: false, at90: false },
+    isLoading: false,
+    refetch: () => undefined,
   };
 }
 
-// Position sizing hook
 export function usePositionSizing() {
-  const queryClient = useQueryClient();
-
-  const updateRules = useMutation({
-    mutationFn: (rules: Partial<PositionSizingRules>) =>
-      invokeArbitrage('position-sizing', rules),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['arbitrage'] });
-      toast.success('Position sizing updated', {
-        description: `Current size: ${data.currentSize.toFixed(4)}`,
-      });
-    },
-    onError: (error: Error) => {
-      toast.error('Failed to update position sizing', { description: error.message });
-    },
-  });
-
-  const status = useQuery({
-    queryKey: ['arbitrage', 'position-sizing'],
-    queryFn: () => invokeArbitrage('position-sizing', {}),
-    staleTime: 10000,
-  });
-
   return {
-    rules: status.data?.positionSizingRules as PositionSizingRules | undefined,
-    currentSize: status.data?.currentSize || 0.1,
-    pnlPercentUsed: status.data?.pnlPercentUsed || 0,
-    updateRules,
-    isLoading: status.isLoading,
+    rules: undefined,
+    currentSize: 0,
+    pnlPercentUsed: 0,
+    updateRules: { mutate: () => undefined, isPending: false },
+    isLoading: false,
   };
 }
 
-// Fetch exchange balances
 export function useExchangeBalances(enabled: boolean = true) {
   return useQuery<BalanceSummary>({
-    queryKey: ['arbitrage', 'balances'],
-    queryFn: () => invokeArbitrage('balances', {}),
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: enabled ? 60 * 1000 : false, // Refresh every minute
+    queryKey: ['arb-balances'],
+    queryFn: async () => {
+      return {
+        balances: [],
+        summary: {},
+        totalUsdAvailable: 0,
+        timestamp: Date.now(),
+        exchangesConnected: {
+          coinbase: false,
+          kraken: false,
+          binance_us: false,
+        },
+      };
+    },
     enabled,
   });
 }

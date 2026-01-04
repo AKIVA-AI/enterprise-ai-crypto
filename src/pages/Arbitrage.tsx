@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,61 +17,80 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useExchangeKeys } from '@/hooks/useExchangeKeys';
+import { useInstruments } from '@/hooks/useInstruments';
+import { useSpotArbSpreads } from '@/hooks/useSpotArbSpreads';
+import { useVenues } from '@/hooks/useVenues';
 
-// Supported exchanges with their configuration
-const EXCHANGES = [
+const FALLBACK_EXCHANGES = [
   {
     id: 'coinbase',
     name: 'Coinbase Advanced',
-    icon: '🟠',
-    description: 'Primary US exchange with futures',
-    apiConfigured: true, // TODO: Pull from actual config
-    features: ['Spot', 'Futures', 'USD pairs'],
-  },
-  {
-    id: 'binance',
-    name: 'Binance',
-    icon: '🟡',
-    description: 'Global exchange with deep liquidity',
-    apiConfigured: false,
-    features: ['Spot', 'Futures', 'USDT pairs'],
+    description: 'Primary US spot venue',
+    features: ['Spot', 'USD pairs'],
   },
   {
     id: 'kraken',
     name: 'Kraken',
-    icon: '🟣',
-    description: 'US-friendly with margin trading',
-    apiConfigured: false,
-    features: ['Spot', 'Margin', 'USD pairs'],
-  },
-  {
-    id: 'gateio',
-    name: 'Gate.io',
-    icon: '🔵',
-    description: 'Wide altcoin selection',
-    apiConfigured: false,
-    features: ['Spot', 'Futures', 'USDT pairs'],
+    description: 'US-friendly with deep liquidity',
+    features: ['Spot', 'USD pairs'],
   },
 ];
 
-// Mock opportunities - will be replaced with real data
-const MOCK_OPPORTUNITIES = [
-  { id: '1', pair: 'BTC/USD', buyExchange: 'binance', sellExchange: 'coinbase', spread: 0.15, profit: 45.20 },
-  { id: '2', pair: 'ETH/USD', buyExchange: 'kraken', sellExchange: 'binance', spread: 0.12, profit: 28.50 },
-  { id: '3', pair: 'SOL/USD', buyExchange: 'gateio', sellExchange: 'coinbase', spread: 0.22, profit: 18.75 },
-];
+const normalizeExchangeId = (name: string) =>
+  name.toLowerCase().replace(' advanced', '').replace(/\s+/g, '_');
 
 export default function Arbitrage() {
   const [isScanning, setIsScanning] = useState(false);
   const [autoExecute, setAutoExecute] = useState(false);
 
-  // Count configured exchanges
-  const configuredCount = EXCHANGES.filter(e => e.apiConfigured).length;
+  const { keys } = useExchangeKeys();
+  const { data: venues } = useVenues();
+  const { data: instruments } = useInstruments();
+  const { data: spreads, isLoading } = useSpotArbSpreads(isScanning);
+
+  const configuredSet = useMemo(() => {
+    return new Set(keys.filter((key) => key.is_active).map((key) => key.exchange));
+  }, [keys]);
+
+  const exchangeCards = useMemo(() => {
+    if (!venues || venues.length === 0) {
+      return FALLBACK_EXCHANGES.map((exchange) => ({
+        ...exchange,
+        apiConfigured: configuredSet.has(exchange.id),
+      }));
+    }
+
+    return venues.map((venue) => ({
+      id: normalizeExchangeId(venue.name),
+      name: venue.name,
+      description: venue.status === 'healthy' ? 'Venue healthy' : 'Venue degraded',
+      apiConfigured: configuredSet.has(normalizeExchangeId(venue.name)),
+      features: ['Spot'],
+    }));
+  }, [venues, configuredSet]);
+
+  const configuredCount = exchangeCards.filter((exchange) => exchange.apiConfigured).length;
+
+  const instrumentMap = useMemo(() => {
+    const map = new Map<string, string>();
+    instruments?.forEach((instrument) => {
+      map.set(instrument.id, instrument.common_symbol || instrument.venue_symbol);
+    });
+    return map;
+  }, [instruments]);
+
+  const venueMap = useMemo(() => {
+    const map = new Map<string, string>();
+    venues?.forEach((venue) => {
+      map.set(venue.id, venue.name);
+    });
+    return map;
+  }, [venues]);
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -79,14 +98,19 @@ export default function Arbitrage() {
               Cross-Exchange Arbitrage
             </h1>
             <p className="text-muted-foreground mt-1">
-              Spot arbitrage across Coinbase, Binance, Kraken, and Gate.io
+              Spot-only arbitrage across compliant venues
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className={cn(
-              configuredCount >= 2 ? 'border-green-500 text-green-500' : 'border-yellow-500 text-yellow-500'
-            )}>
-              {configuredCount}/4 Exchanges Connected
+            <Badge
+              variant="outline"
+              className={cn(
+                configuredCount >= 2
+                  ? 'border-green-500 text-green-500'
+                  : 'border-yellow-500 text-yellow-500'
+              )}
+            >
+              {configuredCount}/{exchangeCards.length} Exchanges Connected
             </Badge>
             <Button
               variant={isScanning ? 'outline' : 'default'}
@@ -100,22 +124,24 @@ export default function Arbitrage() {
           </div>
         </div>
 
-        {/* Exchange Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {EXCHANGES.map((exchange) => (
-            <Card key={exchange.id} className={cn(
-              "relative overflow-hidden transition-all",
-              exchange.apiConfigured ? "border-green-500/50" : "border-border"
-            )}>
-              {/* Status indicator */}
-              <div className={cn(
-                "absolute top-3 right-3 w-3 h-3 rounded-full",
-                exchange.apiConfigured ? "bg-green-500" : "bg-gray-400"
-              )} />
+          {exchangeCards.map((exchange) => (
+            <Card
+              key={exchange.id}
+              className={cn(
+                'relative overflow-hidden transition-all',
+                exchange.apiConfigured ? 'border-green-500/50' : 'border-border'
+              )}
+            >
+              <div
+                className={cn(
+                  'absolute top-3 right-3 w-3 h-3 rounded-full',
+                  exchange.apiConfigured ? 'bg-green-500' : 'bg-gray-400'
+                )}
+              />
 
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <span className="text-2xl">{exchange.icon}</span>
                   {exchange.name}
                 </CardTitle>
                 <CardDescription>{exchange.description}</CardDescription>
@@ -123,7 +149,6 @@ export default function Arbitrage() {
 
               <CardContent>
                 <div className="space-y-3">
-                  {/* Features */}
                   <div className="flex flex-wrap gap-1">
                     {exchange.features.map((feature) => (
                       <Badge key={feature} variant="secondary" className="text-xs">
@@ -132,7 +157,6 @@ export default function Arbitrage() {
                     ))}
                   </div>
 
-                  {/* Status */}
                   <div className="flex items-center justify-between pt-2 border-t">
                     <span className="text-sm text-muted-foreground">API Status</span>
                     {exchange.apiConfigured ? (
@@ -148,7 +172,6 @@ export default function Arbitrage() {
                     )}
                   </div>
 
-                  {/* Configure Button */}
                   {!exchange.apiConfigured && (
                     <Button variant="outline" size="sm" className="w-full gap-2">
                       <Settings className="h-4 w-4" />
@@ -162,9 +185,7 @@ export default function Arbitrage() {
           ))}
         </div>
 
-        {/* Settings & Controls */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Scanner Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -182,12 +203,12 @@ export default function Arbitrage() {
                 />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Min Spread Threshold</span>
-                <Badge variant="outline">0.10%</Badge>
+                <span className="text-sm">Min Edge Threshold</span>
+                <Badge variant="outline">6 bps</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Max Position Size</span>
-                <Badge variant="outline">$10,000</Badge>
+                <Badge variant="outline">$50,000</Badge>
               </div>
 
               {configuredCount < 2 && (
@@ -200,7 +221,6 @@ export default function Arbitrage() {
             </CardContent>
           </Card>
 
-          {/* Live Opportunities */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
@@ -213,7 +233,7 @@ export default function Arbitrage() {
                 )}
               </CardTitle>
               <CardDescription>
-                Real-time price discrepancies across exchanges
+                Real-time price discrepancies across venues
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -229,11 +249,24 @@ export default function Arbitrage() {
                   <p className="font-medium">Scanner is paused</p>
                   <p className="text-sm">Click "Start Scanning" to find opportunities</p>
                 </div>
+              ) : isLoading ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <RefreshCw className="h-12 w-12 mx-auto mb-4 animate-spin opacity-30" />
+                  <p className="font-medium">Loading opportunities</p>
+                  <p className="text-sm">Fetching latest spread data</p>
+                </div>
+              ) : (spreads ?? []).length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <p className="font-medium">No actionable spreads</p>
+                  <p className="text-sm">Waiting for market dislocations</p>
+                </div>
               ) : (
                 <div className="space-y-3">
-                  {MOCK_OPPORTUNITIES.map((opp) => {
-                    const buyEx = EXCHANGES.find(e => e.id === opp.buyExchange);
-                    const sellEx = EXCHANGES.find(e => e.id === opp.sellExchange);
+                  {(spreads ?? []).map((opp) => {
+                    const instrument = instrumentMap.get(opp.instrument_id) ?? 'Unknown';
+                    const buyVenue = venueMap.get(opp.buy_venue_id) ?? 'Unknown';
+                    const sellVenue = venueMap.get(opp.sell_venue_id) ?? 'Unknown';
 
                     return (
                       <div
@@ -243,24 +276,28 @@ export default function Arbitrage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <Badge variant="outline" className="font-mono text-base">
-                              {opp.pair}
+                              {instrument}
                             </Badge>
                             <div className="flex items-center gap-2 text-sm">
-                              <span>{buyEx?.icon}</span>
+                              <span>{buyVenue}</span>
                               <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-                              <span>{sellEx?.icon}</span>
+                              <span>{sellVenue}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-right">
                               <div className="text-xs text-muted-foreground">Spread</div>
-                              <div className="font-mono text-primary">{opp.spread}%</div>
+                              <div className="font-mono text-primary">
+                                {opp.executable_spread_bps.toFixed(2)} bps
+                              </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-xs text-muted-foreground">Est. Profit</div>
-                              <div className="font-mono text-green-500">${opp.profit}</div>
+                              <div className="text-xs text-muted-foreground">Net Edge</div>
+                              <div className="font-mono text-green-500">
+                                {opp.net_edge_bps.toFixed(2)} bps
+                              </div>
                             </div>
-                            <Button size="sm" className="gap-1">
+                            <Button size="sm" className="gap-1" disabled>
                               <Zap className="h-3 w-3" />
                               Execute
                             </Button>

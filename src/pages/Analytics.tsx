@@ -1,8 +1,9 @@
 import { MainLayout } from '@/components/layout/MainLayout';
+import { CapitalAllocatorPanel } from '@/components/allocator/CapitalAllocatorPanel';
 import { PortfolioAnalyticsPanel } from '@/components/portfolio/PortfolioAnalyticsPanel';
 import { TradeJournalPanel } from '@/components/journal/TradeJournalPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, BookOpen } from 'lucide-react';
+import { BarChart3, BookOpen, Compass } from 'lucide-react';
 
 export default function Analytics() {
   return (
@@ -27,6 +28,10 @@ export default function Analytics() {
               <BookOpen className="h-4 w-4" />
               Trade Journal
             </TabsTrigger>
+            <TabsTrigger value="allocator" className="gap-2">
+              <Compass className="h-4 w-4" />
+              Allocator
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics">
@@ -35,6 +40,10 @@ export default function Analytics() {
 
           <TabsContent value="journal">
             <TradeJournalPanel />
+          </TabsContent>
+
+          <TabsContent value="allocator">
+            <CapitalAllocatorPanel />
           </TabsContent>
         </Tabs>
       </div>

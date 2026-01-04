@@ -75,6 +75,14 @@ export { useAlerts } from './useAlerts';
 export { useStrategies } from './useStrategies';
 export { useStrategyLifecycle } from './useStrategyLifecycle';
 export { useVenues } from './useVenues';
+export { useInstruments } from './useInstruments';
+export { useSpotArbSpreads } from './useSpotArbSpreads';
+export { useSpotQuotes } from './useSpotQuotes';
+export { useArbPnlAnalytics } from './useArbPnlAnalytics';
+export { useAllocatorDecisions } from './useAllocatorDecisions';
+export { useMarketRegimes } from './useMarketRegimes';
+export { useStrategyAllocations } from './useStrategyAllocations';
+export { useStrategyPositions } from './useStrategyPositions';
 
 // Real-time & WebSocket
 export { useRealtimeSubscription, useDashboardRealtime } from './useRealtimeSubscriptions';
@@ -133,4 +141,3 @@ export * from './useArbitrageEngine';
 export * from './useCrossExchangeArbitrage';
 export * from './useFundingArbitrage';
 export * from './useArbitrageHistory';
-

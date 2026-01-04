@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +20,12 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTradingMode } from '@/hooks/useTradingMode';
-import { useCoinbaseTicker, useCoinbasePlaceOrder, useCoinbaseBalances } from '@/hooks/useCoinbaseTrading';
-import { useKrakenTicker, useKrakenPlaceOrder, useKrakenBalances } from '@/hooks/useKrakenTrading';
-import { useBinanceUSTicker, useBinanceUSPlaceOrder, useBinanceUSAccount } from '@/hooks/useBinanceUSTrading';
-import { useArbitragePrices } from '@/hooks/useCrossExchangeArbitrage';
+import { useCoinbasePlaceOrder, useCoinbaseBalances } from '@/hooks/useCoinbaseTrading';
+import { useKrakenPlaceOrder, useKrakenBalances } from '@/hooks/useKrakenTrading';
+import { useBinanceUSPlaceOrder, useBinanceUSAccount } from '@/hooks/useBinanceUSTrading';
+import { useInstruments } from '@/hooks/useInstruments';
+import { useSpotQuotes } from '@/hooks/useSpotQuotes';
+import { useVenues } from '@/hooks/useVenues';
 import { VENUES } from '@/lib/tradingModes';
 
 type Exchange = 'coinbase' | 'kraken' | 'binance_us';
@@ -46,7 +48,7 @@ const TRADING_PAIRS: Record<string, { coinbase: string; kraken: string; binance_
 };
 
 export function UnifiedSpotTrader() {
-  const { mode, availableVenues } = useTradingMode();
+  const { mode } = useTradingMode();
   
   const [selectedPair, setSelectedPair] = useState('BTC/USD');
   const [selectedExchange, setSelectedExchange] = useState<Exchange>('coinbase');
@@ -58,8 +60,36 @@ export function UnifiedSpotTrader() {
   // Get exchange-specific symbols
   const pairConfig = TRADING_PAIRS[selectedPair];
   
-  // Fetch prices from all exchanges
-  const { data: arbPrices, isLoading: pricesLoading } = useArbitragePrices(selectedPair);
+  const { data: instruments } = useInstruments();
+  const { data: venues } = useVenues();
+
+  const normalizeSymbol = (symbol: string) => symbol.replace('-', '/').toUpperCase();
+
+  const venueKeyById = useMemo(() => {
+    const map = new Map<string, Exchange>();
+    venues?.forEach((venue) => {
+      const name = venue.name.toLowerCase();
+      if (name.includes('coinbase')) map.set(venue.id, 'coinbase');
+      if (name.includes('kraken')) map.set(venue.id, 'kraken');
+      if (name.includes('binance') && name.includes('us')) map.set(venue.id, 'binance_us');
+    });
+    return map;
+  }, [venues]);
+
+  const instrumentIds = useMemo(() => {
+    if (!instruments || instruments.length === 0) return [];
+    const target = normalizeSymbol(selectedPair);
+    return instruments
+      .filter((instrument) => normalizeSymbol(instrument.common_symbol || '') === target)
+      .filter((instrument) => instrument.contract_type === 'spot')
+      .filter((instrument) => venueKeyById.has(instrument.venue_id))
+      .map((instrument) => instrument.id);
+  }, [instruments, selectedPair, venueKeyById]);
+
+  const { data: spotQuotes, isLoading: pricesLoading } = useSpotQuotes(
+    instrumentIds,
+    instrumentIds.length > 0
+  );
   
   // Exchange accounts
   const { data: coinbaseAccount } = useCoinbaseBalances();
@@ -73,16 +103,24 @@ export function UnifiedSpotTrader() {
   
   // Calculate best prices
   const exchangePrices: ExchangePrice[] = useMemo(() => {
-    if (!arbPrices || !Array.isArray(arbPrices)) return [];
-    
-    return arbPrices.map((p: any) => ({
-      exchange: p.exchange as Exchange,
-      bid: p.bid,
-      ask: p.ask,
-      spread: p.ask - p.bid,
-      spreadPercent: ((p.ask - p.bid) / p.bid) * 100,
-    }));
-  }, [arbPrices]);
+    if (!spotQuotes || spotQuotes.length === 0) return [];
+
+    const latestByExchange = new Map<Exchange, ExchangePrice>();
+    spotQuotes.forEach((quote) => {
+      const exchange = venueKeyById.get(quote.venue_id);
+      if (!exchange) return;
+      if (latestByExchange.has(exchange)) return;
+      latestByExchange.set(exchange, {
+        exchange,
+        bid: quote.bid_price,
+        ask: quote.ask_price,
+        spread: quote.ask_price - quote.bid_price,
+        spreadPercent: quote.bid_price > 0 ? ((quote.ask_price - quote.bid_price) / quote.bid_price) * 100 : 0,
+      });
+    });
+
+    return Array.from(latestByExchange.values());
+  }, [spotQuotes]);
   
   // Get current exchange price
   const currentExchangePrice = exchangePrices.find(p => p.exchange === selectedExchange);

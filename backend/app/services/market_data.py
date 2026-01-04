@@ -13,6 +13,14 @@ from app.database import get_supabase
 logger = structlog.get_logger()
 
 
+class DataQuality:
+    REALTIME = "realtime"
+    DELAYED = "delayed"
+    DERIVED = "derived"
+    SIMULATED = "simulated"
+    UNAVAILABLE = "unavailable"
+
+
 class MarketDataService:
     """
     Unified market data aggregation from multiple venues.
@@ -72,6 +80,15 @@ class MarketDataService:
             for k, v in self._last_prices.items() 
             if k.startswith(f"{venue}:")
         }
+
+    async def get_historical_data(self, instrument: str, timeframe: str, limit: int = 100) -> List[Dict]:
+        """Return cached snapshots for compatibility with FreqTrade integration."""
+        key_prefix = f"{instrument}"
+        snapshots = [
+            data for key, data in self._last_prices.items()
+            if key.endswith(f":{key_prefix}")
+        ]
+        return snapshots[:limit]
     
     def update_price(
         self,
@@ -80,10 +97,18 @@ class MarketDataService:
         bid: float,
         ask: float,
         last: float,
-        volume_24h: Optional[float] = None
+        volume_24h: Optional[float] = None,
+        event_time: Optional[datetime] = None,
+        receive_time: Optional[datetime] = None,
+        data_quality: str = "realtime",
+        l2_snapshot: Optional[Dict[str, Any]] = None,
+        bid_size: Optional[float] = None,
+        ask_size: Optional[float] = None,
     ):
         """Update price (called by venue adapters)."""
         key = f"{venue}:{instrument}"
+        event_time = event_time or datetime.utcnow()
+        receive_time = receive_time or datetime.utcnow()
         
         price_data = {
             "venue": venue,
@@ -95,6 +120,12 @@ class MarketDataService:
             "spread": ask - bid,
             "spread_bps": ((ask - bid) / ((ask + bid) / 2)) * 10000 if (ask + bid) > 0 else 0,
             "volume_24h": volume_24h,
+            "event_time": event_time.isoformat(),
+            "receive_time": receive_time.isoformat(),
+            "data_quality": data_quality,
+            "l2": l2_snapshot,
+            "bid_size": bid_size,
+            "ask_size": ask_size,
             "timestamp": datetime.utcnow().isoformat()
         }
         
@@ -107,6 +138,33 @@ class MarketDataService:
         # Publish to Redis
         if self._redis_client:
             asyncio.create_task(self._publish_redis(key, price_data))
+
+    def update_orderbook(
+        self,
+        venue: str,
+        instrument: str,
+        bids: List[List[float]],
+        asks: List[List[float]],
+        event_time: Optional[datetime] = None,
+        receive_time: Optional[datetime] = None,
+        data_quality: str = "realtime",
+    ):
+        """Update L2 order book snapshot."""
+        best_bid = bids[0][0] if bids else 0.0
+        best_ask = asks[0][0] if asks else 0.0
+        last = (best_bid + best_ask) / 2 if best_bid and best_ask else 0.0
+        self.update_price(
+            venue=venue,
+            instrument=instrument,
+            bid=best_bid,
+            ask=best_ask,
+            last=last,
+            volume_24h=None,
+            event_time=event_time,
+            receive_time=receive_time,
+            data_quality=data_quality,
+            l2_snapshot={"bids": bids, "asks": asks},
+        )
     
     async def _notify_subscribers(self, key: str, data: Dict):
         """Notify all subscribers of a price update."""

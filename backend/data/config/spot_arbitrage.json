@@ -1,0 +1,13 @@
+{
+  "strategy_name": "spot_cross_venue_arb",
+  "book_type": "prop",
+  "venues": ["coinbase", "kraken"],
+  "instruments": ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD"],
+  "max_notional_usd": 50000,
+  "min_size": 0.001,
+  "min_net_edge_bps": 6.0,
+  "max_spread_bps": 20.0,
+  "max_quote_age_ms": 2000,
+  "execution_mode_preference": "inventory",
+  "inventory_buffer_pct": 0.05
+}

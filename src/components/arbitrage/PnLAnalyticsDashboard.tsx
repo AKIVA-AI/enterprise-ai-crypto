@@ -1,12 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   TrendingUp,
   TrendingDown,
@@ -15,36 +9,27 @@ import {
   AlertTriangle,
   CheckCircle2,
   BarChart3,
-  Scale,
-  Bell,
   RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePnLAnalytics, usePositionSizing, PnLHistoryEntry, DailyStats } from '@/hooks/useCrossExchangeArbitrage';
-import { useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
+import { useArbPnlAnalytics } from '@/hooks/useArbPnlAnalytics';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Area, AreaChart } from 'recharts';
 
 export function PnLAnalyticsDashboard() {
-  const { 
-    dailyPnL, 
-    dailyPnLLimit, 
-    percentUsed, 
-    stats, 
-    history, 
-    positionSizing,
-    warningAlertsSent,
+  const {
+    data,
     isLoading,
-    refetch 
-  } = usePnLAnalytics();
-  
-  const { rules, currentSize, updateRules } = usePositionSizing();
-  const [baseSizeInput, setBaseSizeInput] = useState(rules?.baseSize || 0.1);
+    refetch,
+  } = useArbPnlAnalytics();
 
-  // Prepare chart data
-  const chartData = history.map((entry: PnLHistoryEntry, index: number) => {
+  const stats = data?.stats;
+  const history = data?.history ?? [];
+  const dailyPnL = data?.dailyPnL ?? 0;
+
+  const chartData = history.map((entry, index) => {
     const runningPnL = history
       .slice(0, index + 1)
-      .reduce((sum: number, e: PnLHistoryEntry) => sum + e.pnl, 0);
+      .reduce((sum, e) => sum + e.pnl, 0);
     return {
       time: new Date(entry.timestamp).toLocaleTimeString(),
       pnl: entry.pnl,
@@ -65,31 +50,7 @@ export function PnLAnalyticsDashboard() {
 
   return (
     <div className="space-y-4">
-      {/* Warning Alerts Status */}
-      {(warningAlertsSent.at70 || warningAlertsSent.at90) && (
-        <div className={cn(
-          'p-3 rounded-lg flex items-center gap-3',
-          warningAlertsSent.at90 
-            ? 'bg-destructive/10 border border-destructive/30' 
-            : 'bg-warning/10 border border-warning/30'
-        )}>
-          <Bell className={cn(
-            'h-5 w-5',
-            warningAlertsSent.at90 ? 'text-destructive' : 'text-warning'
-          )} />
-          <div>
-            <p className="text-sm font-medium">
-              {warningAlertsSent.at90 ? 'Critical P&L Alert Sent (90%)' : 'Warning P&L Alert Sent (70%)'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Position sizes automatically reduced
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* P&L Summary Card */}
         <Card className="glass-panel">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -125,32 +86,17 @@ export function PnLAnalyticsDashboard() {
 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">P&L Limit Usage</span>
-                <span className={cn(
-                  'font-mono',
-                  percentUsed >= 90 ? 'text-destructive' :
-                  percentUsed >= 70 ? 'text-warning' : 'text-foreground'
-                )}>
-                  {percentUsed.toFixed(1)}%
-                </span>
+                <span className="text-muted-foreground">Trades</span>
+                <span className="font-mono">{stats?.tradesExecuted || 0}</span>
               </div>
-              <Progress 
-                value={Math.min(100, percentUsed)} 
-                className={cn(
-                  'h-2',
-                  percentUsed >= 90 && '[&>div]:bg-destructive',
-                  percentUsed >= 70 && percentUsed < 90 && '[&>div]:bg-warning'
-                )}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Limit: ${dailyPnLLimit}</span>
-                <span>Remaining: ${(dailyPnLLimit - dailyPnL).toFixed(2)}</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Win Rate</span>
+                <span className="font-mono">{stats?.winRate.toFixed(1) || 0}%</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Trading Stats Card */}
         <Card className="glass-panel">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -203,7 +149,7 @@ export function PnLAnalyticsDashboard() {
                   (stats?.profitFactor || 0) >= 1.5 ? 'text-success' :
                   (stats?.profitFactor || 0) >= 1 ? 'text-warning' : 'text-destructive'
                 )}>
-                  {stats?.profitFactor === Infinity ? '∞' : stats?.profitFactor.toFixed(2) || '0.00'}
+                  {stats?.profitFactor === Infinity ? 'Inf' : stats?.profitFactor.toFixed(2) || '0.00'}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -228,7 +174,6 @@ export function PnLAnalyticsDashboard() {
         </Card>
       </div>
 
-      {/* P&L Chart */}
       {chartData.length > 0 && (
         <Card className="glass-panel">
           <CardHeader className="pb-2">
@@ -246,12 +191,12 @@ export function PnLAnalyticsDashboard() {
                       <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <XAxis 
-                    dataKey="time" 
+                  <XAxis
+                    dataKey="time"
                     tick={{ fontSize: 10 }}
                     stroke="hsl(var(--muted-foreground))"
                   />
-                  <YAxis 
+                  <YAxis
                     tick={{ fontSize: 10 }}
                     stroke="hsl(var(--muted-foreground))"
                     tickFormatter={(v) => `$${v}`}
@@ -279,83 +224,6 @@ export function PnLAnalyticsDashboard() {
         </Card>
       )}
 
-      {/* Position Sizing Card */}
-      <Card className="glass-panel">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Scale className="h-4 w-4" />
-            Dynamic Position Sizing
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="text-center p-3 rounded-lg bg-muted/30">
-              <div className="text-lg font-bold font-mono">{rules?.baseSize || 0.1}</div>
-              <div className="text-xs text-muted-foreground">Base Size</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-primary/10">
-              <div className="text-lg font-bold font-mono text-primary">
-                {positionSizing?.currentSize?.toFixed(4) || currentSize.toFixed(4)}
-              </div>
-              <div className="text-xs text-muted-foreground">Current Size</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-muted/30">
-              <div className="text-lg font-bold font-mono">{rules?.maxSize || 0.5}</div>
-              <div className="text-xs text-muted-foreground">Max Size</div>
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm">Scale down at 70% P&L usage</Label>
-                <p className="text-xs text-muted-foreground">Reduce to 50% of base size</p>
-              </div>
-              <Switch
-                checked={rules?.scaleDownAt70Percent ?? true}
-                onCheckedChange={(checked) => updateRules.mutate({ scaleDownAt70Percent: checked })}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm">Scale down at 90% P&L usage</Label>
-                <p className="text-xs text-muted-foreground">Reduce to 25% of base size</p>
-              </div>
-              <Switch
-                checked={rules?.scaleDownAt90Percent ?? true}
-                onCheckedChange={(checked) => updateRules.mutate({ scaleDownAt90Percent: checked })}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              value={baseSizeInput}
-              onChange={(e) => setBaseSizeInput(Number(e.target.value))}
-              step={0.01}
-              min={0.01}
-              max={1}
-              className="font-mono"
-              placeholder="Base size"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => updateRules.mutate({ baseSize: baseSizeInput })}
-              disabled={updateRules.isPending}
-            >
-              Update Base
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Trades */}
       {history.length > 0 && (
         <Card className="glass-panel">
           <CardHeader className="pb-2">
@@ -364,37 +232,39 @@ export function PnLAnalyticsDashboard() {
                 <Target className="h-4 w-4" />
                 Recent Trades
               </span>
-              <Button variant="ghost" size="sm" onClick={() => refetch()}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => refetch()}
+              >
+                Refresh
+              </button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-40">
-              <div className="space-y-2">
-                {history.slice(-10).reverse().map((entry: PnLHistoryEntry, index: number) => (
-                  <div 
-                    key={entry.tradeId} 
-                    className="flex items-center justify-between p-2 rounded-lg bg-muted/20"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {entry.symbol}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(entry.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    <span className={cn(
-                      'font-mono text-sm',
-                      entry.pnl >= 0 ? 'text-success' : 'text-destructive'
-                    )}>
-                      {entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}
+            <div className="space-y-2">
+              {history.slice(-10).reverse().map((entry) => (
+                <div
+                  key={entry.tradeId}
+                  className="flex items-center justify-between p-2 rounded-lg bg-muted/20"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {entry.symbol}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  <span className={cn(
+                    'font-mono text-sm',
+                    entry.pnl >= 0 ? 'text-success' : 'text-destructive'
+                  )}>
+                    {entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

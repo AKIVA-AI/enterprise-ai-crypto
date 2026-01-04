@@ -1,0 +1,18 @@
+{
+  "base_weights": {
+    "futures_scalp": 0.25,
+    "spot": 0.25,
+    "basis": 0.25,
+    "spot_arb": 0.25
+  },
+  "max_strategy_weight": 0.6,
+  "min_strategy_weight": 0.05,
+  "drawdown_throttle": 0.1,
+  "sharpe_floor": 0.5,
+  "cooldown_minutes": 60,
+  "risk_bias_scalars": {
+    "risk_on": 1.1,
+    "neutral": 1.0,
+    "risk_off": 0.7
+  }
+}

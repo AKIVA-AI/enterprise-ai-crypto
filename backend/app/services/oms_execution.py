@@ -18,6 +18,9 @@ from app.config import settings
 from app.database import get_supabase, audit_log, create_alert, check_kill_switch_for_trading
 from app.services.risk_engine import risk_engine
 from app.services.portfolio_engine import portfolio_engine
+from app.services.edge_cost_model import EdgeCostModel
+from app.services.execution_planner import ExecutionPlanner
+from app.services.market_data import market_data_service
 
 logger = structlog.get_logger()
 
@@ -52,6 +55,8 @@ class OMSExecutionService:
     def __init__(self):
         self._adapters: Dict[str, 'VenueAdapter'] = {}
         self._pending_orders: Dict[UUID, Order] = {}
+        self._edge_cost_model = EdgeCostModel(min_edge_buffer_bps=self.MIN_EDGE_BUFFER_BPS)
+        self._execution_planner = ExecutionPlanner()
     
     def register_adapter(self, venue_name: str, adapter: 'VenueAdapter'):
         """Register a venue adapter."""
@@ -140,7 +145,7 @@ class OMSExecutionService:
             return None
         
         # Execution cost check
-        cost_check = await self._check_execution_costs(intent, venue_health)
+        cost_check = await self._check_execution_costs(intent, venue_health, venue_name)
         if not cost_check["allowed"]:
             logger.warning(
                 "intent_rejected_cost",
@@ -175,6 +180,29 @@ class OMSExecutionService:
             logger.warning("zero_position_size", intent_id=str(intent.id))
             return None
         
+        execution_plan = self._resolve_execution_plan(intent)
+        if execution_plan:
+            for leg in execution_plan.legs:
+                if not leg.size or leg.size <= 0:
+                    leg.size = position_size
+            execution_plan.metadata.setdefault("default_venue", venue_name)
+            await self._record_multi_leg_intent(intent, execution_plan)
+
+            async def record_leg_event(event_type, leg, payload):
+                payload["tenant_id"] = (intent.metadata or {}).get("tenant_id") or settings.tenant_id
+                await self._record_leg_event(event_type, leg, payload)
+
+            executed_orders = await self._execution_planner.execute_plan(
+                intent=intent,
+                plan=execution_plan,
+                adapters=self._adapters,
+                save_order_callback=self._save_order,
+                event_recorder=record_leg_event,
+                venue_id_resolver=self._resolve_venue_id,
+            )
+            await self._update_basis_strategy_positions(intent, executed_orders)
+            return executed_orders[-1] if executed_orders else None
+
         # Create order
         order = Order(
             id=uuid4(),
@@ -246,9 +274,10 @@ class OMSExecutionService:
             return order
     
     async def _check_execution_costs(
-        self, 
-        intent: TradeIntent, 
-        venue_health: Optional[VenueHealth]
+        self,
+        intent: TradeIntent,
+        venue_health: Optional[VenueHealth],
+        venue_name: str,
     ) -> Dict:
         """
         Check if expected execution costs are acceptable relative to edge.
@@ -256,46 +285,40 @@ class OMSExecutionService:
         Returns:
             Dict with 'allowed', 'reason', and cost metrics
         """
-        # Estimate spread cost (basis points)
-        spread_cost_bps = 5  # Default 5 bps if unknown
-        
-        # Estimate slippage based on size and liquidity
-        # Larger orders have more slippage
-        size_usd = intent.target_exposure_usd
-        slippage_bps = min(size_usd / 100000 * 5, 20)  # 5 bps per $100k, max 20 bps
-        
-        # Venue latency penalty (high latency = more slippage risk)
-        latency_penalty_bps = 0
-        if venue_health and venue_health.latency_ms > 100:
-            latency_penalty_bps = (venue_health.latency_ms - 100) / 100  # 1 bp per 100ms over 100ms
-        
-        # Trading fee estimate
-        fee_bps = 10  # Default 10 bps (0.1%)
-        
-        # Total expected cost
-        expected_cost_bps = spread_cost_bps + slippage_bps + latency_penalty_bps + fee_bps
-        
-        # Required edge = cost + buffer
-        min_edge_bps = expected_cost_bps + self.MIN_EDGE_BUFFER_BPS
-        
-        # Estimate edge from confidence (rough heuristic)
-        # Higher confidence = higher expected edge
-        estimated_edge_bps = intent.confidence * 100  # 100% confidence = 100 bps expected
-        
-        if estimated_edge_bps < min_edge_bps:
+        market_snapshot = await self._get_market_snapshot(venue_name, intent.instrument)
+        if market_snapshot and market_snapshot.get("data_quality") == DataQuality.UNAVAILABLE:
             return {
                 "allowed": False,
-                "reason": f"Expected edge ({estimated_edge_bps:.1f} bps) < required minimum ({min_edge_bps:.1f} bps)",
-                "expected_cost_bps": expected_cost_bps,
-                "min_edge_bps": min_edge_bps,
-                "estimated_edge_bps": estimated_edge_bps
+                "reason": "Market data unavailable",
+                "expected_cost_bps": None,
+                "min_edge_bps": None,
+                "estimated_edge_bps": None,
             }
-        
+
+        venue_fees_bps = intent.metadata.get("venue_fees_bps", {}) if intent.metadata else {}
+        latency_ms = venue_health.latency_ms if venue_health else None
+
+        result = self._edge_cost_model.evaluate_intent(
+            intent=intent,
+            market_snapshot=market_snapshot or {},
+            venue_fees_bps=venue_fees_bps,
+            latency_ms=latency_ms,
+        )
+
         return {
-            "allowed": True,
-            "expected_cost_bps": expected_cost_bps,
-            "min_edge_bps": min_edge_bps,
-            "estimated_edge_bps": estimated_edge_bps
+            "allowed": result.allowed,
+            "reason": result.reason,
+            "expected_cost_bps": result.breakdown.total_cost_bps,
+            "min_edge_bps": result.min_edge_bps,
+            "estimated_edge_bps": result.expected_edge_bps,
+            "breakdown": {
+                "fee_bps": result.breakdown.fee_bps,
+                "spread_bps": result.breakdown.spread_bps,
+                "slippage_bps": result.breakdown.slippage_bps,
+                "latency_bps": result.breakdown.latency_bps,
+                "funding_bps": result.breakdown.funding_bps,
+                "basis_bps": result.breakdown.basis_bps,
+            },
         }
     
     def _is_reducing_order(self, intent: TradeIntent, positions: List) -> bool:
@@ -308,6 +331,136 @@ class OMSExecutionService:
                 if pos.side == OrderSide.SELL and intent.direction == OrderSide.BUY:
                     return True
         return False
+
+    def _resolve_execution_plan(self, intent: TradeIntent):
+        metadata = intent.metadata or {}
+        if "execution_plan" in metadata:
+            try:
+                from app.models.opportunity import ExecutionPlan
+                return ExecutionPlan(**metadata["execution_plan"])
+            except Exception as exc:
+                logger.warning("execution_plan_parse_failed", error=str(exc), intent_id=str(intent.id))
+        return None
+
+    def _resolve_venue_id(self, venue_name: str) -> Optional[str]:
+        try:
+            supabase = get_supabase()
+            result = supabase.table("venues").select("id").ilike("name", venue_name).single().execute()
+            if result.data:
+                return result.data["id"]
+        except Exception as exc:
+            logger.warning("venue_id_resolution_failed", venue=venue_name, error=str(exc))
+        return None
+
+    async def _record_multi_leg_intent(self, intent: TradeIntent, execution_plan) -> None:
+        tenant_id = (intent.metadata or {}).get("tenant_id") or settings.tenant_id
+        if not tenant_id:
+            return
+        try:
+            supabase = get_supabase()
+            execution_mode = (intent.metadata or {}).get("execution_mode") or execution_plan.metadata.get("execution_mode")
+            plan_payload = execution_plan.dict()
+            plan_payload["notional_usd"] = float(intent.target_exposure_usd)
+            supabase.table("multi_leg_intents").insert({
+                "tenant_id": tenant_id,
+                "intent_id": str(intent.id),
+                "legs_json": plan_payload,
+                "execution_mode": execution_mode or "legged",
+                "status": "open",
+            }).execute()
+        except Exception as exc:
+            logger.warning("multi_leg_intent_record_failed", error=str(exc), intent_id=str(intent.id))
+
+    async def _record_leg_event(self, event_type: str, leg, payload: Dict) -> None:
+        tenant_id = (payload or {}).get("tenant_id") or (payload or {}).get("tenant") or settings.tenant_id
+        if not tenant_id:
+            return
+        try:
+            supabase = get_supabase()
+            supabase.table("leg_events").insert({
+                "tenant_id": tenant_id,
+                "intent_id": payload.get("intent_id"),
+                "leg_id": str(leg.id),
+                "event_type": event_type,
+                "payload_json": payload,
+            }).execute()
+        except Exception as exc:
+            logger.warning("leg_event_record_failed", error=str(exc), intent_id=payload.get("intent_id"))
+
+    async def _update_basis_strategy_positions(self, intent: TradeIntent, executed_orders: List[Order]) -> None:
+        if not executed_orders:
+            return
+        if (intent.metadata or {}).get("strategy_type") != "basis":
+            return
+        tenant_id = (intent.metadata or {}).get("tenant_id") or settings.tenant_id
+        if not tenant_id:
+            return
+        try:
+            supabase = get_supabase()
+            venue_map = {
+                row["id"]: row["venue_type"]
+                for row in supabase.table("venues").select("id, venue_type").execute().data
+            }
+            for order in executed_orders:
+                venue_type = venue_map.get(str(order.venue_id))
+                if not venue_type:
+                    continue
+                size_delta = order.filled_size or order.size
+                if order.side == OrderSide.SELL:
+                    size_delta = -size_delta
+
+                instrument_id = None
+                instrument_row = supabase.table("instruments").select("id").eq(
+                    "tenant_id", tenant_id
+                ).ilike("common_symbol", order.instrument).limit(1).execute()
+                if instrument_row.data:
+                    instrument_id = instrument_row.data[0]["id"]
+
+                if not instrument_id:
+                    continue
+
+                update_field = "spot_position" if venue_type == "spot" else "deriv_position"
+                existing = supabase.table("strategy_positions").select("*").eq(
+                    "tenant_id", tenant_id
+                ).eq("strategy_id", str(intent.strategy_id)).eq(
+                    "instrument_id", instrument_id
+                ).single().execute()
+
+                if existing.data:
+                    new_value = float(existing.data.get(update_field, 0)) + size_delta
+                    spot_pos = float(existing.data.get("spot_position", 0))
+                    deriv_pos = float(existing.data.get("deriv_position", 0))
+                    if update_field == "spot_position":
+                        spot_pos = new_value
+                    else:
+                        deriv_pos = new_value
+                    hedged_ratio = abs(spot_pos / deriv_pos) if deriv_pos else 0
+                    supabase.table("strategy_positions").update({
+                        update_field: new_value,
+                        "hedged_ratio": hedged_ratio,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }).eq("id", existing.data["id"]).execute()
+                else:
+                    spot_pos = size_delta if update_field == "spot_position" else 0
+                    deriv_pos = size_delta if update_field == "deriv_position" else 0
+                    hedged_ratio = abs(spot_pos / deriv_pos) if deriv_pos else 0
+                    supabase.table("strategy_positions").insert({
+                        "tenant_id": tenant_id,
+                        "strategy_id": str(intent.strategy_id),
+                        "instrument_id": instrument_id,
+                        "spot_position": spot_pos,
+                        "deriv_position": deriv_pos,
+                        "hedged_ratio": hedged_ratio,
+                    }).execute()
+        except Exception as exc:
+            logger.warning("strategy_positions_update_failed", error=str(exc), intent_id=str(intent.id))
+
+    async def _get_market_snapshot(self, venue: str, instrument: str) -> Optional[Dict]:
+        try:
+            return await market_data_service.get_price(venue, instrument)
+        except Exception as exc:
+            logger.warning("market_snapshot_failed", error=str(exc), venue=venue, instrument=instrument)
+            return None
     
     async def place_order(
         self,
