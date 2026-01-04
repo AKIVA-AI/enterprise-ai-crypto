@@ -3,7 +3,7 @@ Market Data Service - Unified market data from multiple venues.
 """
 import structlog
 from typing import Dict, List, Optional, Callable, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 import json
 
@@ -107,8 +107,8 @@ class MarketDataService:
     ):
         """Update price (called by venue adapters)."""
         key = f"{venue}:{instrument}"
-        event_time = event_time or datetime.utcnow()
-        receive_time = receive_time or datetime.utcnow()
+        event_time = event_time or datetime.now(timezone.utc)
+        receive_time = receive_time or datetime.now(timezone.utc)
         
         price_data = {
             "venue": venue,
@@ -126,11 +126,11 @@ class MarketDataService:
             "l2": l2_snapshot,
             "bid_size": bid_size,
             "ask_size": ask_size,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
+
         self._last_prices[key] = price_data
-        self._heartbeats[venue] = datetime.utcnow()
+        self._heartbeats[venue] = datetime.now(timezone.utc)
         
         # Notify subscribers
         asyncio.create_task(self._notify_subscribers(key, price_data))
@@ -198,7 +198,7 @@ class MarketDataService:
                 "stale_seconds": None
             }
         
-        stale_seconds = (datetime.utcnow() - last_heartbeat).total_seconds()
+        stale_seconds = (datetime.now(timezone.utc) - last_heartbeat).total_seconds()
         is_stale = stale_seconds > 30  # Consider stale if no update in 30s
         
         return {

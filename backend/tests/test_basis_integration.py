@@ -1,6 +1,6 @@
 import pytest
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.config import settings
 from app.models.basis import BasisQuote
@@ -26,7 +26,7 @@ async def test_basis_scanner_to_oms_unwind(monkeypatch):
         basis_bps_bid=350.0,
         basis_bps_ask=300.0,
         basis_z=2.5,  # Higher Z-score
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         metadata={"spot_mid": 100.5, "perp_mid": 105.5},
     )
 

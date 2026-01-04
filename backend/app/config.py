@@ -60,7 +60,7 @@ class Settings:
     
     def __init__(self):
         # ========== Environment ==========
-        self.env = os.getenv("ENV", "development")
+        self.env = os.getenv("ENVIRONMENT", os.getenv("ENV", "development"))
         self.ENVIRONMENT = self.env  # Alias for compatibility
         self.paper_trading = os.getenv("PAPER_TRADING", "true").lower() == "true"
         self.DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -80,8 +80,14 @@ class Settings:
         
         # ========== Supabase ==========
         self.supabase_url = os.getenv("SUPABASE_URL", "")
-        self.supabase_service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-        self.supabase_anon_key = os.getenv("SUPABASE_ANON_KEY", "")
+        self.supabase_service_role_key = os.getenv(
+            "SUPABASE_SERVICE_ROLE_KEY",
+            os.getenv("SUPABASE_SERVICE_KEY", ""),
+        )
+        self.supabase_anon_key = os.getenv(
+            "SUPABASE_ANON_KEY",
+            os.getenv("SUPABASE_KEY", ""),
+        )
         self.tenant_id = os.getenv("TENANT_ID")
         
         # ========== Redis ==========

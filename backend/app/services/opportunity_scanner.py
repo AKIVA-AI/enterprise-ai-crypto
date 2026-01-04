@@ -97,7 +97,7 @@ class OpportunityScanner:
                     metadata={
                         "strategy": strategy.name,
                         "strategy_type": strategy.type,
-                        "timeframes": stack.dict(),
+                        "timeframes": stack.model_dump(),
                     },
                 )
             )
@@ -242,9 +242,9 @@ class OpportunityScanner:
             "explanation": opportunity.explanation,
         }
         if opportunity.signal_stack:
-            metadata["signal_stack"] = opportunity.signal_stack.dict()
+            metadata["signal_stack"] = opportunity.signal_stack.model_dump()
         if opportunity.execution_plan:
-            metadata["execution_plan"] = opportunity.execution_plan.dict()
+            metadata["execution_plan"] = opportunity.execution_plan.model_dump()
 
         return TradeIntent(
             id=uuid4(),

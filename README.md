@@ -100,14 +100,22 @@ akiva-ai-crypto/
 
 ## Documentation
 
+### Core Documentation
 | Document | Description |
 |----------|-------------|
 | [System Overview](docs/SYSTEM_OVERVIEW.md) | How the system works |
 | [Architecture](docs/ARCHITECTURE.md) | Technical architecture |
 | [Manifesto](docs/MANIFESTO.md) | Core values and philosophy |
 | [Coinbase Setup](docs/COINBASE_SETUP_GUIDE.md) | Exchange configuration |
-| [Deployment](docs/DEPLOYMENT_GUIDE.md) | Production deployment |
 | [Strategies](docs/WhaleFlowScalper_STRATEGY.md) | Strategy documentation |
+
+### Deployment & Operations
+| Document | Description |
+|----------|-------------|
+| [🚀 Deployment Runbook](docs/deployment/DEPLOYMENT_RUNBOOK.md) | Complete deployment guide |
+| [⚙️ Environment Variables](docs/deployment/ENVIRONMENT_VARIABLES.md) | Configuration reference |
+| [📡 API Reference](docs/deployment/API_REFERENCE.md) | API documentation |
+| [📋 Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Production deployment |
 
 ## Environment Variables
 

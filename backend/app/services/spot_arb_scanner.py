@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
@@ -138,7 +138,7 @@ class SpotArbScanner:
                             "executable_spread_bps": edge.executable_spread_bps,
                             "latency_score": latency_score,
                             "liquidity_score": liquidity_score,
-                            "execution_plan": plan.dict(),
+                            "execution_plan": plan.model_dump(),
                             "execution_mode": execution_mode,
                             "buy_venue": buy_venue,
                             "sell_venue": sell_venue,
@@ -266,7 +266,7 @@ class SpotArbScanner:
                 "net_edge_bps": edge.net_edge_bps,
                 "liquidity_score": min(buy_quote.ask_size, sell_quote.bid_size),
                 "latency_score": max(buy_quote.age_ms, sell_quote.age_ms),
-                "ts": datetime.utcnow().isoformat(),
+                "ts": datetime.now(timezone.utc).isoformat(),
             }).execute()
         except Exception as exc:
             logger.warning("arb_spread_store_failed", error=str(exc))

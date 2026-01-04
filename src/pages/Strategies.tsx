@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { BacktestPanel } from '@/components/backtest/BacktestPanel';
 import { StrategyDeploymentWizard } from '@/components/strategies/StrategyDeploymentWizard';
-import { StrategyTemplateSelector } from '@/components/strategies/StrategyTemplateSelector';
+import { StrategyTemplateSelector, StrategyTemplate as SelectorStrategyTemplate } from '@/components/strategies/StrategyTemplateSelector';
 import { StrategyTemplate, getTierColor, getTierLabel } from '@/lib/strategyTemplates';
 
 const statusColors: Record<string, string> = {
@@ -51,14 +52,16 @@ export default function Strategies() {
     setFormData({ name: '', book_id: '', timeframe: '1h', risk_tier: 1 });
   };
 
-  const handleTemplateSelect = (template: StrategyTemplate) => {
+  const handleTemplateSelect = (template: SelectorStrategyTemplate) => {
+    // Create a basic strategy from the template selector
     setFormData({
       name: template.name,
       book_id: formData.book_id || (books[0]?.id || ''),
-      timeframe: template.defaultConfig.timeframe,
-      risk_tier: template.defaultConfig.riskTier,
+      timeframe: '1h', // Default timeframe
+      risk_tier: 2, // Default risk tier
     });
-    setIsCreateOpen(true);
+    setIsTemplatesOpen(false); // Close template dialog
+    setIsCreateOpen(true); // Open create dialog
   };
 
   const handleStatusChange = async (id: string, status: 'off' | 'paper' | 'live') => {
@@ -87,24 +90,24 @@ export default function Strategies() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <LineChart className="h-7 w-7 text-primary" />
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <LineChart className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
               Strategy Library
             </h1>
-            <p className="text-muted-foreground">Create, backtest, and deploy trading strategies</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Create, backtest, and deploy trading strategies</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setIsTemplatesOpen(true)}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={() => setIsTemplatesOpen(true)}>
               <Zap className="h-4 w-4" />Templates
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => { setDeployStrategyId(undefined); setIsDeployOpen(true); }}>
+            <Button variant="outline" className="gap-2 w-full sm:w-auto" onClick={() => { setDeployStrategyId(undefined); setIsDeployOpen(true); }}>
               <Rocket className="h-4 w-4" />Deploy Strategy
             </Button>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2"><Plus className="h-4 w-4" />New Strategy</Button>
+                <Button className="gap-2 w-full sm:w-auto"><Plus className="h-4 w-4" />New Strategy</Button>
               </DialogTrigger>
               <DialogContent>
               <DialogHeader>
@@ -158,12 +161,12 @@ export default function Strategies() {
         </div>
 
         {/* Tier Filter */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Filter className="h-4 w-4" />
+        <div className="flex items-center gap-4" role="group" aria-labelledby="tier-filter-label">
+          <div id="tier-filter-label" className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Filter className="h-4 w-4" aria-hidden="true" />
             Filter by tier:
           </div>
-          <ToggleGroup type="single" value={tierFilter} onValueChange={(v) => v && setTierFilter(v as TierFilter)}>
+          <ToggleGroup type="single" value={tierFilter} onValueChange={(v) => v && setTierFilter(v as TierFilter)} aria-label="Filter strategies by tier">
             <ToggleGroupItem value="all" className="gap-2">
               All
               <Badge variant="secondary" className="ml-1">{tierCounts.all}</Badge>
@@ -187,7 +190,48 @@ export default function Strategies() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="glass-panel rounded-xl p-4 sm:p-6">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                      <Skeleton className="h-6 w-48" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-5 w-20" />
+                        <Skeleton className="h-5 w-24" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-4 w-32 mb-4" />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="bg-muted/30 rounded-lg p-3">
+                        <Skeleton className="h-3 w-8 mb-1" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-3">
+                        <Skeleton className="h-3 w-16 mb-1" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-3">
+                        <Skeleton className="h-3 w-16 mb-1" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-3">
+                        <Skeleton className="h-3 w-12 mb-1" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-row sm:flex-col lg:flex-row items-center gap-2 lg:ml-4">
+                    <Skeleton className="h-8 w-20" />
+                    <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filteredStrategies.length === 0 ? (
           <div className="glass-panel rounded-xl p-8 text-center">
             <LineChart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -204,36 +248,50 @@ export default function Strategies() {
             {filteredStrategies.map((strategy) => {
               const tier = getTierFromRiskTier(strategy.risk_tier);
               return (
-                <div key={strategy.id} className="glass-panel rounded-xl p-6 transition-all hover:border-primary/30">
-                  <div className="flex items-start justify-between">
+                <div key={strategy.id} className="glass-panel rounded-xl p-4 sm:p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transform hover:-translate-y-0.5">
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-lg">{strategy.name}</h3>
-                        <span className={cn('px-2 py-0.5 rounded text-xs font-medium', statusColors[strategy.status])}>{strategy.status}</span>
-                        <Badge variant="outline" className={cn('text-xs', getTierColor(tier))}>
-                          {getTierLabel(tier)}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">• {strategy.timeframe} • Tier {strategy.risk_tier}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                        <h3 className="font-semibold text-base sm:text-lg">{strategy.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={cn('px-2 py-0.5 rounded text-xs font-medium', statusColors[strategy.status])}>{strategy.status}</span>
+                          <Badge variant="outline" className={cn('text-xs', getTierColor(tier))}>
+                            {getTierLabel(tier)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">• {strategy.timeframe} • Tier {strategy.risk_tier}</span>
+                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground mb-4">Book: {(strategy as { books?: { name: string } }).books?.name || 'N/A'}</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div><p className="text-xs text-muted-foreground">P&L</p><p className={cn('font-mono font-semibold', Number(strategy.pnl) >= 0 ? 'text-success' : 'text-destructive')}>${Number(strategy.pnl).toLocaleString()}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Max Drawdown</p><p className="font-mono font-semibold text-destructive">{Number(strategy.max_drawdown).toFixed(1)}%</p></div>
-                        <div><p className="text-xs text-muted-foreground">Asset Class</p><p className="font-mono font-semibold">{strategy.asset_class}</p></div>
-                        <div><p className="text-xs text-muted-foreground">Created</p><p className="font-mono font-semibold">{format(new Date(strategy.created_at), 'MMM d, yyyy')}</p></div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground mb-1">P&L</p>
+                          <p className={cn('font-mono font-semibold text-sm', Number(strategy.pnl) >= 0 ? 'text-success' : 'text-destructive')}>${Number(strategy.pnl).toLocaleString()}</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground mb-1">Max Drawdown</p>
+                          <p className="font-mono font-semibold text-sm text-destructive">{Number(strategy.max_drawdown).toFixed(1)}%</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground mb-1">Asset Class</p>
+                          <p className="font-mono font-semibold text-sm">{strategy.asset_class}</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-xs text-muted-foreground mb-1">Created</p>
+                          <p className="font-mono font-semibold text-sm">{format(new Date(strategy.created_at), 'MMM d, yyyy')}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 ml-4">
+                    <div className="flex flex-row sm:flex-col lg:flex-row items-center gap-2 lg:ml-4">
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="gap-1"
+                        className="gap-1 flex-1 sm:flex-initial"
                         onClick={() => { setDeployStrategyId(strategy.id); setIsDeployOpen(true); }}
                       >
                         <Rocket className="h-3 w-3" />Deploy
                       </Button>
                       <Select value={strategy.status} onValueChange={(v: 'off' | 'paper' | 'live') => handleStatusChange(strategy.id, v)}>
-                        <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-20 sm:w-24"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="off">Off</SelectItem>
                           <SelectItem value="paper">Paper</SelectItem>
@@ -241,10 +299,24 @@ export default function Strategies() {
                         </SelectContent>
                       </Select>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive flex-shrink-0">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
                         <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>Delete Strategy</AlertDialogTitle><AlertDialogDescription>Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => deleteStrategy.mutate(strategy.id)} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Strategy</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{strategy.name}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteStrategy.mutate(strategy.id)} className="bg-destructive">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
@@ -266,11 +338,14 @@ export default function Strategies() {
         />
 
         {/* Strategy Template Selector */}
-        <StrategyTemplateSelector
-          open={isTemplatesOpen}
-          onOpenChange={setIsTemplatesOpen}
-          onSelectTemplate={handleTemplateSelect}
-        />
+        <Dialog open={isTemplatesOpen} onOpenChange={setIsTemplatesOpen}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <StrategyTemplateSelector
+              onSelect={handleTemplateSelect}
+              selectedTemplate={null}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

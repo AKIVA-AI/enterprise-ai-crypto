@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Deque, Dict, List, Optional, Tuple
 
 import structlog
@@ -90,7 +90,7 @@ class BasisQuoteService:
                 basis_bps_bid=basis_bps_bid,
                 basis_bps_ask=basis_bps_ask,
                 basis_z=basis_z,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 metadata={
                     "spot_mid": spot_mid,
                     "perp_mid": perp_mid,

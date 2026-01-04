@@ -3,7 +3,7 @@ Execution Planner - builds and executes multi-leg plans with safety guards.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Dict, List, Optional, Tuple, Callable
 
@@ -73,7 +73,7 @@ class ExecutionPlanner:
                     intent, plan, executed_orders, adapters, save_order_callback, event_recorder
                 )
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             if last_leg_time:
                 delta_ms = (now - last_leg_time).total_seconds() * 1000
                 if delta_ms > plan.max_time_between_legs_ms:
@@ -107,12 +107,12 @@ class ExecutionPlanner:
             try:
                 if event_recorder:
                     await event_recorder("leg_submitted", leg, {"intent_id": str(intent.id)})
-                leg_start = datetime.utcnow()
+                leg_start = datetime.now(timezone.utc)
                 executed = await adapter.place_order(order)
-                executed.latency_ms = int((datetime.utcnow() - leg_start).total_seconds() * 1000)
+                executed.latency_ms = int((datetime.now(timezone.utc) - leg_start).total_seconds() * 1000)
                 await save_order_callback(executed)
                 executed_orders.append((executed, leg.venue))
-                last_leg_time = datetime.utcnow()
+                last_leg_time = datetime.now(timezone.utc)
                 if event_recorder:
                     await event_recorder(
                         "leg_executed",

@@ -52,7 +52,18 @@ const formatPercent = (value: number): string => {
 };
 
 // Custom tooltip
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    value: number;
+    name: string;
+    color?: string;
+    payload: EquityPoint & { drawdownArea: number };
+  }>;
+  label?: string;
+}
+
+const CustomTooltip = ({ active, payload, label }: TooltipProps) => {
   if (!active || !payload || !payload.length) return null;
   
   const data = payload[0].payload;

@@ -1,6 +1,6 @@
 import pytest
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.config import settings
 from app.models.domain import Book, BookType
@@ -23,7 +23,7 @@ async def test_spot_arb_scanner_generates_intent(monkeypatch):
                 bid_size=1.0,
                 ask_size=1.0,
                 spread_bps=10.0,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 age_ms=10,
             ),
             SpotQuote(
@@ -34,7 +34,7 @@ async def test_spot_arb_scanner_generates_intent(monkeypatch):
                 bid_size=1.0,
                 ask_size=1.0,
                 spread_bps=10.0,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 age_ms=10,
             ),
         ]

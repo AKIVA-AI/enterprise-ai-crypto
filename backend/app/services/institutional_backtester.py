@@ -87,6 +87,7 @@ class InstitutionalBacktester:
         self._positions: Dict[str, Position] = {}
         self._equity_curve: List[EquityPoint] = []
         self._trades: List[TradeRecord] = []
+        self._equity_peak: float = 0.0
 
     def run_backtest(
         self,
@@ -230,6 +231,7 @@ class InstitutionalBacktester:
         self._positions = {}
         self._equity_curve = []
         self._trades = []
+        self._equity_peak = self.config.initial_capital
 
         # Populate strategy indicators
         df = strategy.populate_indicators(
@@ -442,11 +444,11 @@ class InstitutionalBacktester:
         total_equity = self._cash + position_value
 
         # Calculate drawdown
-        peak = max(
-            [ep.equity for ep in self._equity_curve] + [self.config.initial_capital]
-        )
-        if peak > 0:
-            drawdown = max(0.0, (peak - total_equity) / peak)
+        # Track peak incrementally to avoid scanning the full curve each step.
+        if total_equity > self._equity_peak:
+            self._equity_peak = total_equity
+        if self._equity_peak > 0:
+            drawdown = max(0.0, (self._equity_peak - total_equity) / self._equity_peak)
         else:
             drawdown = 0.0
 

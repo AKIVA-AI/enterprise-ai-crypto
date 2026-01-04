@@ -11,10 +11,15 @@ import React, { useState } from 'react';
 import { useBacktestDetail, useEquityCurve, useBacktestList, useRunBacktest } from '@/hooks/useBacktestResults';
 import { EquityCurveChart } from './EquityCurveChart';
 import { PerformanceMetricsCard } from './PerformanceMetricsCard';
+import { BacktestComparison } from './BacktestComparison';
+import { TradeJournal } from './TradeJournal';
+import { RiskDashboard } from './RiskDashboard';
+import { ReportExporter } from './ReportExporter';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Play, RefreshCw, Clock, TrendingUp } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Play, RefreshCw, Clock, TrendingUp, BarChart3, Search, Shield, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BacktestDashboardProps {
@@ -116,69 +121,167 @@ export function BacktestDashboard({ className }: BacktestDashboardProps) {
 
       {/* Results Display */}
       {selectedBacktestId && (
-        <>
-          {/* Summary Row */}
-          {backtestDetail && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <SummaryCard
-                title="Final Equity"
-                value={`$${backtestDetail.finalEquity.toLocaleString()}`}
-                subtitle={`Initial: $${backtestDetail.initialCapital.toLocaleString()}`}
-              />
-              <SummaryCard
-                title="Total Return"
-                value={`${(backtestDetail.metrics.totalReturn * 100).toFixed(2)}%`}
-                subtitle={`Annualized: ${(backtestDetail.metrics.annualizedReturn * 100).toFixed(2)}%`}
-                positive={backtestDetail.metrics.totalReturn > 0}
-              />
-              <SummaryCard
-                title="Sharpe Ratio"
-                value={backtestDetail.metrics.sharpeRatio.toFixed(2)}
-                subtitle={`Sortino: ${backtestDetail.metrics.sortinoRatio.toFixed(2)}`}
-                positive={backtestDetail.metrics.sharpeRatio > 1}
-              />
-              <SummaryCard
-                title="Max Drawdown"
-                value={`${(backtestDetail.metrics.maxDrawdown * 100).toFixed(2)}%`}
-                subtitle={`Duration: ${backtestDetail.metrics.maxDrawdownDurationDays}d`}
-                negative={backtestDetail.metrics.maxDrawdown > 0.15}
-              />
-            </div>
-          )}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="comparison" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Compare
+            </TabsTrigger>
+            <TabsTrigger value="trades" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Trades
+            </TabsTrigger>
+            <TabsTrigger value="risk" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Risk
+            </TabsTrigger>
+            <TabsTrigger value="export" className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Export
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Equity Curve - 2 columns */}
-            <div className="lg:col-span-2">
-              <EquityCurveChart
-                data={equityCurve}
-                isLoading={curveLoading}
-                error={curveError}
-                initialCapital={backtestDetail?.initialCapital}
-                height={350}
-              />
-            </div>
-            
-            {/* Compact Metrics - 1 column */}
-            <div>
-              <PerformanceMetricsCard
-                metrics={backtestDetail?.metrics}
-                isLoading={detailLoading}
-                error={detailError}
-                compact
-              />
-            </div>
-          </div>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="mt-6 space-y-6">
+            {/* Summary Row */}
+            {backtestDetail && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <SummaryCard
+                  title="Final Equity"
+                  value={`$${backtestDetail.finalEquity.toLocaleString()}`}
+                  subtitle={`Initial: $${backtestDetail.initialCapital.toLocaleString()}`}
+                />
+                <SummaryCard
+                  title="Total Return"
+                  value={`${(backtestDetail.metrics.totalReturn * 100).toFixed(2)}%`}
+                  subtitle={`Annualized: ${(backtestDetail.metrics.annualizedReturn * 100).toFixed(2)}%`}
+                  positive={backtestDetail.metrics.totalReturn > 0}
+                />
+                <SummaryCard
+                  title="Sharpe Ratio"
+                  value={backtestDetail.metrics.sharpeRatio.toFixed(2)}
+                  subtitle={`Sortino: ${backtestDetail.metrics.sortinoRatio.toFixed(2)}`}
+                  positive={backtestDetail.metrics.sharpeRatio > 1}
+                />
+                <SummaryCard
+                  title="Max Drawdown"
+                  value={`${(backtestDetail.metrics.maxDrawdown * 100).toFixed(2)}%`}
+                  subtitle={`Duration: ${backtestDetail.metrics.maxDrawdownDurationDays}d`}
+                  negative={backtestDetail.metrics.maxDrawdown > 0.15}
+                />
+              </div>
+            )}
 
-          {/* Full Metrics */}
-          <PerformanceMetricsCard
-            metrics={backtestDetail?.metrics}
-            isLoading={detailLoading}
-            error={detailError}
-            title="Detailed Performance Analysis"
-            description="Complete breakdown of strategy performance metrics"
-          />
-        </>
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Equity Curve - 2 columns */}
+              <div className="lg:col-span-2">
+                <EquityCurveChart
+                  data={equityCurve}
+                  isLoading={curveLoading}
+                  error={curveError}
+                  initialCapital={backtestDetail?.initialCapital}
+                  height={350}
+                />
+              </div>
+              
+              {/* Compact Metrics - 1 column */}
+              <div>
+                <PerformanceMetricsCard
+                  metrics={backtestDetail?.metrics}
+                  isLoading={detailLoading}
+                  error={detailError}
+                  compact
+                />
+              </div>
+            </div>
+
+            {/* Full Metrics */}
+            <PerformanceMetricsCard
+              metrics={backtestDetail?.metrics}
+              isLoading={detailLoading}
+              error={detailError}
+              title="Detailed Performance Analysis"
+              description="Complete breakdown of strategy performance metrics"
+            />
+          </TabsContent>
+
+          {/* Comparison Tab */}
+          <TabsContent value="comparison" className="mt-6">
+            <BacktestComparison
+              backtests={backtestDetail ? [backtestDetail] : []}
+              className="w-full"
+            />
+          </TabsContent>
+
+          {/* Trades Tab */}
+          <TabsContent value="trades" className="mt-6">
+            <TradeJournal
+              trades={[]} // Would be populated from API
+              backtest={backtestDetail}
+              className="w-full"
+            />
+          </TabsContent>
+
+          {/* Risk Tab */}
+          <TabsContent value="risk" className="mt-6">
+            {backtestDetail && (
+              <RiskDashboard
+                riskMetrics={{
+                  var95: backtestDetail.metrics.var95,
+                  var99: backtestDetail.metrics.var95 * 1.5, // Estimate 99% VaR
+                  cvar95: backtestDetail.metrics.cvar95,
+                  cvar99: backtestDetail.metrics.cvar95 * 1.5, // Estimate 99% CVaR
+                  maxDrawdown: backtestDetail.metrics.maxDrawdown,
+                  maxDrawdownDuration: backtestDetail.metrics.maxDrawdownDurationDays,
+                  sharpeRatio: backtestDetail.metrics.sharpeRatio,
+                  sortinoRatio: backtestDetail.metrics.sortinoRatio,
+                  calmarRatio: backtestDetail.metrics.calmarRatio,
+                  volatility: backtestDetail.metrics.volatility,
+                  beta: 1.2, // Would come from API
+                  alpha: backtestDetail.metrics.annualizedReturn - 0.1, // Simplified
+                  informationRatio: backtestDetail.metrics.sharpeRatio * 0.8, // Simplified
+                  trackingError: backtestDetail.metrics.volatility * 0.6, // Simplified
+                  downsideDeviation: backtestDetail.metrics.volatility * 0.8, // Simplified
+                  upsideCapture: 1.1, // Would come from API
+                  downsideCapture: 0.9, // Would come from API
+                  correlationToMarket: 0.7, // Would come from API
+                  skewness: -0.2, // Would come from API
+                  kurtosis: 3.5, // Would come from API
+                }}
+                alerts={[
+                  {
+                    id: '1',
+                    type: 'WARNING',
+                    category: 'DRAWDOWN',
+                    title: 'High Drawdown Risk',
+                    description: 'Maximum drawdown exceeds 15% threshold',
+                    value: backtestDetail.metrics.maxDrawdown,
+                    threshold: 0.15,
+                    timestamp: new Date().toISOString(),
+                  },
+                ]}
+                backtest={backtestDetail}
+                className="w-full"
+              />
+            )}
+          </TabsContent>
+
+          {/* Export Tab */}
+          <TabsContent value="export" className="mt-6">
+            {backtestDetail && (
+              <ReportExporter
+                backtest={backtestDetail}
+                trades={[]} // Would be populated from API
+                className="w-full"
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
@@ -212,4 +315,3 @@ function SummaryCard({ title, value, subtitle, positive, negative }: SummaryCard
 }
 
 export default BacktestDashboard;
-

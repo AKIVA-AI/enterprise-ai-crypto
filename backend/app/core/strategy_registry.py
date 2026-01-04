@@ -5,13 +5,15 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
 
 import structlog
 
 from app.config import settings
+from app.database import get_supabase
 
 logger = structlog.get_logger()
 
@@ -27,6 +29,8 @@ class StrategyTimeframes:
 class StrategyDefinition:
     name: str
     type: str
+    description: str = ""
+    parameters: Dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
     universe: List[str] = field(default_factory=list)
     timeframes: Optional[StrategyTimeframes] = None
@@ -40,6 +44,7 @@ class StrategyDefinition:
     book_id: Optional[UUID] = None
     min_edge_bps: Optional[float] = None
     id: UUID = field(default_factory=uuid4)
+    strategy_class: Optional[Type[Any]] = None
 
 
 @dataclass
@@ -54,6 +59,7 @@ class StrategyRegistry:
     def __init__(self, config_path: Optional[Path] = None):
         self.config_path = config_path or (settings.CONFIG_DIR / "strategies.json")
         self._strategies: Dict[str, StrategyDefinition] = {}
+        self._runtime_strategies: Dict[str, StrategyDefinition] = {}
         self._scanner_config = ScannerConfig()
 
     def load(self) -> None:
@@ -82,6 +88,8 @@ class StrategyRegistry:
                 definition = StrategyDefinition(
                     name=raw.get("name", "unnamed"),
                     type=raw.get("type", "spot"),
+                    description=raw.get("description", ""),
+                    parameters=raw.get("parameters", {}),
                     enabled=raw.get("enabled", True),
                     universe=raw.get("universe", []),
                     timeframes=timeframes,
@@ -105,12 +113,88 @@ class StrategyRegistry:
     def get_enabled_strategies(self) -> List[StrategyDefinition]:
         if not self._strategies:
             self.load()
-        return [s for s in self._strategies.values() if s.enabled]
+        combined = list(self._strategies.values()) + list(self._runtime_strategies.values())
+        return [s for s in combined if s.enabled]
 
     def get_strategy(self, name: str) -> Optional[StrategyDefinition]:
         if not self._strategies:
             self.load()
-        return self._strategies.get(name)
+        return self._runtime_strategies.get(name) or self._strategies.get(name)
+
+    def list_strategies(
+        self,
+        include_config: bool = True,
+        include_runtime: bool = True,
+    ) -> List[StrategyDefinition]:
+        """List strategies from config and/or runtime registry."""
+        if include_config and not self._strategies:
+            self.load()
+        combined: Dict[str, StrategyDefinition] = {}
+        if include_config:
+            combined.update(self._strategies)
+        if include_runtime:
+            combined.update(self._runtime_strategies)
+        return list(combined.values())
+
+    def register_strategy(
+        self,
+        strategy_class: Type[Any],
+        name: str,
+        description: str = "",
+        parameters: Optional[Dict[str, Any]] = None,
+        overwrite: bool = False,
+        persist: bool = True,
+    ) -> StrategyDefinition:
+        """
+        Register a strategy for execution.
+
+        Args:
+            strategy_class: Strategy class to register.
+            name: Unique strategy name.
+            description: Strategy description.
+            parameters: Parameter definitions.
+            overwrite: Allow overwriting existing registration.
+            persist: Persist strategy to Supabase.
+        """
+        if not name:
+            raise ValueError("Strategy name is required")
+        if name in self._runtime_strategies and not overwrite:
+            raise ValueError(f"Strategy '{name}' is already registered")
+
+        definition = StrategyDefinition(
+            name=name,
+            type="execution",
+            description=description,
+            parameters=parameters or {},
+            enabled=True,
+            strategy_class=strategy_class,
+        )
+        self._runtime_strategies[name] = definition
+
+        if persist:
+            self._persist_strategy(definition)
+
+        return definition
+
+    def clear(self) -> None:
+        """Clear cached strategies (useful for tests)."""
+        self._runtime_strategies.clear()
+
+    def _persist_strategy(self, definition: StrategyDefinition) -> None:
+        try:
+            supabase = get_supabase()
+            supabase.table("strategies").insert(
+                {
+                    "name": definition.name,
+                    "description": definition.description,
+                    "parameters": definition.parameters,
+                    "strategy_type": definition.type,
+                    "enabled": definition.enabled,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ).execute()
+        except Exception as exc:
+            logger.warning("strategy_registry_persist_failed", error=str(exc))
 
     @property
     def scanner_config(self) -> ScannerConfig:

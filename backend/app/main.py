@@ -11,23 +11,31 @@ Production-grade institutional trading system with:
 
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+import uuid
+
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer
 from fastapi.responses import JSONResponse
 import structlog
-from datetime import datetime
 import uvicorn
 
 from app.api.routes import api_router
+from app.api.health import router as health_router, increment_request_count
 from app.core.config import settings
-from app.core.security import verify_token, get_current_user
+from app.core.security import get_current_user
 from app.database import init_db, close_db
 from app.services.market_data_service import market_data_service
 from app.services.smart_order_router import smart_order_router
 from app.services.advanced_risk_engine import advanced_risk_engine
-from app.core.logging import setup_logging
+from app.logging_config import configure_logging
+from app.middleware.security import (
+    SecurityHeadersMiddleware,
+    RequestValidationMiddleware,
+    setup_rate_limiting,
+)
 
 # FreqTrade Integration
 from app.services.freqtrade_integration import (
@@ -41,7 +49,7 @@ from app.services.freqtrade_integration import (
 from app.arbitrage import get_arbitrage_engine
 
 # Setup structured logging
-logger = setup_logging()
+logger = configure_logging()
 
 # Lifespan context manager for startup/shutdown events
 @asynccontextmanager
@@ -118,16 +126,26 @@ app = FastAPI(
 # Security
 security = HTTPBearer()
 
-# CORS middleware
+# Setup rate limiting
+setup_rate_limiting(app)
+
+# Security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Request validation middleware
+app.add_middleware(RequestValidationMiddleware, enable_injection_detection=True)
+
+# CORS middleware - hardened configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-API-Key"],
+    max_age=86400,  # 24 hours cache for preflight
 )
 
-# Trusted host middleware
+# Trusted host middleware (production only)
 if not settings.DEBUG:
     app.add_middleware(
         TrustedHostMiddleware,
@@ -151,41 +169,22 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "error": "Internal server error",
             "message": "An unexpected error occurred" if not settings.DEBUG else str(exc),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     )
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Liveness probe - basic health check for load balancers."""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0"
-    }
+# Request ID + metrics middleware
+@app.middleware("http")
+async def request_context_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    structlog.contextvars.bind_contextvars(request_id=request_id)
 
-@app.get("/ready")
-async def readiness_check():
-    """Readiness probe - checks if service can handle requests."""
-    freqtrade_status = get_freqtrade_status()
-
-    checks = {
-        "database": "connected",
-        "redis": "connected",
-        "market_data": "active",
-        "trading_engines": "ready",
-        "freqtrade": freqtrade_status.get('freqtrade_integration', {}).get('status', 'unknown')
-    }
-
-    # Service is ready if all checks pass
-    all_ready = all(v in ["connected", "active", "ready", "operational"] for v in checks.values())
-
-    return {
-        "status": "ready" if all_ready else "not_ready",
-        "timestamp": datetime.utcnow().isoformat(),
-        "checks": checks
-    }
+    increment_request_count()
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    structlog.contextvars.clear_contextvars()
+    return response
 
 # FreqTrade health check endpoint
 @app.get("/health/freqtrade")
@@ -205,7 +204,7 @@ async def freqtrade_components_health():
 async def auth_middleware(request: Request, call_next):
     """Authentication middleware for protected routes."""
     # Skip auth for health checks, readiness probes, and docs
-    if request.url.path in ["/health", "/ready", "/docs", "/redoc", "/openapi.json"] or request.url.path.startswith("/health/"):
+    if request.url.path in ["/health", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"] or request.url.path.startswith("/health/"):
         return await call_next(request)
 
     # Skip auth for OPTIONS requests
@@ -248,6 +247,7 @@ app.include_router(
     prefix="/api/v1",
     dependencies=[Depends(get_current_user)]
 )
+app.include_router(health_router)
 
 # Root endpoint
 @app.get("/")
@@ -283,7 +283,7 @@ async def system_info(request: Request):
         },
         "freqtrade_enhanced": True,
         "freqtrade_components": list(freqtrade_status.get('component_health', {}).keys()),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 if __name__ == "__main__":

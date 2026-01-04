@@ -18,15 +18,15 @@ export interface StrategyParameter {
   id: string;
   name: string;
   type: ParameterType;
-  value: any;
+  value: unknown;
   description?: string;
   required?: boolean;
   min?: number;
   max?: number;
   step?: number;
   options?: string[];
-  defaultValue?: any;
-  validation?: (value: any) => string | null;
+  defaultValue?: unknown;
+  validation?: (value: unknown) => string | null;
 }
 
 interface StrategyParameterEditorProps {
@@ -127,7 +127,7 @@ export function StrategyParameterEditor({
       }
     }
 
-    if (param.type === 'select' && param.options && !param.options.includes(param.value)) {
+    if (param.type === 'select' && param.options && typeof param.value === 'string' && !param.options.includes(param.value)) {
       return `${param.name} must be one of: ${param.options.join(', ')}`;
     }
 
@@ -225,7 +225,7 @@ export function StrategyParameterEditor({
               <Input
                 id={param.id}
                 type="number"
-                value={param.value}
+                value={String(param.value)}
                 onChange={(e) => updateParameter(param.id, { value: Number(e.target.value) })}
                 min={param.min}
                 max={param.max}
@@ -261,7 +261,7 @@ export function StrategyParameterEditor({
               </div>
               <Switch
                 id={param.id}
-                checked={param.value}
+                checked={Boolean(param.value)}
                 onCheckedChange={(checked) => updateParameter(param.id, { value: checked })}
               />
             </div>
@@ -289,7 +289,7 @@ export function StrategyParameterEditor({
               )}
             </div>
             <Select
-              value={param.value}
+              value={String(param.value)}
               onValueChange={(value) => updateParameter(param.id, { value })}
             >
               <SelectTrigger className={cn(error && 'border-destructive')}>
@@ -316,7 +316,7 @@ export function StrategyParameterEditor({
                 {param.required && <span className="text-destructive ml-1">*</span>}
               </Label>
               <Badge variant="outline" className="text-xs">
-                {param.value}
+                {String(param.value)}
               </Badge>
               {param.description && (
                 <div className="group relative">
@@ -328,7 +328,7 @@ export function StrategyParameterEditor({
               )}
             </div>
             <Slider
-              value={[param.value]}
+              value={[Number(param.value)]}
               onValueChange={([value]) => updateParameter(param.id, { value })}
               min={param.min}
               max={param.max}
@@ -363,7 +363,7 @@ export function StrategyParameterEditor({
             </div>
             <Input
               id={param.id}
-              value={param.value}
+              value={String(param.value)}
               onChange={(e) => updateParameter(param.id, { value: e.target.value })}
               placeholder={param.description}
               className={cn(error && 'border-destructive')}

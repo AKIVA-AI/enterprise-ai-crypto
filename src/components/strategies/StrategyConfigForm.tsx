@@ -129,7 +129,7 @@ export function StrategyConfigForm({
     onSubmit(submissionData);
   };
 
-  const handleInputChange = (field: keyof BacktestRequest, value: any) => {
+  const handleInputChange = (field: keyof BacktestRequest, value: string | number | boolean | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error for this field when user starts typing
     if (errors[field]) {
@@ -229,7 +229,7 @@ export function StrategyConfigForm({
                     onSelect={(date) => {
                       setStartDate(date);
                       setStartDateOpen(false);
-                      handleInputChange('startDate', date?.toISOString());
+                      handleInputChange('startDate', date?.toISOString() || '');
                     }}
                     initialFocus
                   />
@@ -263,7 +263,7 @@ export function StrategyConfigForm({
                     onSelect={(date) => {
                       setEndDate(date);
                       setEndDateOpen(false);
-                      handleInputChange('endDate', date?.toISOString());
+                      handleInputChange('endDate', date?.toISOString() || '');
                     }}
                     initialFocus
                     disabled={(date) => startDate ? date < startDate : false}

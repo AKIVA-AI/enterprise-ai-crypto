@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import List, Optional
@@ -17,6 +18,7 @@ from app.api.schemas.backtest_schemas import (
 )
 from app.models.backtest_result import BacktestResult, PerformanceMetrics
 from app.services.institutional_backtester import BacktestConfig, InstitutionalBacktester
+from app.services.cache import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/backtest", tags=["backtest"])
 
 # In-memory storage for demo (replace with database in production)
 _backtest_results: dict[str, BacktestResult] = {}
+_market_data_cache = TTLCache(max_size=128)
 
 
 def _metrics_to_response(metrics: PerformanceMetrics) -> PerformanceMetricsResponse:
@@ -92,33 +95,44 @@ async def _fetch_market_data(
     import numpy as np
     import pandas as pd
 
-    if timeframe == "1h":
-        periods = int((end_date - start_date).total_seconds() / 3600)
-    elif timeframe == "4h":
-        periods = int((end_date - start_date).total_seconds() / 14400)
-    elif timeframe == "1d":
-        periods = int((end_date - start_date).total_seconds() / 86400)
-    else:
-        periods = 500
+    cache_key = f"{','.join(instruments)}:{start_date.isoformat()}:{end_date.isoformat()}:{timeframe}"
+    # Cache synthetic data to avoid recomputing for identical requests.
+    cached = _market_data_cache.get(cache_key)
+    if cached is not None:
+        return cached
 
-    periods = min(periods, 5000)
-    if periods <= 1:
-        return pd.DataFrame()
+    def _build_dataframe() -> pd.DataFrame:
+        if timeframe == "1h":
+            periods = int((end_date - start_date).total_seconds() / 3600)
+        elif timeframe == "4h":
+            periods = int((end_date - start_date).total_seconds() / 14400)
+        elif timeframe == "1d":
+            periods = int((end_date - start_date).total_seconds() / 86400)
+        else:
+            periods = 500
 
-    np.random.seed(42)
-    dates = pd.date_range(start=start_date, periods=periods, freq=timeframe)
-    price = 50000 + np.cumsum(np.random.randn(periods) * 100)
+        periods = min(periods, 5000)
+        if periods <= 1:
+            return pd.DataFrame()
 
-    return pd.DataFrame(
-        {
-            "date": dates,
-            "open": price,
-            "high": price * 1.005,
-            "low": price * 0.995,
-            "close": price,
-            "volume": np.random.uniform(100, 1000, periods),
-        }
-    )
+        np.random.seed(42)
+        dates = pd.date_range(start=start_date, periods=periods, freq=timeframe)
+        price = 50000 + np.cumsum(np.random.randn(periods) * 100)
+
+        return pd.DataFrame(
+            {
+                "date": dates,
+                "open": price,
+                "high": price * 1.005,
+                "low": price * 0.995,
+                "close": price,
+                "volume": np.random.uniform(100, 1000, periods),
+            }
+        )
+
+    data = await asyncio.to_thread(_build_dataframe)
+    _market_data_cache.set(cache_key, data, ttl_seconds=60)
+    return data
 
 
 @router.post(
@@ -177,7 +191,7 @@ async def run_backtest(request: BacktestRequest):
 
         # 4. Run backtest
         backtester = InstitutionalBacktester(config)
-        result = backtester.run_backtest(strategy, data)
+        result = await asyncio.to_thread(backtester.run_backtest, strategy, data)
 
         # 5. Store result
         result_id = str(result.id)
