@@ -16,24 +16,21 @@ export function MainLayout({ children, showComplianceBanner = false }: MainLayou
   const { isOpen, toggle } = useAICopilot();
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex w-full">
       <Sidebar />
-      <div
-        className={cn(
-          'pl-64 transition-all duration-300 flex-1 flex flex-col min-h-screen',
-          isOpen ? 'pr-[380px]' : 'pr-0'
-        )}
-      >
-        <TopBar />
-        {showComplianceBanner && <ComplianceBanner compact dismissible />}
-        <main className="p-6 flex-1 overflow-auto">
-          {/* Risk Alerts Banner - Shows critical risk warnings */}
-          <RiskAlertBanner />
-          {children}
-        </main>
-        <ComplianceDisclaimer />
+      <div className="flex flex-1 ml-64">
+        <div className="flex-1 flex flex-col min-h-screen">
+          <TopBar />
+          {showComplianceBanner && <ComplianceBanner compact dismissible />}
+          <main className="p-6 flex-1 overflow-auto">
+            {/* Risk Alerts Banner - Shows critical risk warnings */}
+            <RiskAlertBanner />
+            {children}
+          </main>
+          <ComplianceDisclaimer />
+        </div>
+        <AICopilotSidebar isOpen={isOpen} onToggle={toggle} />
       </div>
-      <AICopilotSidebar isOpen={isOpen} onToggle={toggle} />
     </div>
   );
 }

@@ -123,30 +123,14 @@ export function AICopilotSidebar({ isOpen, onToggle }: AICopilotSidebarProps) {
     return variants[risk] || variants.moderate;
   };
 
-  // Collapsed state
+  // Collapsed state - just return null, the toggle button is in the TopBar
   if (!isOpen) {
-    return (
-      <div className="fixed right-0 top-1/2 -translate-y-1/2 z-30">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-l-xl rounded-r-none border-r-0 h-14 w-8 bg-background shadow-lg hover:w-10 transition-all"
-              onClick={onToggle}
-            >
-              <PanelRightOpen className="h-5 w-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="left">Open AI Assistant</TooltipContent>
-        </Tooltip>
-      </div>
-    );
+    return null;
   }
 
   return (
     <aside
-      className="fixed right-0 top-0 z-40 h-screen bg-background border-l border-border flex flex-col shadow-xl transition-all duration-300"
+      className="h-screen bg-background border-l border-border flex flex-col shrink-0 transition-all duration-300"
       style={{ width: sidebarWidthPx }}
     >
       {/* Header */}

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { MainLayout } from '@/components/layout/MainLayout';
 
 interface Opportunity {
   id: string;
@@ -74,6 +75,7 @@ export default function Screener() {
   };
 
   return (
+    <MainLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -201,6 +203,7 @@ export default function Screener() {
         </CardContent>
       </Card>
     </div>
+    </MainLayout>
   );
 }
 
