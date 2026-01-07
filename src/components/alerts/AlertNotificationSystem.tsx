@@ -149,10 +149,8 @@ export function useAlertNotifications(config: Partial<AlertConfig> = {}) {
   }, [playSound, showDesktopNotification, queryClient]);
 
   useEffect(() => {
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    // Don't auto-request notification permission - must be triggered by user action
+    // Permission will be requested when user explicitly enables notifications
 
     // Subscribe to alerts
     const alertsChannel = supabase

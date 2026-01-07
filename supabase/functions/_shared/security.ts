@@ -12,7 +12,15 @@
 const ALLOWED_ORIGINS = [
   'https://amvakxshlojoshdfcqos.lovableproject.com',
   'https://amvakxshlojoshdfcqos.lovable.app',
+  'https://heart-bound-transit.lovable.app',
+  'https://preview--heart-bound-transit.lovable.app',
   // Add custom production domains here
+];
+
+// Allowed origin patterns (for dynamic subdomains)
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/.*\.lovable\.app$/,
+  /^https:\/\/.*\.lovableproject\.com$/,
 ];
 
 // Development origins (only in dev mode)
@@ -154,12 +162,25 @@ setInterval(() => {
 export function getSecureCorsHeaders(requestOrigin: string | null): Record<string, string> {
   const isDev = Deno.env.get('ENVIRONMENT') !== 'production';
   const allowedOrigins = isDev ? [...ALLOWED_ORIGINS, ...DEV_ORIGINS] : ALLOWED_ORIGINS;
-  
-  // Check if origin is allowed
-  const origin = requestOrigin && allowedOrigins.includes(requestOrigin) 
-    ? requestOrigin 
-    : allowedOrigins[0]; // Default to first allowed origin
-  
+
+  // Check if origin is allowed (exact match or pattern match)
+  let origin = allowedOrigins[0]; // Default to first allowed origin
+
+  if (requestOrigin) {
+    // Check exact match first
+    if (allowedOrigins.includes(requestOrigin)) {
+      origin = requestOrigin;
+    } else {
+      // Check pattern match
+      for (const pattern of ALLOWED_ORIGIN_PATTERNS) {
+        if (pattern.test(requestOrigin)) {
+          origin = requestOrigin;
+          break;
+        }
+      }
+    }
+  }
+
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
