@@ -176,25 +176,39 @@ export function useTransitionStrategy() {
       
       if (eventError) throw eventError;
       
-      // Create audit event
-      await supabase.from('audit_events').insert({
-        action: 'strategy_lifecycle_transition',
-        resource_type: 'strategy',
-        resource_id: strategyId,
-        severity: toState === 'quarantined' || toState === 'disabled' ? 'warning' : 'info',
-        before_state: { lifecycle_state: fromState },
-        after_state: { lifecycle_state: toState, reason },
-      });
-      
-      // Create alert for quarantine
-      if (toState === 'quarantined' || toState === 'disabled') {
-        await supabase.from('alerts').insert({
-          title: `Strategy ${toState === 'quarantined' ? 'Quarantined' : 'Disabled'}`,
-          message: `Strategy "${current.name}" has been ${toState}. Reason: ${reason}`,
-          severity: 'warning',
-          source: 'strategy_lifecycle',
-          metadata: { strategy_id: strategyId, from_state: fromState, to_state: toState },
+      // Create audit event via edge function (required for RLS-protected table)
+      try {
+        await supabase.functions.invoke('audit-log', {
+          body: {
+            action: 'strategy_lifecycle_transition',
+            resource_type: 'strategy',
+            resource_id: strategyId,
+            severity: toState === 'quarantined' || toState === 'disabled' ? 'warning' : 'info',
+            before_state: { lifecycle_state: fromState },
+            after_state: { lifecycle_state: toState, reason },
+          },
         });
+      } catch (auditError) {
+        console.error('Failed to log audit event:', auditError);
+        // Continue execution - audit logging failure shouldn't block the action
+      }
+      
+      // Create alert for quarantine via edge function (required for RLS-protected table)
+      if (toState === 'quarantined' || toState === 'disabled') {
+        try {
+          await supabase.functions.invoke('alert-create', {
+            body: {
+              title: `Strategy ${toState === 'quarantined' ? 'Quarantined' : 'Disabled'}`,
+              message: `Strategy "${current.name}" has been ${toState}. Reason: ${reason}`,
+              severity: 'warning',
+              source: 'strategy_lifecycle',
+              metadata: { strategy_id: strategyId, from_state: fromState, to_state: toState },
+            },
+          });
+        } catch (alertError) {
+          console.error('Failed to create alert:', alertError);
+          // Continue execution - alert creation failure shouldn't block the action
+        }
       }
       
       return { strategyId, fromState, toState, reason };

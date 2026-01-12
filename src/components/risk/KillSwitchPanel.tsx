@@ -75,20 +75,34 @@ export function KillSwitchPanel() {
     
     if (error) throw error;
 
-    // Log audit event
-    await supabase.from('audit_events').insert({
-      action: enabled ? 'kill_switch.activate' : 'kill_switch.deactivate',
-      resource_type: 'global_settings',
-      severity: enabled ? 'critical' : 'warning',
-    });
+    // Log audit event via edge function (required for RLS-protected table)
+    try {
+      await supabase.functions.invoke('audit-log', {
+        body: {
+          action: enabled ? 'kill_switch.activate' : 'kill_switch.deactivate',
+          resource_type: 'global_settings',
+          severity: enabled ? 'critical' : 'warning',
+        },
+      });
+    } catch (auditError) {
+      console.error('Failed to log audit event:', auditError);
+      // Continue execution - audit logging failure shouldn't block the action
+    }
 
-    // Create alert
-    await supabase.from('alerts').insert({
-      title: enabled ? 'KILL SWITCH ACTIVATED' : 'Kill Switch Deactivated',
-      message: enabled ? 'All trading has been halted' : 'Trading has been resumed',
-      severity: enabled ? 'critical' : 'info',
-      source: 'risk_engine',
-    });
+    // Create alert via edge function (required for RLS-protected table)
+    try {
+      await supabase.functions.invoke('alert-create', {
+        body: {
+          title: enabled ? 'KILL SWITCH ACTIVATED' : 'Kill Switch Deactivated',
+          message: enabled ? 'All trading has been halted' : 'Trading has been resumed',
+          severity: enabled ? 'critical' : 'info',
+          source: 'risk_engine',
+        },
+      });
+    } catch (alertError) {
+      console.error('Failed to create alert:', alertError);
+      // Continue execution - alert creation failure shouldn't block the action
+    }
 
     toast[enabled ? 'error' : 'success'](
       enabled ? '🚨 KILL SWITCH ACTIVATED' : '✅ Kill Switch Deactivated',
