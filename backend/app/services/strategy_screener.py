@@ -22,9 +22,10 @@ import logging
 import subprocess
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from enum import Enum
 from pathlib import Path
 
@@ -32,6 +33,171 @@ logger = logging.getLogger(__name__)
 
 # Project root for FreqTrade paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent  # akiva-ai-crypto/
+
+# =============================================================================
+# INPUT VALIDATION FOR SUBPROCESS SECURITY
+# =============================================================================
+
+# Strict regex patterns for input validation
+STRATEGY_NAME_PATTERN = re.compile(r'^[A-Za-z][A-Za-z0-9_]{0,63}$')  # Alphanumeric + underscore, starts with letter
+PAIR_PATTERN = re.compile(r'^[A-Z]{2,10}/[A-Z]{2,10}(:[A-Z]{2,10})?$')  # e.g., BTC/USD or BTC/USDC:USDC
+TIMEFRAME_PATTERN = re.compile(r'^[1-9][0-9]?[mhd]$')  # e.g., 1m, 15m, 4h, 1d
+CONFIG_FILE_PATTERN = re.compile(r'^[A-Za-z0-9_-]+\.json$')  # Alphanumeric config filename
+
+# Whitelisted values for additional security
+ALLOWED_TIMEFRAMES: Set[str] = {'1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d'}
+ALLOWED_CONFIG_FILES: Set[str] = {'config_coinbase.json', 'config_coinbase_spot.json', 'config.json', 'config_freqai.json'}
+
+
+class InputValidationError(Exception):
+    """Raised when input validation fails for subprocess commands."""
+    pass
+
+
+def validate_strategy_name(strategy: str) -> str:
+    """
+    Validate strategy name for subprocess execution.
+    
+    Security: Prevents command injection via malicious strategy names.
+    Only allows alphanumeric characters and underscores, starting with a letter.
+    
+    Raises:
+        InputValidationError: If strategy name is invalid
+    """
+    if not strategy or not isinstance(strategy, str):
+        raise InputValidationError("Strategy name must be a non-empty string")
+    
+    strategy = strategy.strip()
+    
+    if len(strategy) > 64:
+        raise InputValidationError(f"Strategy name too long: {len(strategy)} chars (max 64)")
+    
+    if not STRATEGY_NAME_PATTERN.match(strategy):
+        raise InputValidationError(
+            f"Invalid strategy name: '{strategy}'. "
+            "Must start with a letter and contain only alphanumeric characters and underscores."
+        )
+    
+    # Additional check: no path traversal attempts
+    if '..' in strategy or '/' in strategy or '\\' in strategy:
+        raise InputValidationError(f"Invalid characters in strategy name: '{strategy}'")
+    
+    logger.debug(f"Validated strategy name: {strategy}")
+    return strategy
+
+
+def validate_trading_pair(pair: str, allowed_pairs: Optional[Set[str]] = None) -> str:
+    """
+    Validate trading pair format for subprocess execution.
+    
+    Security: Prevents command injection via malicious pair strings.
+    Validates format and optionally checks against whitelist.
+    
+    Args:
+        pair: Trading pair string (e.g., "BTC/USD", "ETH/USDC:USDC")
+        allowed_pairs: Optional set of allowed pairs for strict validation
+        
+    Raises:
+        InputValidationError: If pair format is invalid or not in allowed list
+    """
+    if not pair or not isinstance(pair, str):
+        raise InputValidationError("Trading pair must be a non-empty string")
+    
+    pair = pair.strip().upper()
+    
+    if len(pair) > 30:
+        raise InputValidationError(f"Trading pair too long: {len(pair)} chars (max 30)")
+    
+    if not PAIR_PATTERN.match(pair):
+        raise InputValidationError(
+            f"Invalid trading pair format: '{pair}'. "
+            "Expected format: BASE/QUOTE or BASE/QUOTE:SETTLE (e.g., BTC/USD, ETH/USDC:USDC)"
+        )
+    
+    # Check against whitelist if provided
+    if allowed_pairs and pair not in allowed_pairs:
+        raise InputValidationError(
+            f"Trading pair not in allowed list: '{pair}'. "
+            f"Allowed pairs: {', '.join(sorted(allowed_pairs)[:10])}..."
+        )
+    
+    logger.debug(f"Validated trading pair: {pair}")
+    return pair
+
+
+def validate_timeframe(timeframe: str) -> str:
+    """
+    Validate timeframe for subprocess execution.
+    
+    Security: Only allows known timeframe formats from whitelist.
+    
+    Raises:
+        InputValidationError: If timeframe is invalid
+    """
+    if not timeframe or not isinstance(timeframe, str):
+        raise InputValidationError("Timeframe must be a non-empty string")
+    
+    timeframe = timeframe.strip().lower()
+    
+    if timeframe not in ALLOWED_TIMEFRAMES:
+        raise InputValidationError(
+            f"Invalid timeframe: '{timeframe}'. "
+            f"Allowed values: {', '.join(sorted(ALLOWED_TIMEFRAMES))}"
+        )
+    
+    logger.debug(f"Validated timeframe: {timeframe}")
+    return timeframe
+
+
+def validate_config_file(config_file: str) -> str:
+    """
+    Validate config filename for subprocess execution.
+    
+    Security: Prevents path traversal and arbitrary file access.
+    Only allows whitelisted config files.
+    
+    Raises:
+        InputValidationError: If config file is invalid
+    """
+    if not config_file or not isinstance(config_file, str):
+        raise InputValidationError("Config file must be a non-empty string")
+    
+    config_file = config_file.strip()
+    
+    # Check for path traversal attempts
+    if '..' in config_file or '/' in config_file or '\\' in config_file:
+        raise InputValidationError(f"Invalid characters in config filename: '{config_file}'")
+    
+    if not CONFIG_FILE_PATTERN.match(config_file):
+        raise InputValidationError(
+            f"Invalid config filename format: '{config_file}'. "
+            "Must be alphanumeric with .json extension."
+        )
+    
+    if config_file not in ALLOWED_CONFIG_FILES:
+        raise InputValidationError(
+            f"Config file not in allowed list: '{config_file}'. "
+            f"Allowed files: {', '.join(sorted(ALLOWED_CONFIG_FILES))}"
+        )
+    
+    logger.debug(f"Validated config file: {config_file}")
+    return config_file
+
+
+def validate_days(days: int) -> int:
+    """
+    Validate lookback days for subprocess execution.
+    
+    Raises:
+        InputValidationError: If days value is out of range
+    """
+    if not isinstance(days, int):
+        raise InputValidationError(f"Days must be an integer, got: {type(days)}")
+    
+    if days < 1 or days > 365:
+        raise InputValidationError(f"Days out of range: {days}. Must be 1-365.")
+    
+    return days
 
 
 class Exchange(Enum):
@@ -139,29 +305,51 @@ class FreqTradeBacktester:
         Run a FreqTrade backtest and return results.
 
         Returns dict with: win_rate, sharpe, max_drawdown, profit_factor, total_trades
+        
+        Security: All inputs are validated before subprocess execution.
         """
         try:
-            # Build command
-            config_path = self.user_data_dir / config_file
+            # =================================================================
+            # SECURITY: Validate all inputs before subprocess execution
+            # =================================================================
+            validated_strategy = validate_strategy_name(strategy)
+            validated_pair = validate_trading_pair(pair)
+            validated_config = validate_config_file(config_file)
+            validated_timeframe = validate_timeframe(timeframe)
+            validated_days = validate_days(days)
+            
+            # Build command with validated inputs
+            config_path = self.user_data_dir / validated_config
 
-            # Calculate date range
+            # Verify config file exists to prevent errors
+            if not config_path.exists():
+                logger.warning(f"Config file not found: {config_path}")
+                return None
+
+            # Calculate date range with validated days
             end_date = datetime.utcnow()
-            start_date = end_date - timedelta(days=days)
+            start_date = end_date - timedelta(days=validated_days)
+            
+            # Format timerange string (already validated format)
+            timerange = f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}"
 
             cmd = [
                 "freqtrade", "backtesting",
-                "--strategy", strategy,
+                "--strategy", validated_strategy,
                 "--config", str(config_path),
-                "--pairs", pair,
-                "--timeframe", timeframe,
-                "--timerange", f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}",
+                "--pairs", validated_pair,
+                "--timeframe", validated_timeframe,
+                "--timerange", timerange,
                 "--export", "none",  # Don't export trades file
                 "--no-header",
             ]
 
-            logger.info(f"Running backtest: {strategy} on {pair}")
+            # AUDIT: Log the validated command for security audit trail
+            logger.info(f"Running validated backtest command: strategy={validated_strategy}, "
+                       f"pair={validated_pair}, config={validated_config}, "
+                       f"timeframe={validated_timeframe}, days={validated_days}")
 
-            # Run subprocess
+            # Run subprocess with validated arguments
             result = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -175,12 +363,16 @@ class FreqTradeBacktester:
             )
 
             if result.returncode != 0:
-                logger.warning(f"Backtest failed for {strategy}/{pair}: {stderr.decode()}")
+                logger.warning(f"Backtest failed for {validated_strategy}/{validated_pair}: {stderr.decode()[:500]}")
                 return None
 
             # Parse results from stdout
             return self._parse_backtest_output(stdout.decode())
 
+        except InputValidationError as e:
+            # SECURITY: Log validation failures for monitoring
+            logger.error(f"Input validation failed for backtest: {e}")
+            return None
         except asyncio.TimeoutError:
             logger.warning(f"Backtest timeout for {strategy}/{pair}")
             return None
