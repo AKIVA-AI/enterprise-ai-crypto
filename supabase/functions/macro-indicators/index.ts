@@ -41,6 +41,19 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Authenticate user
+    const { user, error: authError } = await validateAuth(supabase, req.headers.get('Authorization'));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { action = 'get_all', indicators } = await req.json() as MacroRequest;
     
     console.log(`[MacroIndicators] Action: ${action}, FRED API: ${FRED_API_KEY ? 'configured' : 'missing'}`);

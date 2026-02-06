@@ -34,14 +34,15 @@ serve(async (req) => {
       }
     }
 
-    // SECURITY: Authenticate user for write operations
+    // SECURITY: Authenticate user for all operations (except health_check and detect_region)
+    const isPublicAction = body.action === 'health_check' || body.action === 'detect_region';
     const isWriteOperation = path === 'place-order' || body.action === 'place_order';
     let userId: string | null = null;
     
-    if (isWriteOperation) {
+    if (!isPublicAction) {
       const authHeader = req.headers.get('Authorization');
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return new Response(JSON.stringify({ error: 'Authentication required for trading operations' }), {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -57,26 +58,28 @@ serve(async (req) => {
         });
       }
       
-      // Verify user has trading permissions
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .in('role', ['admin', 'cio', 'trader']);
-      
-      if (!roleData || roleData.length === 0) {
-        console.log(`Unauthorized trading attempt by user ${user.id}`);
-        await supabase.from('audit_events').insert({
-          action: 'unauthorized_trading_attempt',
-          resource_type: 'order',
-          user_id: user.id,
-          user_email: user.email,
-          severity: 'warning',
-        });
-        return new Response(JSON.stringify({ error: 'Insufficient permissions for trading' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      // For write operations, verify user has trading permissions
+      if (isWriteOperation) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .in('role', ['admin', 'cio', 'trader']);
+        
+        if (!roleData || roleData.length === 0) {
+          console.log(`Unauthorized trading attempt by user ${user.id}`);
+          await supabase.from('audit_events').insert({
+            action: 'unauthorized_trading_attempt',
+            resource_type: 'order',
+            user_id: user.id,
+            user_email: user.email,
+            severity: 'warning',
+          });
+          return new Response(JSON.stringify({ error: 'Insufficient permissions for trading' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
       
       userId = user.id;

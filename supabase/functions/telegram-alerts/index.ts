@@ -111,6 +111,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Authenticate user
+    const { user, error: authError } = await validateAuth(supabase, req.headers.get('Authorization'));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { action, botToken, chatId, alert, channelId } = await req.json();
 
     switch (action) {

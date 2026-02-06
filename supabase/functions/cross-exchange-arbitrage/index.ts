@@ -589,14 +589,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Authenticate and rate limit
+    // Authenticate user - required for arbitrage operations
     const authHeader = req.headers.get('Authorization');
-    const { user } = await validateAuth(supabase, authHeader);
-
-    if (user) {
-      const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.arbitrage, corsHeaders);
-      if (rateLimitResponse) return rateLimitResponse;
+    const { user, error: authError } = await validateAuth(supabase, authHeader);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    // Apply rate limiting
+    const rateLimitResponse = rateLimitMiddleware(user.id, RATE_LIMITS.arbitrage, corsHeaders);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const { action, params = {} } = await req.json();
     console.log(`[Arbitrage] Action: ${action}`, params);

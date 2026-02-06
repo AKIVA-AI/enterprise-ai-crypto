@@ -360,6 +360,19 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Authenticate user
+    const { user, error: authError } = await validateAuth(supabase, req.headers.get('Authorization'));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { messages, action } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
@@ -367,7 +380,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Trading copilot request:", { action, messageCount: messages?.length });
+    console.log("Trading copilot request:", { action, messageCount: messages?.length, userId: user.id });
 
     // Build system prompt
     const systemPrompt = `You are an expert trading copilot for a professional crypto trading platform. You have access to real-time market data, portfolio information, risk metrics, and trading signals.

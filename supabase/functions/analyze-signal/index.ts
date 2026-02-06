@@ -23,6 +23,16 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Authenticate user
+    const { user, error: authError } = await validateAuth(supabase, req.headers.get('Authorization'));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { signalId, strategyId, instrument, analysisType } = await req.json() as AnalysisRequest;
 
     console.log(`[analyze-signal] Analysis type: ${analysisType}, signal: ${signalId}, strategy: ${strategyId}`);

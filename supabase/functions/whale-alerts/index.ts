@@ -62,6 +62,15 @@ serve(async (req) => {
     const whaleAlertApiKey = Deno.env.get('WHALE_ALERT_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Authenticate user
+    const { user, error: authError } = await validateAuth(supabase, req.headers.get('Authorization'));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const {
       action,
       wallet_address,

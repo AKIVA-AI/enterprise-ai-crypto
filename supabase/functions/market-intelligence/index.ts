@@ -21,6 +21,16 @@ serve(async (req) => {
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Authenticate user
+    const { user, error: authError } = await validateAuth(supabase, req.headers.get('Authorization'));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { action, instruments = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT'], timeframe = '24h' } = await req.json() as IntelligenceRequest;
 
     console.log(`[market-intelligence] Action: ${action}, instruments: ${instruments.join(', ')}`);
