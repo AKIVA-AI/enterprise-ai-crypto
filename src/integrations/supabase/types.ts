@@ -2860,6 +2860,63 @@ export type Database = {
           },
         ]
       }
+      wallets_masked: {
+        Row: {
+          address_masked: string | null
+          balance: number | null
+          created_at: string | null
+          currency: string | null
+          id: string | null
+          is_watch_only: boolean | null
+          last_synced_at: string | null
+          metadata: Json | null
+          name: string | null
+          network: string | null
+          pending_approvals: number | null
+          required_signers: number | null
+          signers: number | null
+          type: string | null
+          updated_at: string | null
+          usd_value: number | null
+        }
+        Insert: {
+          address_masked?: never
+          balance?: number | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string | null
+          is_watch_only?: boolean | null
+          last_synced_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          network?: string | null
+          pending_approvals?: number | null
+          required_signers?: number | null
+          signers?: number | null
+          type?: string | null
+          updated_at?: string | null
+          usd_value?: number | null
+        }
+        Update: {
+          address_masked?: never
+          balance?: number | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string | null
+          is_watch_only?: boolean | null
+          last_synced_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          network?: string | null
+          pending_approvals?: number | null
+          required_signers?: number | null
+          signers?: number | null
+          type?: string | null
+          updated_at?: string | null
+          usd_value?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_view_order: {

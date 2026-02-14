@@ -5,17 +5,24 @@ import { toast } from 'sonner';
 import { useEffect } from 'react';
 
 export type Wallet = Tables<'wallets'>;
+// Masked wallet type returned from the view (address is masked)
+export type WalletMasked = Omit<Wallet, 'address'> & { address_masked: string };
+
 export function useWallets() {
   const query = useQuery({
     queryKey: ['wallets'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('wallets')
+        .from('wallets_masked' as any)
         .select('*')
         .order('usd_value', { ascending: false });
       
       if (error) throw error;
-      return data as Wallet[];
+      // Map address_masked back to address field for UI compatibility
+      return (data || []).map((w: any) => ({
+        ...w,
+        address: w.address_masked,
+      })) as Wallet[];
     },
   });
 
@@ -49,11 +56,11 @@ export function useTotalTreasuryValue() {
     queryKey: ['wallets', 'total-value'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('wallets')
+        .from('wallets_masked' as any)
         .select('usd_value');
       
       if (error) throw error;
-      return data?.reduce((sum, w) => sum + Number(w.usd_value), 0) || 0;
+      return (data as any[])?.reduce((sum: number, w: any) => sum + Number(w.usd_value), 0) || 0;
     },
   });
 }
