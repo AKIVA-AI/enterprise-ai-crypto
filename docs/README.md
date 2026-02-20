@@ -1,21 +1,23 @@
-# AKIVA AI Documentation Index
+# AKIVA AI Documentation
 
 ## Start Here
 
 | Document | Description |
 |----------|-------------|
-| [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | **START HERE** - What this system is |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture and data flow |
-| [MANIFESTO.md](MANIFESTO.md) | Core values: safety, transparency, profitability |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [DESIGN_THEME.md](DESIGN_THEME.md) | UI design system |
 
-## Setup & Configuration
+## Setup & Deployment
 
 | Document | Description |
 |----------|-------------|
 | [COINBASE_SETUP_GUIDE.md](COINBASE_SETUP_GUIDE.md) | Coinbase Advanced API setup |
 | [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) | Production deployment |
-| [NORTHFLANK_DEPLOYMENT.md](NORTHFLANK_DEPLOYMENT.md) | Cloud deployment on Northflank |
-| [PYTHON_AGENT_DEPLOYMENT.md](PYTHON_AGENT_DEPLOYMENT.md) | Agent deployment guide |
+| [EDGE_FUNCTION_DEPLOYMENT_GUIDE.md](EDGE_FUNCTION_DEPLOYMENT_GUIDE.md) | Edge function deployment |
+| [EDGE_FUNCTION_QUICK_REFERENCE.md](EDGE_FUNCTION_QUICK_REFERENCE.md) | Edge function quick reference |
+| [SECRET_ROTATION_GUIDE.md](SECRET_ROTATION_GUIDE.md) | API key rotation procedures |
+| [deployment/](deployment/) | Runbooks, API reference, environment variables |
 
 ## Trading & Strategies
 
@@ -25,47 +27,40 @@
 | [TRADING_STYLES_GUIDE.md](TRADING_STYLES_GUIDE.md) | Trading style options |
 | [QUICKSTART_TRADING.md](QUICKSTART_TRADING.md) | Quick trading guide |
 | [US_LEVERAGE_TRADING_GUIDE.md](US_LEVERAGE_TRADING_GUIDE.md) | US leverage trading |
-| [FREQTRADE_ARBITRAGE_STRATEGIES.md](FREQTRADE_ARBITRAGE_STRATEGIES.md) | Arbitrage strategies |
+| [BASIS_ARBITRAGE.md](BASIS_ARBITRAGE.md) | Basis arbitrage strategy |
+| [SPOT_ARBITRAGE.md](SPOT_ARBITRAGE.md) | Spot arbitrage strategy |
+| [CAPITAL_ALLOCATOR.md](CAPITAL_ALLOCATOR.md) | Capital allocation engine |
 
-## Technical Deep-Dives
-
-| Document | Description |
-|----------|-------------|
-| [PYTHON_ENGINE_ARCHITECTURE.md](PYTHON_ENGINE_ARCHITECTURE.md) | Backend engine design |
-| [SIGNAL_SOURCES_ARCHITECTURE.md](SIGNAL_SOURCES_ARCHITECTURE.md) | Signal generation |
-| [AGENT_RESPONSIBILITY_MATRIX.md](AGENT_RESPONSIBILITY_MATRIX.md) | Multi-agent roles |
-| [ENTERPRISE_ARCHITECTURE.md](ENTERPRISE_ARCHITECTURE.md) | Enterprise features |
-
-## Safety & Compliance
+## Architecture Deep-Dives
 
 | Document | Description |
 |----------|-------------|
-| [SECURITY_ENFORCEMENT_PROOF.md](SECURITY_ENFORCEMENT_PROOF.md) | Security guarantees |
-| [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) | Security audit |
-| [REGULATORY_COMPLIANCE_DOCUMENTATION.md](REGULATORY_COMPLIANCE_DOCUMENTATION.md) | Compliance docs |
+| [MARKET_DATA_ARCHITECTURE.md](MARKET_DATA_ARCHITECTURE.md) | Market data pipeline |
+| [MULTI_AGENT_COORDINATION.md](MULTI_AGENT_COORDINATION.md) | Multi-agent orchestration |
+| [MULTI_TENANT_RLS_GUIDE.md](MULTI_TENANT_RLS_GUIDE.md) | Multi-tenant RLS design |
+| [WEBSOCKET_COVERAGE.md](WEBSOCKET_COVERAGE.md) | WebSocket coverage map |
+| [WEBSOCKET_IMPLEMENTATION.md](WEBSOCKET_IMPLEMENTATION.md) | WebSocket implementation |
+| [INSTITUTIONAL_GRADE.md](INSTITUTIONAL_GRADE.md) | Institutional-grade features |
+| [USER_CONFIGURED_MARKET_DATA.md](USER_CONFIGURED_MARKET_DATA.md) | User-configured data feeds |
+| [API_BACKTEST_REFERENCE.md](API_BACKTEST_REFERENCE.md) | Backtesting API reference |
+
+## Security & Compliance
+
+| Document | Description |
+|----------|-------------|
+| [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) | Security audit results |
+| [SECURITY_AUDIT_AUDIT_LOGS.md](SECURITY_AUDIT_AUDIT_LOGS.md) | Audit log design |
 | [INCIDENT_RESPONSE_RUNBOOK.md](INCIDENT_RESPONSE_RUNBOOK.md) | Emergency procedures |
-| [WHY_WE_DONT_ALWAYS_TRADE.md](WHY_WE_DONT_ALWAYS_TRADE.md) | Trade selectivity philosophy |
+| [REGULATORY_COMPLIANCE_DOCUMENTATION.md](REGULATORY_COMPLIANCE_DOCUMENTATION.md) | Compliance documentation |
 
-## Development
-
-| Document | Description |
-|----------|-------------|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
-| [CODE_OF_ETHICS.md](CODE_OF_ETHICS.md) | Ethical guidelines |
-| [DESIGN_THEME.md](DESIGN_THEME.md) | UI design system |
-| [testing/](testing/) | Testing documentation |
-
-## Status
+## Testing
 
 | Document | Description |
 |----------|-------------|
-| [PRODUCTION_READY_STATUS.md](PRODUCTION_READY_STATUS.md) | Current production status |
-
-## Archived
-
-Historical documents moved to [archive/](archive/) folder.
+| [testing/E2E_TESTING_GUIDE.md](testing/E2E_TESTING_GUIDE.md) | End-to-end testing guide |
+| [testing/E2E_TROUBLESHOOTING.md](testing/E2E_TROUBLESHOOTING.md) | E2E troubleshooting |
+| [testing/RUN_E2E_TESTS.md](testing/RUN_E2E_TESTS.md) | Running E2E tests |
 
 ---
 
-*Last updated: January 2026*
-
+*Last updated: February 2026*
