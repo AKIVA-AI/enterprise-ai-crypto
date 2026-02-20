@@ -486,10 +486,14 @@ async function simulateFill(order: TradeOrder): Promise<{
 }
 
 /**
- * Route order to the appropriate exchange for live execution.
- * Returns null if execution fails (caller should fail-closed).
+ * Route order to the appropriate exchange for live execution with retry logic.
+ * Retries up to MAX_RETRIES times with exponential backoff on transient failures.
+ * Returns null if all attempts fail (caller should fail-closed).
  */
-async function executeOnVenue(order: TradeOrder): Promise<{
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 500;
+
+async function executeOnVenueOnce(order: TradeOrder): Promise<{
   filledPrice: number;
   filledSize: number;
   fee: number;
@@ -497,24 +501,41 @@ async function executeOnVenue(order: TradeOrder): Promise<{
   slippage: number;
 } | null> {
   const venue = order.venue.toLowerCase();
-  
+
   switch (venue) {
     case 'binance':
     case 'binance_us':
       return executeBinanceOrder(order);
-    
-    case 'coinbase': {
+    case 'coinbase':
       return executeCoinbaseOrder(order);
-    }
-    
-    case 'kraken': {
+    case 'kraken':
       return executeKrakenOrder(order);
-    }
-    
     default:
       console.error(`[LiveTrading] Unknown venue: ${venue}`);
       return null;
   }
+}
+
+async function executeOnVenue(order: TradeOrder): Promise<{
+  filledPrice: number;
+  filledSize: number;
+  fee: number;
+  latencyMs: number;
+  slippage: number;
+} | null> {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const result = await executeOnVenueOnce(order);
+    if (result) return result;
+
+    if (attempt < MAX_RETRIES) {
+      const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      console.warn(`[LiveTrading] Attempt ${attempt}/${MAX_RETRIES} failed on ${order.venue}, retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+
+  console.error(`[LiveTrading] All ${MAX_RETRIES} attempts failed on ${order.venue}`);
+  return null;
 }
 
 /**
