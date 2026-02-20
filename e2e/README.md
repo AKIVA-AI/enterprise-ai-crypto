@@ -1,6 +1,6 @@
 # E2E Tests with Playwright
 
-This directory contains end-to-end (E2E) tests for the Akiva AI Crypto Trading Platform using Playwright.
+This directory contains end-to-end (E2E) tests for the Enterprise Crypto Trading Platform using Playwright.
 
 ## Why E2E Tests?
 

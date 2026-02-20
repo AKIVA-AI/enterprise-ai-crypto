@@ -1,5 +1,5 @@
 {
-    "_comment": "AKIVA AI - Coinbase Advanced Spot - Multi-Coin Trading",
+    "_comment": "Enterprise Crypto - Coinbase Advanced Spot - Multi-Coin Trading",
     "_strategy": "WhaleFlowScalper",
     "_version": "2.0",
     "max_open_trades": 6,
@@ -79,13 +79,13 @@
         "listen_port": 8081,
         "verbosity": "error",
         "enable_openapi": true,
-        "jwt_secret_key": "akiva-spot-secret-change-me",
-        "ws_token": "akiva-ws-spot-token-change-me",
+        "jwt_secret_key": "CHANGE_ME_IN_PRODUCTION",
+        "ws_token": "CHANGE_ME_IN_PRODUCTION",
         "CORS_origins": ["http://localhost:3000", "http://localhost:5173"],
-        "username": "akiva",
-        "password": "akiva2025"
+        "username": "CHANGE_ME_IN_PRODUCTION",
+        "password": "CHANGE_ME_IN_PRODUCTION"
     },
-    "bot_name": "akiva_coinbase_spot",
+    "bot_name": "ec_coinbase_spot",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {

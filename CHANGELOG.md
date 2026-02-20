@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎉 Initial Open-Source Release
 
-First public release of AKIVA AI Crypto — an institutional-grade crypto trading platform.
+First public release of Enterprise Crypto — an institutional-grade crypto trading platform.
 
 ### Added
 
@@ -76,4 +76,4 @@ First public release of AKIVA AI Crypto — an institutional-grade crypto tradin
 
 ---
 
-*AKIVA AI — Institutional trading, open source.*
+*Enterprise Crypto — Institutional trading, open source.*

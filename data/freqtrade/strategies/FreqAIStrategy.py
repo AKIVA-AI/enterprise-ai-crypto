@@ -1,5 +1,5 @@
 """
-Akiva FreqAI Strategy - ML-Powered Production Strategy
+FreqAI Strategy - ML-Powered Production Strategy
 
 Based on FreqTrade's official FreqaiExampleStrategy.
 Uses machine learning for signal generation.
@@ -26,9 +26,9 @@ from freqtrade.strategy import IStrategy, DecimalParameter, IntParameter
 logger = logging.getLogger(__name__)
 
 
-class AkivaFreqAIStrategy(IStrategy):
+class FreqAIStrategy(IStrategy):
     """
-    Production FreqAI strategy for Akiva AI Crypto platform.
+    Production FreqAI strategy for Enterprise Crypto platform.
     
     Uses machine learning models to predict price movements.
     The model predicts the smoothed close price change over a future window.

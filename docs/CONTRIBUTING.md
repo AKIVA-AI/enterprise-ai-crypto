@@ -86,8 +86,8 @@ Before coding, discuss your idea:
 ### 2. Fork and Branch
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/akiva-ai-crypto.git
-cd akiva-ai-crypto
+git clone https://github.com/YOUR_USERNAME/enterprise-crypto.git
+cd enterprise-crypto
 git checkout -b feature/your-feature-name
 ```
 

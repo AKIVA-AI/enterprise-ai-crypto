@@ -2,7 +2,7 @@
 
 ## Overview
 
-This directory contains load testing scripts for the Akiva AI Crypto Trading Platform using [Locust](https://locust.io/).
+This directory contains load testing scripts for the Enterprise Crypto Trading Platform using [Locust](https://locust.io/).
 
 ## Installation
 

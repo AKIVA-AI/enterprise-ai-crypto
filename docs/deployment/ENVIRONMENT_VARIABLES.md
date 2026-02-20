@@ -1,4 +1,4 @@
-# Akiva AI Crypto - Environment Variables Reference
+# Enterprise Crypto - Environment Variables Reference
 
 ## Table of Contents
 1. [Frontend Variables](#frontend-variables)
@@ -31,7 +31,7 @@
 
 | Variable | Required | Description | Example | Default |
 |----------|----------|-------------|---------|---------|
-| `VITE_APP_NAME` | No | Application name | `Akiva AI Crypto` | `Akiva AI Crypto` |
+| `VITE_APP_NAME` | No | Application name | `Enterprise Crypto` | `Enterprise Crypto` |
 | `VITE_APP_VERSION` | No | Application version | `1.0.0` | `1.0.0` |
 | `VITE_APP_DESCRIPTION` | No | Application description | `AI-powered crypto trading platform` | - |
 
@@ -176,7 +176,7 @@
 |----------|----------|-------------|---------|---------|
 | `LOG_LEVEL` | No | Logging level (debug/info/warn/error) | `info` | `info` |
 | `LOG_FORMAT` | No | Log format (json/text) | `json` | `json` |
-| `LOG_FILE_PATH` | No | Log file path | `/var/log/akiva-crypto.log` | - |
+| `LOG_FILE_PATH` | No | Log file path | `/var/log/enterprise-crypto.log` | - |
 | `ENABLE_CONSOLE_LOG` | No | Enable console logging | `true` | `true` |
 
 ### Analytics
@@ -229,8 +229,8 @@ VITE_SUPABASE_ANON_KEY=staging-anon-key
 SUPABASE_SERVICE_ROLE_KEY=staging-service-key
 
 # API
-VITE_API_URL=https://staging-api.akiva-crypto.com
-VITE_WS_URL=wss://staging-api.akiva-crypto.com
+VITE_API_URL=https://staging-api.enterprise-crypto.com
+VITE_WS_URL=wss://staging-api.enterprise-crypto.com
 
 # Features
 VITE_ENABLE_TRADING=true
@@ -251,8 +251,8 @@ VITE_SUPABASE_ANON_KEY=production-anon-key
 SUPABASE_SERVICE_ROLE_KEY=production-service-key
 
 # API
-VITE_API_URL=https://api.akiva-crypto.com
-VITE_WS_URL=wss://api.akiva-crypto.com
+VITE_API_URL=https://api.enterprise-crypto.com
+VITE_WS_URL=wss://api.enterprise-crypto.com
 
 # Features
 VITE_ENABLE_TRADING=true

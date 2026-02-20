@@ -68,13 +68,13 @@
         "username": "freqtrader",
         "password": "CHANGE_ME_IN_PRODUCTION"
     },
-    "bot_name": "akiva_freqtrade",
+    "bot_name": "enterprise_crypto",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
     },
-    "strategy": "AkivaBaseStrategy",
+    "strategy": "BaseStrategy",
     "strategy_path": "strategies/"
 }
 

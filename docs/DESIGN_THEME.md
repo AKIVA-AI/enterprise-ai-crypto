@@ -1,4 +1,4 @@
-# AKIVA AI CRYPTO Design Theme - Supabase Dark with Purple Accents
+# Enterprise Crypto Design Theme - Supabase Dark with Purple Accents
 
 > Last Updated: December 2025
 
@@ -343,7 +343,7 @@ A clean, professional design theme inspired by Supabase's classic dark UI with p
 
 ## Brand Voice Alignment
 
-The Kraken Purple theme reflects the AKIVA AI CRYPTO brand voice:
+The Kraken Purple theme reflects the Enterprise Crypto brand voice:
 - **Institutional**: Deep, professional backgrounds convey seriousness
 - **Sophisticated**: Vibrant purples suggest premium, advanced technology
 - **Data-Driven**: Cyan accents highlight quantitative and analytical focus

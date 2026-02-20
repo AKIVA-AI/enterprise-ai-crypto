@@ -67,7 +67,7 @@ class Settings:
         self.debug = self.DEBUG  # Alias
         
         # ========== Application Info ==========
-        self.app_name = "AKIVA AI Crypto"
+        self.app_name = "Enterprise Crypto"
         self.app_version = "1.0.0"
         
         # ========== Directories ==========

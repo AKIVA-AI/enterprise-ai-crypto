@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AKIVA AI Crypto platform now implements **multi-tenant Row Level Security (RLS)** to ensure data isolation between different organizations/tenants. This guide explains how the system works and how to work with it.
+The Enterprise Crypto platform now implements **multi-tenant Row Level Security (RLS)** to ensure data isolation between different organizations/tenants. This guide explains how the system works and how to work with it.
 
 ## Architecture
 

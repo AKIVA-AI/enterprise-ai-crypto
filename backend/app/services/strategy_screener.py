@@ -1,5 +1,5 @@
 """
-AKIVA AI Strategy Screener Service
+Enterprise Crypto Strategy Screener Service
 
 Scans all available coins × strategies to find high-probability opportunities.
 Runs quick backtests and ranks results by win rate, Sharpe, and drawdown.
@@ -32,7 +32,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # Project root for FreqTrade paths
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent  # akiva-ai-crypto/
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent.parent  # enterprise-crypto/
 
 # =============================================================================
 # INPUT VALIDATION FOR SUBPROCESS SECURITY

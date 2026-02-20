@@ -1,5 +1,5 @@
 {
-    "_comment": "AKIVA AI - Bot 1: WhaleFlowScalper (97.8% win, +4.06%)",
+    "_comment": "Enterprise Crypto - Bot 1: WhaleFlowScalper (97.8% win, +4.06%)",
     "_strategy": "WhaleFlowScalper",
     "max_open_trades": 3,
     "stake_currency": "USDT",
@@ -19,7 +19,7 @@
     "pairlists": [{"method": "StaticPairList"}],
     "telegram": {"enabled": false, "token": "", "chat_id": ""},
     "api_server": {"enabled": true, "listen_ip_address": "0.0.0.0", "listen_port": 8080, "verbosity": "error", "enable_openapi": true, "jwt_secret_key": "change-me-to-a-random-secret", "ws_token": "change-me-to-a-random-token", "CORS_origins": ["http://localhost:3000", "http://localhost:5173"], "username": "freqtrader", "password": "freqtrader"},
-    "bot_name": "akiva_futures_bot",
+    "bot_name": "ec_futures_bot",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {"process_throttle_secs": 5},

@@ -73,7 +73,7 @@ class WhaleFlowScalper(IStrategy):
         """Called when the bot starts."""
         super().bot_start(**kwargs)
         trading_mode = self.config.get('trading_mode', 'futures')
-        logger.info(f"AKIVA AI: WhaleFlowScalper running in {trading_mode.upper()} mode")
+        logger.info(f"Enterprise Crypto: WhaleFlowScalper running in {trading_mode.upper()} mode")
         if trading_mode == 'futures':
             logger.info(f"  - Shorting: ENABLED | Max Leverage: {self.max_leverage}x")
 

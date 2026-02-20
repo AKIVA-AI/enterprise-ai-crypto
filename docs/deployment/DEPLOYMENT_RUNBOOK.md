@@ -1,4 +1,4 @@
-# Akiva AI Crypto - Deployment Runbook
+# Enterprise Crypto - Deployment Runbook
 
 ## Table of Contents
 1. [Prerequisites](#prerequisites)
@@ -35,7 +35,7 @@
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd akiva-ai-crypto
+cd enterprise-crypto
 ```
 
 ### 2. Install Node.js Dependencies
@@ -115,10 +115,10 @@ npm run test:e2e
 ### 1. Build Docker Images
 ```bash
 # Build frontend image
-docker build -f Dockerfile.frontend -t akiva-crypto-frontend .
+docker build -f Dockerfile.frontend -t enterprise-crypto-frontend .
 
 # Build backend image (if needed)
-docker build -t akiva-crypto-backend ./backend
+docker build -t enterprise-crypto-backend ./backend
 ```
 
 ### 2. Run with Docker Compose

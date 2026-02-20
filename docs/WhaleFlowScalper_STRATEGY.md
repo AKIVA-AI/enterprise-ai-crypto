@@ -141,7 +141,7 @@ atr_sl_multiplier = DecimalParameter(1.5, 3.0, default=2.0)
 
 ## File Location
 ```
-akiva-ai-crypto/user_data/strategies/WhaleFlowScalper.py
+enterprise-crypto/user_data/strategies/WhaleFlowScalper.py
 ```
 
 ---

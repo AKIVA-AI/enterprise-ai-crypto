@@ -38,7 +38,7 @@ class WhaleFlowScalperSpot(WhaleFlowScalper):
         """Called when the bot starts."""
         # Call grandparent's bot_start (skip WhaleFlowScalper's)
         IStrategy.bot_start(self, **kwargs)
-        logger.info("AKIVA AI: WhaleFlowScalperSpot running in SPOT mode")
+        logger.info("Enterprise Crypto: WhaleFlowScalperSpot running in SPOT mode")
         logger.info("  - Shorting: DISABLED | Leverage: 1x (no leverage)")
     
     def populate_entry_trend(self, dataframe, metadata):

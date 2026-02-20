@@ -72,7 +72,7 @@ class FreqTradeIntegrationHub:
         self.error_handlers: List[Callable[[Exception], None]] = []
 
         # Configuration
-        self.config_name = 'akiva_freqtrade'
+        self.config_name = 'enterprise_crypto'
         self.environment = settings.ENVIRONMENT or 'development'
 
     async def initialize(self) -> bool:

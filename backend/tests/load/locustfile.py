@@ -1,5 +1,5 @@
 """
-Load testing for the Akiva AI Crypto Trading Platform.
+Load testing for the Enterprise Crypto Trading Platform.
 
 Usage:
     pip install locust

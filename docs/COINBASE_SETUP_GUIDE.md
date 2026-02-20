@@ -2,7 +2,7 @@
 
 ## Overview
 
-AKIVA AI is now configured to use **Coinbase Advanced** as the primary trading venue. This is the recommended option for US-based traders because:
+Enterprise Crypto is now configured to use **Coinbase Advanced** as the primary trading venue. This is the recommended option for US-based traders because:
 
 - ✅ **US Compliant** - Fully regulated US exchange
 - ✅ **Perpetual Futures** - Up to 10x leverage (launched July 2025)

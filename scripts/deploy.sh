@@ -25,7 +25,7 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 echo "
 ╔════════════════════════════════════════════════════╗
-║       AKIVA AI CRYPTO - DEPLOYMENT SCRIPT          ║
+║       ENTERPRISE CRYPTO - DEPLOYMENT SCRIPT          ║
 ║       Environment: $ENVIRONMENT                        ║
 ╚════════════════════════════════════════════════════╝
 "

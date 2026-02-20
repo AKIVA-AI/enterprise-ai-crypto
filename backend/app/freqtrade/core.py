@@ -169,7 +169,7 @@ class FreqTradeCore:
             ],
             "telegram": {"enabled": False},
             "api_server": {"enabled": False},
-            "bot_name": "akiva_freqtrade",
+            "bot_name": "enterprise_crypto",
             "initial_state": "running",
             "force_entry_enable": True,
             "internals": {

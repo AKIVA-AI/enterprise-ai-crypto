@@ -1,13 +1,13 @@
 version: '3.8'
 
-# AKIVA AI - Dual Bot Trading Setup
+# Enterprise Crypto - Dual Bot Trading Setup
 # Runs both strategies 24/7 on all pairs
 
 services:
   # Bot 1: WhaleFlowScalper (97.8% win rate, +4.06% profit)
   freqtrade-whale:
     image: freqtradeorg/freqtrade:stable
-    container_name: akiva-whale-bot
+    container_name: ec-whale-bot
     restart: unless-stopped
     volumes:
       - ./user_data:/freqtrade/user_data
@@ -23,7 +23,7 @@ services:
   # Bot 2: HighWinRateScalper (100% win rate, +1.43% profit)
   freqtrade-highwin:
     image: freqtradeorg/freqtrade:stable
-    container_name: akiva-highwin-bot
+    container_name: ec-highwin-bot
     restart: unless-stopped
     volumes:
       - ./user_data:/freqtrade/user_data

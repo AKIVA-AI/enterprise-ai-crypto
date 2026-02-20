@@ -19,7 +19,7 @@
 ### Step 1: Deploy Shared Utilities
 
 ```bash
-cd akiva-ai-crypto/supabase/functions
+cd enterprise-crypto/supabase/functions
 
 # Deploy shared utilities (these are automatically included in functions)
 # No explicit deployment needed - they're imported by functions

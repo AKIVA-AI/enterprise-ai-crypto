@@ -1,4 +1,4 @@
-# 🚨 Incident Response Runbook - AKIVA Crypto Trading Platform
+# 🚨 Incident Response Runbook - Enterprise Crypto Trading Platform
 
 **Version:** 1.0
 **Effective Date:** December 27, 2025
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This Incident Response Runbook outlines the procedures for identifying, responding to, and recovering from security incidents, system outages, and operational disruptions affecting the AKIVA Crypto Trading Platform. The goal is to minimize impact on trading operations, ensure regulatory compliance, and maintain market integrity.
+This Incident Response Runbook outlines the procedures for identifying, responding to, and recovering from security incidents, system outages, and operational disruptions affecting the Enterprise Crypto Trading Platform. The goal is to minimize impact on trading operations, ensure regulatory compliance, and maintain market integrity.
 
 ### Key Contacts
 - **Incident Response Coordinator:** [Primary Contact]
@@ -260,7 +260,7 @@ This Incident Response Runbook outlines the procedures for identifying, respondi
 ### Internal Communications
 
 #### **Incident Notification**
-- **Email Distribution:** incident-response@akiva-ai.com
+- **Email Distribution:** incident-response@enterprise-crypto.com
 - **Slack Channel:** #incident-response
 - **Phone Bridge:** Emergency conference line
 - **Status Dashboard:** Real-time incident status

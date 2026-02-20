@@ -1,5 +1,5 @@
 {
-    "_comment": "AKIVA AI - Bot 2: HighWinRateScalper (100% win rate)",
+    "_comment": "Enterprise Crypto - Bot 2: HighWinRateScalper (100% win rate)",
     "_strategy": "HighWinRateScalper",
     
     "max_open_trades": 3,
@@ -80,7 +80,7 @@
         "password": "freqtrader"
     },
     
-    "bot_name": "akiva_highwinrate_bot",
+    "bot_name": "ec_highwinrate_bot",
     "initial_state": "running",
     "force_entry_enable": false,
     

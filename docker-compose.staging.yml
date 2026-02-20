@@ -96,5 +96,5 @@ volumes:
 
 networks:
   default:
-    name: akiva-crypto-staging
+    name: enterprise-crypto-staging
 

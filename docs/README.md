@@ -1,4 +1,4 @@
-# AKIVA AI Documentation
+# Enterprise Crypto Documentation
 
 ## Start Here
 

@@ -1,4 +1,4 @@
-# AKIVA AI Crypto
+# Enterprise Crypto
 
 > **Open-source, institutional-grade crypto trading platform** — enterprise risk management, multi-exchange execution, and real-time monitoring built on Supabase + React.
 
@@ -15,7 +15,7 @@ Most crypto trading tools are either:
 - **Too expensive** — institutional platforms cost $50k+/year
 - **Black boxes** — you can't see why trades were blocked or executed
 
-AKIVA bridges this gap: **institutional-grade controls, open-source transparency, zero cost.**
+Enterprise Crypto bridges this gap: **institutional-grade controls, open-source transparency, zero cost.**
 
 ## Architecture
 
@@ -85,8 +85,8 @@ AKIVA bridges this gap: **institutional-grade controls, open-source transparency
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_ORG/akiva-ai-crypto.git
-cd akiva-ai-crypto
+git clone https://github.com/YOUR_ORG/enterprise-crypto.git
+cd enterprise-crypto
 bun install
 ```
 
@@ -149,7 +149,7 @@ Add API keys as Supabase secrets via the dashboard:
 ## Project Structure
 
 ```
-akiva-ai-crypto/
+enterprise-crypto/
 ├── src/                          # React frontend
 │   ├── components/               # UI components (shadcn/ui + custom)
 │   │   ├── dashboard/            # Control center widgets
@@ -244,4 +244,4 @@ See [SECURITY.md](SECURITY.md) for our security policy and vulnerability reporti
 
 ---
 
-*AKIVA AI — Institutional trading, open source.*
+*Enterprise Crypto — Institutional trading, open source.*

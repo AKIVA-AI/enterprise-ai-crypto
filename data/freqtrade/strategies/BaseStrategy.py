@@ -2,7 +2,7 @@
 # flake8: noqa: F401
 # isort: skip_file
 """
-Akiva Base Strategy - Production FreqTrade Strategy
+Base Strategy - Production FreqTrade Strategy
 
 Based on FreqTrade's official SampleStrategy template.
 This is a REAL FreqTrade-compatible strategy that inherits from IStrategy.
@@ -40,9 +40,9 @@ import talib.abstract as ta
 from technical import qtpylib
 
 
-class AkivaBaseStrategy(IStrategy):
+class BaseStrategy(IStrategy):
     """
-    Production-ready base strategy for Akiva AI Crypto platform.
+    Production-ready base strategy for Enterprise Crypto platform.
     
     Based on FreqTrade's official template with conservative settings
     suitable for initial production deployment.

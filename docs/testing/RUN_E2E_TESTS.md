@@ -113,7 +113,7 @@ npm run test:e2e:manual:headed
 
 ### **Terminal 1:**
 ```bash
-cd c:\Users\ccana\Documents\augment-projects\akiva-ai-crypto
+cd enterprise-crypto
 npm run dev
 ```
 
@@ -121,7 +121,7 @@ npm run dev
 
 ### **Terminal 2:**
 ```bash
-cd c:\Users\ccana\Documents\augment-projects\akiva-ai-crypto
+cd enterprise-crypto
 npm run test:e2e:manual:headed
 ```
 

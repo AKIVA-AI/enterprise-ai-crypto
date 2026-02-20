@@ -1,5 +1,5 @@
 """
-Akiva Trend Strategy - FreqTrade Compatible
+Trend Strategy - FreqTrade Compatible
 
 A professional trend-following strategy using multiple indicators.
 100% compatible with FreqTrade's IStrategy interface.
@@ -15,7 +15,7 @@ import numpy as np
 from typing import Dict, Any, Optional
 
 
-class AkivaTrendStrategy:
+class TrendStrategy:
     """
     Trend-following strategy using EMA crossovers and RSI confirmation.
     

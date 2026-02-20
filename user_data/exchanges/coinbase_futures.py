@@ -1,7 +1,7 @@
 """
 Coinbase Advanced Futures Exchange Implementation for Freqtrade
 
-AKIVA AI - Custom exchange class enabling Coinbase perpetual futures trading.
+Enterprise Crypto - Custom exchange class enabling Coinbase perpetual futures trading.
 
 Coinbase Advanced launched perpetual futures for US users in July 2025.
 This class extends Freqtrade's base exchange to support:
@@ -59,7 +59,7 @@ class CoinbaseFutures(Exchange):
     def __init__(self, config: dict, *, exchange_config: dict | None = None, **kwargs) -> None:
         # Accept and pass through any additional kwargs (like 'validate')
         super().__init__(config, exchange_config=exchange_config, **kwargs)
-        logger.info("AKIVA AI: Coinbase Futures exchange initialized")
+        logger.info("Enterprise Crypto: Coinbase Futures exchange initialized")
 
     def _get_params(
         self,
@@ -134,6 +134,6 @@ class CoinbaseFutures(Exchange):
     def additional_exchange_init(self) -> None:
         """Additional initialization for Coinbase futures."""
         super().additional_exchange_init()
-        logger.info("AKIVA AI: Coinbase Advanced Futures ready for trading")
+        logger.info("Enterprise Crypto: Coinbase Advanced Futures ready for trading")
         logger.info(f"Trading mode: {self.trading_mode}, Margin mode: {self.margin_mode}")
 

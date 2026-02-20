@@ -1,5 +1,5 @@
 """
-AKIVA AI - Exchange Registration Script
+Enterprise Crypto - Exchange Registration Script
 
 This script registers custom exchange classes with Freqtrade.
 Run this before starting the trading bot to enable Coinbase Futures support.
@@ -44,16 +44,16 @@ def register():
             def __init__(self, config, **kwargs):
                 trading_mode = config.get('trading_mode', 'spot')
                 if trading_mode == 'futures':
-                    logger.info("AKIVA AI: Using CoinbaseFutures for futures trading")
+                    logger.info("Enterprise Crypto: Using CoinbaseFutures for futures trading")
                     super().__init__(config, **kwargs)
                 else:
-                    logger.info("AKIVA AI: Using generic Coinbase for spot trading")
+                    logger.info("Enterprise Crypto: Using generic Coinbase for spot trading")
                     # For spot, use the parent Exchange class behavior
                     super().__init__(config, **kwargs)
         
         setattr(ft_exchanges, 'Coinbase', CoinbaseAuto)
         
-        logger.info("AKIVA AI: Custom exchanges registered successfully")
+        logger.info("Enterprise Crypto: Custom exchanges registered successfully")
         logger.info("  - CoinbaseFutures: Coinbase Advanced perpetual futures")
         
         return True
@@ -76,7 +76,7 @@ def patch_exchange_resolver():
         MAP_EXCHANGE_CHILDCLASS['coinbase_futures'] = 'coinbasefutures'
         MAP_EXCHANGE_CHILDCLASS['coinbasefutures'] = 'coinbasefutures'
         
-        logger.info("AKIVA AI: Exchange resolver patched")
+        logger.info("Enterprise Crypto: Exchange resolver patched")
         return True
         
     except Exception as e:

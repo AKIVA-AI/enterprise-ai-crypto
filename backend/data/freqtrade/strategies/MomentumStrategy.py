@@ -1,5 +1,5 @@
 """
-Akiva Momentum Strategy - FreqTrade Compatible
+Momentum Strategy - FreqTrade Compatible
 
 A momentum-based strategy using RSI divergence and MACD.
 100% compatible with FreqTrade's IStrategy interface.
@@ -15,7 +15,7 @@ import numpy as np
 from typing import Dict, Any
 
 
-class AkivaMomentumStrategy:
+class MomentumStrategy:
     """
     Momentum strategy using RSI divergence and MACD confirmation.
     

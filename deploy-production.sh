@@ -3,7 +3,7 @@
 # ==========================================
 # Production Deployment Script
 # ==========================================
-# This script deploys the Akiva AI Crypto platform to production
+# This script deploys the Enterprise Crypto platform to production
 # 
 # Usage:
 #   ./deploy-production.sh [environment]
@@ -32,7 +32,7 @@ NC='\033[0m' # No Color
 # Configuration
 ENVIRONMENT=${1:-staging}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_NAME="akiva-ai-crypto"
+PROJECT_NAME="enterprise-crypto"
 
 # Functions
 log_info() {

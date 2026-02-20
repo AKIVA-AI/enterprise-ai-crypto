@@ -109,7 +109,7 @@ git push origin main
 
 1. **Create Project**
    - Go to Northflank dashboard
-   - Create new project: "akiva-ai-crypto"
+   - Create new project: "enterprise-crypto"
 
 2. **Add Services**
    - **Frontend Service:**

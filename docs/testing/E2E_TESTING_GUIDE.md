@@ -69,7 +69,7 @@ After running tests:
 ## 📁 Test Structure
 
 ```
-akiva-ai-crypto/
+enterprise-crypto/
 ├── e2e/                          # E2E test directory
 │   ├── trade-flow.spec.ts        # Trade submission tests
 │   ├── risk-dashboard.spec.ts    # Risk dashboard tests

@@ -1,8 +1,8 @@
-# Akiva AI Crypto - Deployment Documentation
+# Enterprise Crypto - Deployment Documentation
 
 ## Overview
 
-This directory contains comprehensive deployment and operational documentation for the Akiva AI Crypto trading platform.
+This directory contains comprehensive deployment and operational documentation for the Enterprise Crypto trading platform.
 
 ## 📚 Documentation Index
 
@@ -41,7 +41,7 @@ This directory contains comprehensive deployment and operational documentation f
 ```bash
 # Clone and setup
 git clone <repository-url>
-cd akiva-ai-crypto
+cd enterprise-crypto
 
 # Install dependencies
 npm install
@@ -115,14 +115,14 @@ npm run build
 - **Features**: Debug mode enabled, mock data available
 
 ### Staging Environment
-- **Frontend**: `https://staging.akiva-crypto.com`
-- **Backend API**: `https://staging-api.akiva-crypto.com`
+- **Frontend**: `https://staging.enterprise-crypto.com`
+- **Backend API**: `https://staging-api.enterprise-crypto.com`
 - **Database**: Staging Supabase project
 - **Features**: Production-like, limited trading
 
 ### Production Environment
-- **Frontend**: `https://app.akiva-crypto.com`
-- **Backend API**: `https://api.akiva-crypto.com`
+- **Frontend**: `https://app.enterprise-crypto.com`
+- **Backend API**: `https://api.enterprise-crypto.com`
 - **Database**: Production Supabase project
 - **Features**: Full trading enabled, monitoring active
 
@@ -138,7 +138,7 @@ docker-compose down
 docker-compose up -d
 
 # 3. Verify configuration
-curl https://api.akiva-crypto.com/health
+curl https://api.enterprise-crypto.com/health
 ```
 
 ### Database Migrations
@@ -200,7 +200,7 @@ docker-compose ps
 docker-compose logs -f backend
 
 # Test API connectivity
-curl -I https://api.akiva-crypto.com/health
+curl -I https://api.enterprise-crypto.com/health
 
 # Check environment variables
 printenv | grep VITE_
@@ -252,4 +252,4 @@ docs/deployment/
 
 **Last Updated**: 2025-01-04  
 **Version**: 1.0.0  
-**Maintainer**: Akiva AI Team
+**Maintainer**: Enterprise Crypto Team

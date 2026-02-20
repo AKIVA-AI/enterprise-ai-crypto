@@ -76,7 +76,7 @@ class FreqAIEnhancedEngine:
         return {
             "freqai": {
                 "enabled": True,
-                "identifier": "akiva_ai_crypto",
+                "identifier": "enterprise_crypto",
                 "feature_parameters": {
                     "include_timeframes": ["5m", "15m", "1h", "4h", "1d"],
                     "include_corr_pairlist": ["BTC/USDT", "ETH/USDT", "BNB/USDT"],

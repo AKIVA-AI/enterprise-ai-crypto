@@ -12,7 +12,7 @@ This happens when the dev server takes too long to start or there's a configurat
 
 Open a terminal and run:
 ```bash
-cd c:\Users\ccana\Documents\augment-projects\akiva-ai-crypto
+cd enterprise-crypto
 npm run dev
 ```
 
@@ -34,7 +34,7 @@ Open a **NEW terminal** (keep the first one running) and run:
 
 #### **Option A: Run All Tests (Headless)**
 ```bash
-cd c:\Users\ccana\Documents\augment-projects\akiva-ai-crypto
+cd enterprise-crypto
 npx playwright test --config=playwright.config.manual.ts
 ```
 
@@ -160,14 +160,14 @@ npm run test:e2e:manual:headed
 
 1. **Open Terminal 1:**
 ```bash
-cd c:\Users\ccana\Documents\augment-projects\akiva-ai-crypto
+cd enterprise-crypto
 npm run dev
 ```
 Wait for "ready in XXX ms"
 
 2. **Open Terminal 2:**
 ```bash
-cd c:\Users\ccana\Documents\augment-projects\akiva-ai-crypto
+cd enterprise-crypto
 npx playwright test e2e/trade-flow.spec.ts --config=playwright.config.manual.ts --headed
 ```
 

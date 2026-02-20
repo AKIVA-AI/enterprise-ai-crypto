@@ -6,8 +6,8 @@ This script validates and prepares FreqTrade for production trading.
 
 Usage:
     python scripts/setup_freqtrade.py --validate
-    python scripts/setup_freqtrade.py --backtest AkivaBaseStrategy
-    python scripts/setup_freqtrade.py --dry-run AkivaBaseStrategy
+    python scripts/setup_freqtrade.py --backtest BaseStrategy
+    python scripts/setup_freqtrade.py --dry-run BaseStrategy
 """
 
 import sys
@@ -133,7 +133,7 @@ def main():
     args = parser.parse_args()
     
     print("=" * 60)
-    print("  Akiva AI Crypto - FreqTrade Setup")
+    print("  Enterprise Crypto - FreqTrade Setup")
     print("=" * 60)
     
     # Always check dependencies

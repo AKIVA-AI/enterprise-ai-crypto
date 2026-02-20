@@ -45,7 +45,7 @@ class FreqTradeSignalAgent(BaseAgent):
             capabilities=["freqtrade_strategies", "signal_generation", "backtesting"]
         )
         
-        self.strategy_names = strategies or ["AkivaTrendStrategy", "AkivaMomentumStrategy"]
+        self.strategy_names = strategies or ["TrendStrategy", "MomentumStrategy"]
         self.pairs = pairs or ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
         self.timeframe = timeframe
         

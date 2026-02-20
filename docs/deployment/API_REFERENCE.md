@@ -1,4 +1,4 @@
-# Akiva AI Crypto - API Quick Reference
+# Enterprise Crypto - API Quick Reference
 
 ## Table of Contents
 1. [Authentication Endpoints](#authentication-endpoints)
@@ -13,8 +13,8 @@
 
 ## Base URL
 - **Development**: `http://localhost:8000`
-- **Staging**: `https://staging-api.akiva-crypto.com`
-- **Production**: `https://api.akiva-crypto.com`
+- **Staging**: `https://staging-api.enterprise-crypto.com`
+- **Production**: `https://api.enterprise-crypto.com`
 
 ## Authentication
 
@@ -894,10 +894,10 @@ X-RateLimit-Reset: 1642291200
 
 ### JavaScript/TypeScript
 ```typescript
-import { AkivaCryptoAPI } from '@akiva-crypto/sdk';
+import { EnterpriseCryptoAPI } from '@enterprise-crypto/sdk';
 
-const api = new AkivaCryptoAPI({
-  baseURL: 'https://api.akiva-crypto.com',
+const api = new EnterpriseCryptoAPI({
+  baseURL: 'https://api.enterprise-crypto.com',
   apiKey: 'your-api-key'
 });
 
@@ -925,10 +925,10 @@ const backtest = await api.runBacktest({
 
 ### Python
 ```python
-from akiva_crypto import AkivaCryptoAPI
+from enterprise_crypto import EnterpriseCryptoAPI
 
-api = AkivaCryptoAPI(
-    base_url='https://api.akiva-crypto.com',
+api = EnterpriseCryptoAPI(
+    base_url='https://api.enterprise-crypto.com',
     api_key='your-api-key'
 )
 
@@ -957,26 +957,26 @@ backtest = api.run_backtest(
 ## Testing
 
 ### Test Environment
-- **Base URL**: `https://test-api.akiva-crypto.com`
+- **Base URL**: `https://test-api.enterprise-crypto.com`
 - **Test API Key**: `test-api-key-12345`
 - **Test JWT**: Use `/auth/login` with test credentials
 
 ### Test Commands
 ```bash
 # Health check
-curl https://test-api.akiva-crypto.com/health
+curl https://test-api.enterprise-crypto.com/health
 
 # Authentication
-curl -X POST https://test-api.akiva-crypto.com/auth/login \
+curl -X POST https://test-api.enterprise-crypto.com/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"test123"}'
 
 # Get portfolio
-curl https://test-api.akiva-crypto.com/api/portfolio \
+curl https://test-api.enterprise-crypto.com/api/portfolio \
   -H "Authorization: Bearer <token>"
 
 # Place order
-curl -X POST https://test-api.akiva-crypto.com/api/trading/orders \
+curl -X POST https://test-api.enterprise-crypto.com/api/trading/orders \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"exchange":"binance","symbol":"BTC-USD","side":"buy","type":"limit","amount":0.01,"price":45000}'
