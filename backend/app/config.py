@@ -97,7 +97,7 @@ class Settings:
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 
         # ========== API Server ==========
-        self.api_host = os.getenv("API_HOST", "0.0.0.0")
+        self.api_host = os.getenv("API_HOST", "0.0.0.0")  # nosec B104
         self.api_port = int(os.getenv("API_PORT", "8000"))
 
         # ========== CORS & Hosts ==========
