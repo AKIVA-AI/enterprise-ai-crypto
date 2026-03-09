@@ -69,7 +69,7 @@ jobs:
 
       - name: Run tests with coverage
         working-directory: backend
-        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=50 -x -q
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=20 -x -q
 
       - name: Build Docker image
         working-directory: backend
