@@ -3,8 +3,9 @@ API routes for strategy management.
 
 Production-ready FreqTrade strategy API.
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from typing import Optional, List, Dict, Any
+
+from fastapi import APIRouter, HTTPException
+from typing import Optional
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/strategies", tags=["strategies"])
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/api/strategies", tags=["strategies"])
 # Check FreqTrade availability at import time
 try:
     from app.freqtrade.strategy_manager import StrategyManager, is_freqtrade_available
+
     FREQTRADE_AVAILABLE = is_freqtrade_available()
 except ImportError:
     FREQTRADE_AVAILABLE = False
@@ -20,6 +22,7 @@ except ImportError:
 
 class BacktestRequest(BaseModel):
     """Backtest configuration."""
+
     strategy_name: str
     pair: str = "BTC/USDT"
     timeframe: str = "5m"
@@ -31,6 +34,7 @@ class BacktestRequest(BaseModel):
 
 class StrategySignalRequest(BaseModel):
     """Request for strategy signals."""
+
     strategy_name: str
     pair: str
     timeframe: str = "5m"
@@ -41,7 +45,9 @@ async def get_freqtrade_status():
     """Get FreqTrade system status."""
     return {
         "freqtrade_available": FREQTRADE_AVAILABLE,
-        "message": "FreqTrade ready for production" if FREQTRADE_AVAILABLE else "FreqTrade not installed",
+        "message": "FreqTrade ready for production"
+        if FREQTRADE_AVAILABLE
+        else "FreqTrade not installed",
     }
 
 
@@ -57,7 +63,7 @@ async def list_strategies():
             "freqtrade_available": FREQTRADE_AVAILABLE,
             "discovered": discovered,
             "loaded": loaded,
-            "strategies": manager.list_strategies()
+            "strategies": manager.list_strategies(),
         }
     except Exception as e:
         return {
@@ -66,7 +72,7 @@ async def list_strategies():
             "loaded": 0,
             "strategies": [],
             "error": str(e),
-            "hint": "Install FreqTrade: pip install freqtrade"
+            "hint": "Install FreqTrade: pip install freqtrade",
         }
 
 
@@ -103,7 +109,9 @@ async def validate_strategy(strategy_name: str):
     try:
         manager = StrategyManager()
         if not manager.load_strategy(strategy_name):
-            raise HTTPException(status_code=404, detail="Strategy not found or failed to load")
+            raise HTTPException(
+                status_code=404, detail="Strategy not found or failed to load"
+            )
 
         validation = manager.validate_strategy(strategy_name)
 
@@ -125,18 +133,18 @@ async def run_backtest(request: BacktestRequest):
         from app.freqtrade.strategy_manager import StrategyManager
         from app.freqtrade.backtester import Backtester, BacktestConfig
         from app.freqtrade.data_provider import FreqTradeDataProvider
-        
+
         # Load strategy
         manager = StrategyManager()
         if not manager.load_strategy(request.strategy_name):
             raise HTTPException(status_code=404, detail="Strategy not found")
-        
+
         strategy = manager.get_strategy(request.strategy_name)
-        
+
         # Get data
         provider = FreqTradeDataProvider()
         data = provider.get_ohlcv(request.pair, request.timeframe, limit=500)
-        
+
         # Run backtest
         config = BacktestConfig(
             timeframe=request.timeframe,
@@ -144,8 +152,10 @@ async def run_backtest(request: BacktestRequest):
             starting_balance=request.starting_balance,
         )
         backtester = Backtester(config)
-        result = backtester.run_backtest(strategy, data, request.pair, request.strategy_name)
-        
+        result = backtester.run_backtest(
+            strategy, data, request.pair, request.strategy_name
+        )
+
         return {
             "strategy": result.strategy_name,
             "pair": request.pair,
@@ -167,7 +177,9 @@ async def run_backtest(request: BacktestRequest):
                 "worst_trade_pct": round(result.worst_trade_pct, 2),
                 "max_drawdown_pct": round(result.max_drawdown_pct, 2),
                 "sharpe_ratio": round(result.sharpe_ratio, 2),
-                "profit_factor": round(result.profit_factor, 2) if result.profit_factor != float('inf') else "∞",
+                "profit_factor": round(result.profit_factor, 2)
+                if result.profit_factor != float("inf")
+                else "∞",
             },
             "trades_count": len(result.trades),
         }
@@ -183,32 +195,32 @@ async def get_strategy_signal(request: StrategySignalRequest):
     try:
         from app.freqtrade.strategy_manager import StrategyManager
         from app.freqtrade.data_provider import FreqTradeDataProvider
-        
+
         # Load strategy
         manager = StrategyManager()
         if not manager.load_strategy(request.strategy_name):
             raise HTTPException(status_code=404, detail="Strategy not found")
-        
+
         strategy = manager.get_strategy(request.strategy_name)
-        
+
         # Get data
         provider = FreqTradeDataProvider()
         data = provider.get_ohlcv(request.pair, request.timeframe, limit=200)
-        
+
         # Run strategy
         df = strategy.populate_indicators(data.copy(), {"pair": request.pair})
         df = strategy.populate_entry_trend(df, {"pair": request.pair})
         df = strategy.populate_exit_trend(df, {"pair": request.pair})
-        
+
         # Get last row
         last = df.iloc[-1]
-        
+
         signal = "neutral"
         if last.get("enter_long", 0) == 1:
             signal = "buy"
         elif last.get("exit_long", 0) == 1:
             signal = "sell"
-        
+
         return {
             "strategy": request.strategy_name,
             "pair": request.pair,
@@ -220,10 +232,11 @@ async def get_strategy_signal(request: StrategySignalRequest):
                 "ema_fast": float(last.get("ema_fast", 0)),
                 "ema_slow": float(last.get("ema_slow", 0)),
             },
-            "timestamp": last["date"].isoformat() if hasattr(last["date"], 'isoformat') else str(last["date"]),
+            "timestamp": last["date"].isoformat()
+            if hasattr(last["date"], "isoformat")
+            else str(last["date"]),
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

@@ -1,13 +1,12 @@
 """
 API routes for trading operations.
 """
-from fastapi import APIRouter, HTTPException, Header, Request
-from typing import Optional, List
-from uuid import UUID
+
+from fastapi import APIRouter, Request
+from typing import Optional
 from pydantic import BaseModel
 
 from app.database import get_supabase
-from app.models.domain import OrderSide
 from app.middleware.security import get_rate_limiter, RATE_LIMITS
 
 router = APIRouter(prefix="/api/trading", tags=["trading"])
@@ -28,11 +27,15 @@ class PlaceOrderRequest(BaseModel):
 async def get_positions(request: Request, book_id: Optional[str] = None):
     """Get all open positions, optionally filtered by book."""
     supabase = get_supabase()
-    query = supabase.table("positions").select("*, venues(name), books(name)").eq("is_open", True)
-    
+    query = (
+        supabase.table("positions")
+        .select("*, venues(name), books(name)")
+        .eq("is_open", True)
+    )
+
     if book_id:
         query = query.eq("book_id", book_id)
-    
+
     result = query.order("created_at", desc=True).execute()
     return result.data
 
@@ -43,17 +46,17 @@ async def get_orders(
     request: Request,
     status: Optional[str] = None,
     book_id: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
 ):
     """Get orders with optional filters."""
     supabase = get_supabase()
     query = supabase.table("orders").select("*, venues(name), books(name)")
-    
+
     if status:
         query = query.eq("status", status)
     if book_id:
         query = query.eq("book_id", book_id)
-    
+
     result = query.order("created_at", desc=True).limit(limit).execute()
     return result.data
 
@@ -64,10 +67,10 @@ async def get_fills(request: Request, order_id: Optional[str] = None, limit: int
     """Get order fills."""
     supabase = get_supabase()
     query = supabase.table("fills").select("*, orders(instrument, side)")
-    
+
     if order_id:
         query = query.eq("order_id", order_id)
-    
+
     result = query.order("executed_at", desc=True).limit(limit).execute()
     return result.data
 
@@ -78,16 +81,16 @@ async def get_trade_intents(
     request: Request,
     status: Optional[str] = None,
     strategy_id: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
 ):
     """Get trade intents with optional filters."""
     supabase = get_supabase()
     query = supabase.table("trade_intents").select("*, strategies(name), books(name)")
-    
+
     if status:
         query = query.eq("status", status)
     if strategy_id:
         query = query.eq("strategy_id", strategy_id)
-    
+
     result = query.order("created_at", desc=True).limit(limit).execute()
     return result.data

@@ -7,10 +7,8 @@ IMPLEMENTATION STATUS:
 - Required for live: API key/secret, nonce management, signed requests
 - Known issues: Nonce generation must use monotonically increasing values
 """
+
 import structlog
-import hmac
-import hashlib
-import base64
 import time
 import random
 from typing import Dict, List, Optional
@@ -20,7 +18,6 @@ import httpx
 
 from app.adapters.base import VenueAdapter
 from app.models.domain import Order, OrderStatus, OrderSide, VenueHealth, VenueStatus
-from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -75,8 +72,10 @@ class KrakenAdapter(VenueAdapter):
             logger.info("kraken_connected", mode="paper")
             return True
 
-        logger.warning("kraken_live_not_implemented",
-                       message="Kraken live trading is not yet implemented. Use paper mode.")
+        logger.warning(
+            "kraken_live_not_implemented",
+            message="Kraken live trading is not yet implemented. Use paper mode.",
+        )
         return False
 
     async def disconnect(self):
@@ -129,7 +128,7 @@ class KrakenAdapter(VenueAdapter):
             order_id=str(order.id),
             price=order.filled_price,
             slippage_bps=order.slippage * 100,
-            latency_ms=latency_ms
+            latency_ms=latency_ms,
         )
 
         return order
@@ -181,5 +180,5 @@ class KrakenAdapter(VenueAdapter):
             error_rate=0.0,
             last_heartbeat=datetime.utcnow(),
             is_enabled=self._connected,
-            supported_instruments=list(self.PAIR_MAP.keys())
+            supported_instruments=list(self.PAIR_MAP.keys()),
         )

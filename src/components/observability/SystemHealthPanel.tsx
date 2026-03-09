@@ -150,7 +150,7 @@ export function SystemHealthPanel() {
   // Run health checks on mount
   useEffect(() => {
     runChecks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
   
   const overallStatus = health?.overall || 'healthy';

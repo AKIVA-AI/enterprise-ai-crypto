@@ -1,14 +1,21 @@
 """
 Arbitrage Engine - generates arbitrage opportunities and execution plans.
 """
+
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import structlog
 
 from app.models.domain import OrderSide
-from app.models.opportunity import ExecutionLeg, ExecutionMode, ExecutionPlan, Opportunity, OpportunityType
+from app.models.opportunity import (
+    ExecutionLeg,
+    ExecutionMode,
+    ExecutionPlan,
+    Opportunity,
+    OpportunityType,
+)
 
 logger = structlog.get_logger()
 

@@ -23,9 +23,7 @@ import logging
 import asyncio
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, UTC
-from pathlib import Path
 import signal
-import sys
 
 # Local FreqTrade-integrated services
 from app.services.enhanced_quantitative_engine import FreqAIEnhancedEngine
@@ -72,8 +70,8 @@ class FreqTradeIntegrationHub:
         self.error_handlers: List[Callable[[Exception], None]] = []
 
         # Configuration
-        self.config_name = 'enterprise_crypto'
-        self.environment = settings.ENVIRONMENT or 'development'
+        self.config_name = "enterprise_crypto"
+        self.environment = settings.ENVIRONMENT or "development"
 
     async def initialize(self) -> bool:
         """
@@ -94,9 +92,7 @@ class FreqTradeIntegrationHub:
             logger.info("✓ Configuration Manager initialized")
 
             # Load configuration
-            config = self.config_manager.load_configuration(
-                self.config_name, self.environment
-            )
+            self.config_manager.load_configuration(self.config_name, self.environment)
             logger.info("✓ Configuration loaded")
 
             # Initialize market data service
@@ -108,7 +104,9 @@ class FreqTradeIntegrationHub:
             logger.info("✓ FreqAI Enhanced Engine initialized")
 
             # Initialize backtesting engine
-            self.backtesting_engine = EnhancedBacktestingEngine(self.market_data_service)
+            self.backtesting_engine = EnhancedBacktestingEngine(
+                self.market_data_service
+            )
             logger.info("✓ Enhanced Backtesting Engine initialized")
 
             # Initialize fallback services
@@ -157,8 +155,11 @@ class FreqTradeIntegrationHub:
     def _register_signal_handlers(self):
         """Register system signal handlers for graceful shutdown."""
         try:
+
             def signal_handler(signum, frame):
-                logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+                logger.info(
+                    f"Received signal {signum}, initiating graceful shutdown..."
+                )
                 asyncio.create_task(self.shutdown())
 
             # Register signal handlers
@@ -166,7 +167,7 @@ class FreqTradeIntegrationHub:
             signal.signal(signal.SIGTERM, signal_handler)
 
             # Handle Windows signals if applicable
-            if hasattr(signal, 'SIGBREAK'):
+            if hasattr(signal, "SIGBREAK"):
                 signal.signal(signal.SIGBREAK, signal_handler)
 
             logger.info("Signal handlers registered")
@@ -229,70 +230,76 @@ class FreqTradeIntegrationHub:
         if self.freqai_engine:
             try:
                 metrics = self.freqai_engine.get_model_performance_metrics()
-                health_status['freqai_engine'] = {
-                    'status': 'healthy',
-                    'metrics': metrics,
-                    'last_check': datetime.now(UTC).isoformat()
+                health_status["freqai_engine"] = {
+                    "status": "healthy",
+                    "metrics": metrics,
+                    "last_check": datetime.now(UTC).isoformat(),
                 }
             except Exception as e:
-                health_status['freqai_engine'] = {
-                    'status': 'unhealthy',
-                    'error': str(e),
-                    'last_check': datetime.now(UTC).isoformat()
+                health_status["freqai_engine"] = {
+                    "status": "unhealthy",
+                    "error": str(e),
+                    "last_check": datetime.now(UTC).isoformat(),
                 }
 
         # Check market data service
         if self.market_data_service:
             try:
                 connection_status = self.market_data_service.get_connection_status()
-                health_status['market_data_service'] = {
-                    'status': 'healthy',
-                    'connections': connection_status,
-                    'last_check': datetime.now(UTC).isoformat()
+                health_status["market_data_service"] = {
+                    "status": "healthy",
+                    "connections": connection_status,
+                    "last_check": datetime.now(UTC).isoformat(),
                 }
             except Exception as e:
-                health_status['market_data_service'] = {
-                    'status': 'unhealthy',
-                    'error': str(e),
-                    'last_check': datetime.now(UTC).isoformat()
+                health_status["market_data_service"] = {
+                    "status": "unhealthy",
+                    "error": str(e),
+                    "last_check": datetime.now(UTC).isoformat(),
                 }
 
         # Check backtesting engine
         if self.backtesting_engine:
-            health_status['backtesting_engine'] = {
-                'status': 'healthy',
-                'last_check': datetime.now(UTC).isoformat()
+            health_status["backtesting_engine"] = {
+                "status": "healthy",
+                "last_check": datetime.now(UTC).isoformat(),
             }
 
         # Check configuration manager
         if self.config_manager:
-            health_status['config_manager'] = {
-                'status': 'healthy',
-                'last_check': datetime.now(UTC).isoformat()
+            health_status["config_manager"] = {
+                "status": "healthy",
+                "last_check": datetime.now(UTC).isoformat(),
             }
 
         self.component_health = health_status
 
         # Log unhealthy components
-        unhealthy = [name for name, status in health_status.items() if status['status'] == 'unhealthy']
+        unhealthy = [
+            name
+            for name, status in health_status.items()
+            if status["status"] == "unhealthy"
+        ]
         if unhealthy:
             logger.warning(f"Unhealthy components detected: {', '.join(unhealthy)}")
 
     def get_health_status(self) -> Dict[str, Any]:
         """Get comprehensive health status of all components."""
         return {
-            'overall_status': 'healthy' if all(
-                status['status'] == 'healthy'
+            "overall_status": "healthy"
+            if all(
+                status["status"] == "healthy"
                 for status in self.component_health.values()
-            ) else 'degraded',
-            'components': self.component_health,
-            'integration_hub': {
-                'initialized': self.is_initialized,
-                'running': self.is_running,
-                'config_name': self.config_name,
-                'environment': self.environment,
-                'timestamp': datetime.now(UTC).isoformat()
-            }
+            )
+            else "degraded",
+            "components": self.component_health,
+            "integration_hub": {
+                "initialized": self.is_initialized,
+                "running": self.is_running,
+                "config_name": self.config_name,
+                "environment": self.environment,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
         }
 
     async def shutdown(self) -> bool:
@@ -353,13 +360,14 @@ class FreqTradeIntegrationHub:
         if cleanup_tasks:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
 
-    def _handle_config_change(self, action: str, config_name: str,
-                            environment: str, config: Dict[str, Any]):
+    def _handle_config_change(
+        self, action: str, config_name: str, environment: str, config: Dict[str, Any]
+    ):
         """Handle configuration changes."""
         logger.info(f"Configuration {action}: {config_name} ({environment})")
 
         # Notify components of configuration changes
-        if action in ['updated', 'loaded']:
+        if action in ["updated", "loaded"]:
             # Reload component configurations if needed
             asyncio.create_task(self._reload_component_configs(config))
 
@@ -430,15 +438,14 @@ class FreqTradeIntegrationHub:
 
     # Public API Methods
 
-    async def get_market_data(self, pair: str, exchange: str = 'binance',
-                            limit: int = 100) -> Optional[Dict[str, Any]]:
+    async def get_market_data(
+        self, pair: str, exchange: str = "binance", limit: int = 100
+    ) -> Optional[Dict[str, Any]]:
         """Get market data using enhanced service."""
         if self.market_data_service:
             try:
                 return await self.market_data_service.get_historical_data(
-                    pair=pair,
-                    exchange=exchange,
-                    limit=limit
+                    pair=pair, exchange=exchange, limit=limit
                 )
             except Exception as e:
                 logger.warning(f"Enhanced market data failed, using fallback: {e}")
@@ -446,22 +453,22 @@ class FreqTradeIntegrationHub:
         # Fallback to original service
         if self.fallback_market_data:
             return await self.fallback_market_data.get_historical_data(
-                pair=pair,
-                exchange=exchange,
-                limit=limit
+                pair=pair, exchange=exchange, limit=limit
             )
 
         return None
 
-    async def generate_signals(self, market_data: Dict[str, Any],
-                             pair: str) -> Dict[str, Any]:
+    async def generate_signals(
+        self, market_data: Dict[str, Any], pair: str
+    ) -> Dict[str, Any]:
         """Generate trading signals using FreqAI."""
         if not self.freqai_engine:
-            return {'error': 'FreqAI engine not available'}
+            return {"error": "FreqAI engine not available"}
 
         try:
             # Convert data format
             import pandas as pd
+
             df = pd.DataFrame(market_data)
 
             # Generate signals
@@ -470,32 +477,38 @@ class FreqTradeIntegrationHub:
 
         except Exception as e:
             logger.error(f"Signal generation failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
-    async def run_backtest(self, strategy_name: str, pairs: List[str],
-                          start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+    async def run_backtest(
+        self,
+        strategy_name: str,
+        pairs: List[str],
+        start_date: datetime,
+        end_date: datetime,
+    ) -> Dict[str, Any]:
         """Run backtest using enhanced engine."""
         if not self.backtesting_engine:
-            return {'error': 'Backtesting engine not available'}
+            return {"error": "Backtesting engine not available"}
 
         try:
             results = await self.backtesting_engine.run_backtest(
                 strategy_name=strategy_name,
                 pairs=pairs,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
             )
             return results
 
         except Exception as e:
             logger.error(f"Backtest failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
-    def get_configuration(self, config_name: str = None,
-                         environment: str = None) -> Dict[str, Any]:
+    def get_configuration(
+        self, config_name: str = None, environment: str = None
+    ) -> Dict[str, Any]:
         """Get configuration using enhanced manager."""
         if not self.config_manager:
-            return {'error': 'Configuration manager not available'}
+            return {"error": "Configuration manager not available"}
 
         try:
             config_name = config_name or self.config_name
@@ -506,37 +519,36 @@ class FreqTradeIntegrationHub:
 
         except Exception as e:
             logger.error(f"Configuration retrieval failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
-    async def train_ml_models(self, pair: str, start_date: datetime,
-                            end_date: datetime) -> Dict[str, float]:
+    async def train_ml_models(
+        self, pair: str, start_date: datetime, end_date: datetime
+    ) -> Dict[str, float]:
         """Train ML models using FreqAI."""
         if not self.freqai_engine:
-            return {'error': 'FreqAI engine not available'}
+            return {"error": "FreqAI engine not available"}
 
         try:
             results = await self.freqai_engine.train_models(
-                pair=pair,
-                start_date=start_date,
-                end_date=end_date
+                pair=pair, start_date=start_date, end_date=end_date
             )
             return results
 
         except Exception as e:
             logger.error(f"ML training failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status."""
         return {
-            'freqtrade_integration': {
-                'initialized': self.is_initialized,
-                'running': self.is_running,
-                'config_name': self.config_name,
-                'environment': self.environment,
+            "freqtrade_integration": {
+                "initialized": self.is_initialized,
+                "running": self.is_running,
+                "config_name": self.config_name,
+                "environment": self.environment,
             },
-            'component_health': self.get_health_status(),
-            'timestamp': datetime.now(UTC).isoformat()
+            "component_health": self.get_health_status(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
 
@@ -585,9 +597,9 @@ def get_freqtrade_status() -> Dict[str, Any]:
         return _freqtrade_hub.get_system_status()
 
     return {
-        'freqtrade_integration': {
-            'initialized': False,
-            'running': False,
-            'status': 'not_initialized'
+        "freqtrade_integration": {
+            "initialized": False,
+            "running": False,
+            "status": "not_initialized",
         }
     }

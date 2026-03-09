@@ -1,6 +1,7 @@
 """
 Middleware package for the trading platform.
 """
+
 from app.middleware.security import (
     SecurityHeadersMiddleware,
     RequestValidationMiddleware,
@@ -16,4 +17,3 @@ __all__ = [
     "get_rate_limiter",
     "RATE_LIMITS",
 ]
-

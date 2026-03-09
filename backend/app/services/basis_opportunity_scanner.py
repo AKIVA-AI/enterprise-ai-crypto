@@ -1,12 +1,13 @@
 """
 Basis Opportunity Scanner - builds multi-leg trade intents for cash-and-carry.
 """
+
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 from uuid import UUID, uuid5, NAMESPACE_URL, uuid4
 
 import structlog
@@ -102,7 +103,9 @@ class BasisOpportunityScanner:
 
         intents: List[TradeIntent] = []
         for quote in quotes:
-            funding_bps = await self._get_funding_bps(tenant_id, quote.instrument, self.config.deriv_venue)
+            funding_bps = await self._get_funding_bps(
+                tenant_id, quote.instrument, self.config.deriv_venue
+            )
             if funding_bps is None:
                 funding_bps = 0.0
 
@@ -283,25 +286,44 @@ class BasisOpportunityScanner:
             metadata=metadata,
         )
 
-    async def _get_funding_bps(self, tenant_id: str, instrument: str, venue: str) -> Optional[float]:
+    async def _get_funding_bps(
+        self, tenant_id: str, instrument: str, venue: str
+    ) -> Optional[float]:
         try:
             supabase = get_supabase()
-            venue_row = supabase.table("venues").select("id").ilike("name", venue).single().execute()
+            venue_row = (
+                supabase.table("venues")
+                .select("id")
+                .ilike("name", venue)
+                .single()
+                .execute()
+            )
             if not venue_row.data:
                 return None
             venue_id = venue_row.data["id"]
-            instrument_row = supabase.table("instruments").select("id").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).ilike("venue_symbol", instrument).single().execute()
+            instrument_row = (
+                supabase.table("instruments")
+                .select("id")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .ilike("venue_symbol", instrument)
+                .single()
+                .execute()
+            )
             if not instrument_row.data:
                 return None
             instrument_id = instrument_row.data["id"]
 
-            result = supabase.table("funding_rates").select("funding_rate").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).eq("instrument_id", instrument_id).order(
-                "funding_time", desc=True
-            ).limit(1).execute()
+            result = (
+                supabase.table("funding_rates")
+                .select("funding_rate")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .eq("instrument_id", instrument_id)
+                .order("funding_time", desc=True)
+                .limit(1)
+                .execute()
+            )
 
             if result.data:
                 return float(result.data[0]["funding_rate"]) * 10000

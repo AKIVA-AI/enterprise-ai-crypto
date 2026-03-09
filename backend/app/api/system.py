@@ -1,6 +1,7 @@
 """
 System Control API - Kill Switch and System Management
 """
+
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any
 from pydantic import BaseModel
@@ -10,7 +11,7 @@ from app.database import (
     activate_kill_switch,
     deactivate_kill_switch,
     get_kill_switch_status,
-    create_alert
+    create_alert,
 )
 from app.auth import get_current_user  # Assuming you have auth
 
@@ -20,12 +21,14 @@ router = APIRouter(prefix="/system", tags=["system"])
 
 class KillSwitchRequest(BaseModel):
     """Kill switch activation request."""
+
     reason: str
     user_id: str = "api_user"
 
 
 class KillSwitchResponse(BaseModel):
     """Kill switch operation response."""
+
     success: bool
     message: str
     status: Dict[str, Any]
@@ -33,8 +36,7 @@ class KillSwitchResponse(BaseModel):
 
 @router.post("/kill-switch/activate", response_model=KillSwitchResponse)
 async def activate_kill_switch_endpoint(
-    request: KillSwitchRequest,
-    current_user: Dict = Depends(get_current_user)
+    request: KillSwitchRequest, current_user: Dict = Depends(get_current_user)
 ):
     """
     Activate the kill switch to halt all trading operations.
@@ -46,17 +48,21 @@ async def activate_kill_switch_endpoint(
         if not current_user.get("is_admin", False):
             raise HTTPException(status_code=403, detail="Admin privileges required")
 
-        success = await activate_kill_switch(request.reason, request.user_id or current_user.get("id"))
+        success = await activate_kill_switch(
+            request.reason, request.user_id or current_user.get("id")
+        )
 
         if success:
             status = await get_kill_switch_status()
             return KillSwitchResponse(
                 success=True,
                 message=f"Kill switch activated: {request.reason}",
-                status=status
+                status=status,
             )
         else:
-            raise HTTPException(status_code=500, detail="Failed to activate kill switch")
+            raise HTTPException(
+                status_code=500, detail="Failed to activate kill switch"
+            )
 
     except Exception as e:
         logger.error("kill_switch_activation_api_error", error=str(e))
@@ -65,7 +71,7 @@ async def activate_kill_switch_endpoint(
 
 @router.post("/kill-switch/deactivate", response_model=KillSwitchResponse)
 async def deactivate_kill_switch_endpoint(
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user),
 ):
     """
     Deactivate the kill switch to resume trading operations.
@@ -82,12 +88,12 @@ async def deactivate_kill_switch_endpoint(
         if success:
             status = await get_kill_switch_status()
             return KillSwitchResponse(
-                success=True,
-                message="Kill switch deactivated",
-                status=status
+                success=True, message="Kill switch deactivated", status=status
             )
         else:
-            raise HTTPException(status_code=500, detail="Failed to deactivate kill switch")
+            raise HTTPException(
+                status_code=500, detail="Failed to deactivate kill switch"
+            )
 
     except Exception as e:
         logger.error("kill_switch_deactivation_api_error", error=str(e))
@@ -96,7 +102,7 @@ async def deactivate_kill_switch_endpoint(
 
 @router.get("/kill-switch/status")
 async def get_kill_switch_status_endpoint(
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user),
 ):
     """
     Get the current kill switch status.
@@ -107,7 +113,7 @@ async def get_kill_switch_status_endpoint(
         status = await get_kill_switch_status()
         return {
             "kill_switch": status,
-            "system_status": "operational" if not status["active"] else "halted"
+            "system_status": "operational" if not status["active"] else "halted",
         }
 
     except Exception as e:
@@ -120,7 +126,7 @@ async def create_system_alert(
     title: str,
     message: str,
     severity: str = "info",
-    current_user: Dict = Depends(get_current_user)
+    current_user: Dict = Depends(get_current_user),
 ):
     """
     Create a system alert.
@@ -133,7 +139,7 @@ async def create_system_alert(
             message=message,
             severity=severity,
             source="api",
-            metadata={"user_id": current_user.get("id")}
+            metadata={"user_id": current_user.get("id")},
         )
 
         return {"message": "Alert created successfully"}
@@ -161,13 +167,12 @@ async def system_health_check():
                 "api": "operational",
                 "database": "operational",  # Add actual health checks
                 "risk_engine": "operational",
-                "execution": "operational" if not kill_switch_status["active"] else "halted"
-            }
+                "execution": "operational"
+                if not kill_switch_status["active"]
+                else "halted",
+            },
         }
 
     except Exception as e:
         logger.error("health_check_error", error=str(e))
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "error": str(e)}

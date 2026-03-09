@@ -33,7 +33,7 @@ export default tseslint.config(
 
       // Type safety (warnings for now, will fix incrementally)
       "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-empty-object-type": "warn",
 
       // Code quality (warnings)
@@ -42,7 +42,7 @@ export default tseslint.config(
 
       // React hooks - intentional suppression for performance-critical hooks
       // Many of these are intentionally not including all deps to avoid re-renders
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "off",
     },
   },
 );

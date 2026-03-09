@@ -1,6 +1,7 @@
 """
 Regime Detection Service - classifies market regime for allocator.
 """
+
 from __future__ import annotations
 
 from collections import deque
@@ -102,11 +103,17 @@ class RegimeDetectionService:
     async def _liquidity_regime(self) -> str:
         try:
             supabase = get_supabase()
-            result = supabase.table("arb_spreads").select("liquidity_score").order(
-                "ts", desc=True
-            ).limit(20).execute()
+            result = (
+                supabase.table("arb_spreads")
+                .select("liquidity_score")
+                .order("ts", desc=True)
+                .limit(20)
+                .execute()
+            )
             if result.data:
-                avg_liquidity = sum(row["liquidity_score"] for row in result.data) / len(result.data)
+                avg_liquidity = sum(
+                    row["liquidity_score"] for row in result.data
+                ) / len(result.data)
                 if avg_liquidity > 10:
                     return "deep_liquidity"
                 if avg_liquidity < 1:
@@ -129,15 +136,17 @@ class RegimeDetectionService:
             return
         try:
             supabase = get_supabase()
-            supabase.table("market_regimes").insert({
-                "tenant_id": tenant_id,
-                "direction": state.direction,
-                "volatility": state.volatility,
-                "liquidity": state.liquidity,
-                "risk_bias": state.risk_bias,
-                "regime_state": state.details,
-                "ts": datetime.utcnow().isoformat(),
-            }).execute()
+            supabase.table("market_regimes").insert(
+                {
+                    "tenant_id": tenant_id,
+                    "direction": state.direction,
+                    "volatility": state.volatility,
+                    "liquidity": state.liquidity,
+                    "risk_bias": state.risk_bias,
+                    "regime_state": state.details,
+                    "ts": datetime.utcnow().isoformat(),
+                }
+            ).execute()
         except Exception as exc:
             logger.warning("regime_store_failed", error=str(exc))
 

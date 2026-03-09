@@ -1,10 +1,11 @@
 """
 Strategy Metrics Service - aggregates performance and risk metrics.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import structlog
 
@@ -31,9 +32,12 @@ class StrategyMetricsService:
             return
         try:
             supabase = get_supabase()
-            strategies = supabase.table("strategies").select(
-                "id, strategy_type, enabled"
-            ).eq("tenant_id", tenant_id).execute()
+            strategies = (
+                supabase.table("strategies")
+                .select("id, strategy_type, enabled")
+                .eq("tenant_id", tenant_id)
+                .execute()
+            )
 
             for strategy in strategies.data:
                 strategy_id = strategy["id"]
@@ -45,38 +49,45 @@ class StrategyMetricsService:
                 risk = self._compute_risk(supabase, strategy_id, strategy_type)
 
                 if perf:
-                    supabase.table("strategy_performance").insert({
-                        "tenant_id": tenant_id,
-                        "strategy_id": strategy_id,
-                        "window": "7d",
-                        "pnl": perf["pnl"],
-                        "sharpe": perf["sharpe"],
-                        "sortino": perf["sortino"],
-                        "max_drawdown": perf["max_drawdown"],
-                        "win_rate": perf["win_rate"],
-                        "turnover": perf["turnover"],
-                        "ts": datetime.utcnow().isoformat(),
-                    }).execute()
+                    supabase.table("strategy_performance").insert(
+                        {
+                            "tenant_id": tenant_id,
+                            "strategy_id": strategy_id,
+                            "window": "7d",
+                            "pnl": perf["pnl"],
+                            "sharpe": perf["sharpe"],
+                            "sortino": perf["sortino"],
+                            "max_drawdown": perf["max_drawdown"],
+                            "win_rate": perf["win_rate"],
+                            "turnover": perf["turnover"],
+                            "ts": datetime.utcnow().isoformat(),
+                        }
+                    ).execute()
 
                 if risk:
-                    supabase.table("strategy_risk_metrics").insert({
-                        "tenant_id": tenant_id,
-                        "strategy_id": strategy_id,
-                        "gross_exposure": risk["gross_exposure"],
-                        "net_exposure": risk["net_exposure"],
-                        "var_estimate": risk["var_estimate"],
-                        "stress_loss_estimate": risk["stress_loss_estimate"],
-                        "correlation_cluster": risk["correlation_cluster"],
-                        "ts": datetime.utcnow().isoformat(),
-                    }).execute()
+                    supabase.table("strategy_risk_metrics").insert(
+                        {
+                            "tenant_id": tenant_id,
+                            "strategy_id": strategy_id,
+                            "gross_exposure": risk["gross_exposure"],
+                            "net_exposure": risk["net_exposure"],
+                            "var_estimate": risk["var_estimate"],
+                            "stress_loss_estimate": risk["stress_loss_estimate"],
+                            "correlation_cluster": risk["correlation_cluster"],
+                            "ts": datetime.utcnow().isoformat(),
+                        }
+                    ).execute()
 
         except Exception as exc:
             logger.warning("strategy_metrics_refresh_failed", error=str(exc))
 
     def _compute_performance(self, supabase, strategy_id: str) -> Optional[Dict]:
-        positions = supabase.table("positions").select(
-            "unrealized_pnl, realized_pnl"
-        ).eq("strategy_id", strategy_id).execute()
+        positions = (
+            supabase.table("positions")
+            .select("unrealized_pnl, realized_pnl")
+            .eq("strategy_id", strategy_id)
+            .execute()
+        )
 
         if not positions.data:
             return None
@@ -84,9 +95,12 @@ class StrategyMetricsService:
             float(row.get("unrealized_pnl", 0)) + float(row.get("realized_pnl", 0))
             for row in positions.data
         )
-        trades = supabase.table("orders").select("id", count="exact").eq(
-            "strategy_id", strategy_id
-        ).execute()
+        trades = (
+            supabase.table("orders")
+            .select("id", count="exact")
+            .eq("strategy_id", strategy_id)
+            .execute()
+        )
         trade_count = trades.count or 1
         win_rate = 0.5
 
@@ -100,9 +114,12 @@ class StrategyMetricsService:
         }
 
     def _compute_risk(self, supabase, strategy_id: str, strategy_type: str) -> Dict:
-        positions = supabase.table("positions").select(
-            "size, mark_price, side"
-        ).eq("strategy_id", strategy_id).execute()
+        positions = (
+            supabase.table("positions")
+            .select("size, mark_price, side")
+            .eq("strategy_id", strategy_id)
+            .execute()
+        )
         gross = 0.0
         net = 0.0
         for row in positions.data:

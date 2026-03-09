@@ -3,7 +3,7 @@ Strategy Screener API Endpoints
 
 Provides endpoints for:
 - Running strategy scans
-- Getting opportunity rankings  
+- Getting opportunity rankings
 - Deploying opportunities to trading
 """
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/screener", tags=["screener"])
 
 class ScanRequest(BaseModel):
     """Request to run a strategy scan."""
+
     strategies: Optional[List[str]] = None
     exchanges: Optional[List[str]] = None
     timeframes: Optional[List[str]] = None
@@ -31,6 +32,7 @@ class ScanRequest(BaseModel):
 
 class DeployRequest(BaseModel):
     """Request to deploy an opportunity."""
+
     opportunity_id: str
     mode: str = "paper"  # paper or live
     max_position_size: float = 0.1
@@ -60,13 +62,13 @@ async def run_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         max_drawdown=request.max_drawdown,
         top_n=request.top_n,
     )
-    
+
     # Update screener config
     strategy_screener.config = config
-    
+
     # Run scan (for now synchronously, could be background task)
     opportunities = await strategy_screener.scan()
-    
+
     return {
         "status": "completed",
         "scan_time": datetime.utcnow().isoformat(),
@@ -81,7 +83,7 @@ async def run_scan(request: ScanRequest, background_tasks: BackgroundTasks):
                 "sharpe": o.sharpe_ratio,
             }
             for o in opportunities[:10]
-        ]
+        ],
     }
 
 
@@ -93,7 +95,7 @@ async def get_opportunities(
 ):
     """Get filtered list of opportunities."""
     opps = strategy_screener.get_opportunities()
-    
+
     # Apply filters
     if strategy:
         opps = [o for o in opps if o.strategy == strategy]
@@ -101,7 +103,7 @@ async def get_opportunities(
         opps = [o for o in opps if o.exchange.value == exchange]
     if min_score > 0:
         opps = [o for o in opps if o.score >= min_score]
-    
+
     return {
         "count": len(opps),
         "opportunities": [
@@ -120,7 +122,7 @@ async def get_opportunities(
                 "total_trades": o.total_trades,
             }
             for o in opps
-        ]
+        ],
     }
 
 
@@ -130,7 +132,7 @@ async def get_opportunity(opportunity_id: str):
     opp = strategy_screener.get_opportunity_by_id(opportunity_id)
     if not opp:
         raise HTTPException(status_code=404, detail="Opportunity not found")
-    
+
     return {
         "id": opp.id,
         "strategy": opp.strategy,
@@ -158,7 +160,7 @@ async def deploy_opportunity(request: DeployRequest):
     opp = strategy_screener.get_opportunity_by_id(request.opportunity_id)
     if not opp:
         raise HTTPException(status_code=404, detail="Opportunity not found")
-    
+
     # TODO: Actually deploy to FreqTrade bot
     # For now, return deployment plan
     return {
@@ -172,6 +174,5 @@ async def deploy_opportunity(request: DeployRequest):
             "max_position_size": request.max_position_size,
             "max_leverage": request.max_leverage,
         },
-        "message": f"Ready to deploy {opp.strategy} on {opp.pair}. Use run_multi_strategy.py to start."
+        "message": f"Ready to deploy {opp.strategy} on {opp.pair}. Use run_multi_strategy.py to start.",
     }
-

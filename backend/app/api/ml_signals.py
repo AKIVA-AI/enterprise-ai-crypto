@@ -7,7 +7,7 @@ allowing the UI to display ML predictions for user-executed trades.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -19,14 +19,18 @@ router = APIRouter(prefix="/ml", tags=["ML Signals"])
 
 class MLSignalRequest(BaseModel):
     """Request for ML signal generation."""
+
     pair: str = Field(..., description="Trading pair (e.g., BTC-USD)")
     timeframe: str = Field(default="5m", description="Candle timeframe")
     model: str = Field(default="LightGBMRegressor", description="ML model to use")
-    lookback_candles: int = Field(default=200, description="Number of historical candles")
+    lookback_candles: int = Field(
+        default=200, description="Number of historical candles"
+    )
 
 
 class MLSignalResponse(BaseModel):
     """ML signal response."""
+
     pair: str
     direction: str  # buy, sell, hold
     confidence: float
@@ -39,6 +43,7 @@ class MLSignalResponse(BaseModel):
 
 class MLModelStatus(BaseModel):
     """ML model status."""
+
     name: str
     trained: bool
     last_trained: Optional[str] = None
@@ -64,21 +69,18 @@ async def generate_ml_signal(request: MLSignalRequest):
         df = data_provider.get_ohlcv(
             pair=request.pair,
             timeframe=request.timeframe,
-            limit=request.lookback_candles
+            limit=request.lookback_candles,
         )
 
         if df is None or len(df) < 50:
             raise HTTPException(
-                status_code=400,
-                detail=f"Insufficient market data for {request.pair}"
+                status_code=400, detail=f"Insufficient market data for {request.pair}"
             )
 
         # Generate ML signal
         manager = FreqAIManager()
         signal = await manager.generate_ml_signals(
-            pair=request.pair,
-            df=df,
-            model_name=request.model
+            pair=request.pair, df=df, model_name=request.model
         )
 
         return MLSignalResponse(
@@ -89,7 +91,7 @@ async def generate_ml_signal(request: MLSignalRequest):
             model=signal.get("model", request.model),
             features_snapshot=signal.get("features_snapshot", {}),
             generated_at=datetime.utcnow().isoformat(),
-            timeframe=request.timeframe
+            timeframe=request.timeframe,
         )
 
     except HTTPException:
@@ -114,7 +116,7 @@ async def list_ml_models():
                 trained=m.get("trained", False),
                 last_trained=m.get("last_trained"),
                 accuracy=m.get("accuracy"),
-                gpu_available=manager.gpu_available
+                gpu_available=manager.gpu_available,
             )
             for m in models
         ]
@@ -136,7 +138,7 @@ async def train_model(model_name: str, pair: str = "BTC-USD", timeframe: str = "
             "status": "training_started" if result else "training_failed",
             "model": model_name,
             "pair": pair,
-            "timeframe": timeframe
+            "timeframe": timeframe,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

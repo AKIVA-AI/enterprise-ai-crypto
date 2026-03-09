@@ -12,15 +12,15 @@ from .capital_allocation_agent import CapitalAllocationAgent
 from .arbitrage_agent import ArbitrageAgent
 
 __all__ = [
-    'BaseAgent',
-    'AgentMessage',
-    'AgentChannel',
-    'SignalAgent',
-    'RiskAgent',
-    'ExecutionAgent',
-    'AgentOrchestrator',
-    'FreqTradeSignalAgent',
-    'MetaDecisionAgent',
-    'CapitalAllocationAgent',
-    'ArbitrageAgent',
+    "BaseAgent",
+    "AgentMessage",
+    "AgentChannel",
+    "SignalAgent",
+    "RiskAgent",
+    "ExecutionAgent",
+    "AgentOrchestrator",
+    "FreqTradeSignalAgent",
+    "MetaDecisionAgent",
+    "CapitalAllocationAgent",
+    "ArbitrageAgent",
 ]

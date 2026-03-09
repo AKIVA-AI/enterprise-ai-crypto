@@ -1,11 +1,12 @@
 """
 Execution Planner - builds and executes multi-leg plans with safety guards.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from uuid import uuid4
-from typing import Dict, List, Optional, Tuple, Callable
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 import structlog
 
@@ -43,7 +44,7 @@ class ExecutionPlanner:
         self,
         intent: TradeIntent,
         plan: ExecutionPlan,
-        adapters: Dict[str, "VenueAdapter"],
+        adapters: Dict[str, Any],
         save_order_callback,
         event_recorder: Optional[Callable[[str, ExecutionLeg, Dict], None]] = None,
         venue_id_resolver: Optional[Callable[[str], Optional[str]]] = None,
@@ -70,7 +71,12 @@ class ExecutionPlanner:
                     severity="warning",
                 )
                 return await self._unwind_if_needed(
-                    intent, plan, executed_orders, adapters, save_order_callback, event_recorder
+                    intent,
+                    plan,
+                    executed_orders,
+                    adapters,
+                    save_order_callback,
+                    event_recorder,
                 )
 
             now = datetime.now(timezone.utc)
@@ -84,7 +90,12 @@ class ExecutionPlanner:
                         severity="warning",
                     )
                     return await self._unwind_if_needed(
-                        intent, plan, executed_orders, adapters, save_order_callback, event_recorder
+                        intent,
+                        plan,
+                        executed_orders,
+                        adapters,
+                        save_order_callback,
+                        event_recorder,
                     )
 
             order = Order(
@@ -106,10 +117,14 @@ class ExecutionPlanner:
 
             try:
                 if event_recorder:
-                    await event_recorder("leg_submitted", leg, {"intent_id": str(intent.id)})
+                    await event_recorder(
+                        "leg_submitted", leg, {"intent_id": str(intent.id)}
+                    )
                 leg_start = datetime.now(timezone.utc)
                 executed = await adapter.place_order(order)
-                executed.latency_ms = int((datetime.now(timezone.utc) - leg_start).total_seconds() * 1000)
+                executed.latency_ms = int(
+                    (datetime.now(timezone.utc) - leg_start).total_seconds() * 1000
+                )
                 await save_order_callback(executed)
                 executed_orders.append((executed, leg.venue))
                 last_leg_time = datetime.now(timezone.utc)
@@ -127,16 +142,32 @@ class ExecutionPlanner:
             except Exception as exc:
                 logger.error("leg_execution_failed", error=str(exc), leg=leg.venue)
                 if event_recorder:
-                    await event_recorder("leg_failed", leg, {"intent_id": str(intent.id), "error": str(exc)})
+                    await event_recorder(
+                        "leg_failed",
+                        leg,
+                        {"intent_id": str(intent.id), "error": str(exc)},
+                    )
                 return await self._unwind_if_needed(
-                    intent, plan, executed_orders, adapters, save_order_callback, event_recorder
+                    intent,
+                    plan,
+                    executed_orders,
+                    adapters,
+                    save_order_callback,
+                    event_recorder,
                 )
 
             if executed.status in (OrderStatus.REJECTED, OrderStatus.CANCELLED):
                 if event_recorder:
-                    await event_recorder("leg_rejected", leg, {"intent_id": str(intent.id)})
+                    await event_recorder(
+                        "leg_rejected", leg, {"intent_id": str(intent.id)}
+                    )
                 return await self._unwind_if_needed(
-                    intent, plan, executed_orders, adapters, save_order_callback, event_recorder
+                    intent,
+                    plan,
+                    executed_orders,
+                    adapters,
+                    save_order_callback,
+                    event_recorder,
                 )
 
         return [order for order, _ in executed_orders]
@@ -146,7 +177,7 @@ class ExecutionPlanner:
         intent: TradeIntent,
         plan: ExecutionPlan,
         executed_orders: List[Tuple[Order, str]],
-        adapters: Dict[str, "VenueAdapter"],
+        adapters: Dict[str, Any],
         save_order_callback,
         event_recorder: Optional[Callable[[str, ExecutionLeg, Dict], None]] = None,
     ) -> List[Order]:
@@ -197,7 +228,9 @@ class ExecutionPlanner:
 
         return []
 
-    async def _record_action(self, intent: TradeIntent, action: str, message: str, severity: str) -> None:
+    async def _record_action(
+        self, intent: TradeIntent, action: str, message: str, severity: str
+    ) -> None:
         await create_alert(
             title=f"Execution Planner: {action}",
             message=message,

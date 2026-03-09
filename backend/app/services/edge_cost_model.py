@@ -1,6 +1,7 @@
 """
 Edge and Cost Model - evaluates expected edge vs execution costs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -45,9 +46,19 @@ class EdgeCostModel:
         latency_ms: Optional[int] = None,
     ) -> EdgeCostResult:
         expected_edge_bps = self._estimate_edge_bps(intent)
-        spread_bps = float(market_snapshot.get("spread_bps", 5.0)) if market_snapshot else 5.0
-        volatility_bps = float(market_snapshot.get("volatility_bps", 15.0)) if market_snapshot else 15.0
-        volume_usd = float(market_snapshot.get("volume_24h", 1_000_000)) if market_snapshot else 1_000_000
+        spread_bps = (
+            float(market_snapshot.get("spread_bps", 5.0)) if market_snapshot else 5.0
+        )
+        volatility_bps = (
+            float(market_snapshot.get("volatility_bps", 15.0))
+            if market_snapshot
+            else 15.0
+        )
+        volume_usd = (
+            float(market_snapshot.get("volume_24h", 1_000_000))
+            if market_snapshot
+            else 1_000_000
+        )
 
         fee_bps = self._estimate_fees(intent, venue_fees_bps or {})
         slippage_bps = self._estimate_slippage(
@@ -60,12 +71,18 @@ class EdgeCostModel:
         funding_bps = float(intent.metadata.get("funding_rate_bps", 0.0))
         basis_bps = float(intent.metadata.get("basis_risk_bps", 0.0))
 
-        total_cost_bps = fee_bps + spread_bps + slippage_bps + latency_bps + funding_bps + basis_bps
+        total_cost_bps = (
+            fee_bps + spread_bps + slippage_bps + latency_bps + funding_bps + basis_bps
+        )
         min_edge_bps = total_cost_bps + self.min_edge_buffer_bps
 
         allowed = expected_edge_bps >= min_edge_bps
-        reason = "ok" if allowed else (
-            f"Expected edge ({expected_edge_bps:.1f} bps) < required minimum ({min_edge_bps:.1f} bps)"
+        reason = (
+            "ok"
+            if allowed
+            else (
+                f"Expected edge ({expected_edge_bps:.1f} bps) < required minimum ({min_edge_bps:.1f} bps)"
+            )
         )
 
         breakdown = EdgeCostBreakdown(
@@ -93,7 +110,9 @@ class EdgeCostModel:
                 return float(meta[key])
         return float(intent.confidence) * 100
 
-    def _estimate_fees(self, intent: TradeIntent, venue_fees_bps: Dict[str, float]) -> float:
+    def _estimate_fees(
+        self, intent: TradeIntent, venue_fees_bps: Dict[str, float]
+    ) -> float:
         meta = intent.metadata or {}
         if "fee_bps" in meta:
             return float(meta["fee_bps"])

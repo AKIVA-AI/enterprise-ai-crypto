@@ -9,11 +9,10 @@ Provides the main interface to FreqTrade functionality:
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
 from pathlib import Path
 from datetime import datetime
-import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FreqTradeConfig:
     """FreqTrade configuration."""
+
     user_data_dir: str = "data/freqtrade"
     strategy_dir: str = "strategies"
     data_dir: str = "data"
@@ -37,6 +37,7 @@ class FreqTradeConfig:
 @dataclass
 class StrategyResult:
     """Result from strategy execution."""
+
     strategy_name: str
     pair: str
     signal: str  # buy, sell, neutral
@@ -48,16 +49,16 @@ class StrategyResult:
 class FreqTradeCore:
     """
     FreqTrade Core Integration.
-    
+
     Provides 100% alignment with FreqTrade's functionality:
     - IStrategy-compatible strategies
     - FreqAI ML models
     - Professional backtesting
     - Hyperparameter optimization
     """
-    
-    _instance: Optional['FreqTradeCore'] = None
-    
+
+    _instance: Optional["FreqTradeCore"] = None
+
     def __init__(self, config: Optional[FreqTradeConfig] = None):
         self.config = config or FreqTradeConfig()
         self._initialized = False
@@ -65,44 +66,47 @@ class FreqTradeCore:
         self._freqtrade = None
         self._backtester = None
         self._freqai = None
-    
+
     @classmethod
-    def get_instance(cls, config: Optional[FreqTradeConfig] = None) -> 'FreqTradeCore':
+    def get_instance(cls, config: Optional[FreqTradeConfig] = None) -> "FreqTradeCore":
         """Get singleton instance."""
         if cls._instance is None:
             cls._instance = cls(config)
         return cls._instance
-    
+
     async def initialize(self) -> bool:
         """Initialize FreqTrade components."""
         if self._initialized:
             return True
-        
+
         try:
             # Ensure directories exist
             self._setup_directories()
-            
+
             # Build FreqTrade config
             ft_config = self._build_config()
-            
+
             # Initialize FreqTrade
-            from freqtrade.freqtradebot import FreqtradeBot
+            from freqtrade.freqtradebot import FreqtradeBot  # noqa: F401
             from freqtrade.configuration import Configuration
-            
+
             # Create configuration object
-            config_obj = Configuration({
-                'config': [],
-                'strategy': None,
-            }, None)
-            
+            config_obj = Configuration(
+                {
+                    "config": [],
+                    "strategy": None,
+                },
+                None,
+            )
+
             # Merge our config
             for key, value in ft_config.items():
                 config_obj[key] = value
-            
+
             logger.info("FreqTrade Core initialized successfully")
             self._initialized = True
             return True
-            
+
         except ImportError as e:
             logger.warning(f"FreqTrade import error (running in limited mode): {e}")
             self._initialized = True
@@ -110,7 +114,7 @@ class FreqTradeCore:
         except Exception as e:
             logger.error(f"FreqTrade initialization failed: {e}")
             return False
-    
+
     def _setup_directories(self) -> None:
         """Create required directories."""
         base_dir = Path(self.config.user_data_dir)
@@ -124,7 +128,7 @@ class FreqTradeCore:
         ]
         for d in dirs:
             d.mkdir(parents=True, exist_ok=True)
-    
+
     def _build_config(self) -> Dict[str, Any]:
         """Build FreqTrade configuration dictionary."""
         return {
@@ -140,51 +144,44 @@ class FreqTradeCore:
                 "entry": 10,
                 "exit": 10,
                 "exit_timeout_count": 0,
-                "unit": "minutes"
+                "unit": "minutes",
             },
             "entry_pricing": {
                 "price_side": "same",
                 "use_order_book": True,
                 "order_book_top": 1,
                 "price_last_balance": 0.0,
-                "check_depth_of_market": {
-                    "enabled": False,
-                    "bids_to_ask_delta": 1
-                }
+                "check_depth_of_market": {"enabled": False, "bids_to_ask_delta": 1},
             },
             "exit_pricing": {
                 "price_side": "same",
                 "use_order_book": True,
-                "order_book_top": 1
+                "order_book_top": 1,
             },
             "exchange": {
                 "name": self.config.exchange,
                 "key": "",
                 "secret": "",
                 "ccxt_sync_config": {},
-                "ccxt_async_config": {}
+                "ccxt_async_config": {},
             },
-            "pairlists": [
-                {"method": "StaticPairList"}
-            ],
+            "pairlists": [{"method": "StaticPairList"}],
             "telegram": {"enabled": False},
             "api_server": {"enabled": False},
             "bot_name": "enterprise_crypto",
             "initial_state": "running",
             "force_entry_enable": True,
-            "internals": {
-                "process_throttle_secs": 5
-            },
+            "internals": {"process_throttle_secs": 5},
             "user_data_dir": self.config.user_data_dir,
             "strategy_path": str(Path(self.config.user_data_dir) / "strategies"),
             "datadir": str(Path(self.config.user_data_dir) / "data"),
         }
-    
+
     def load_strategy(self, strategy_name: str) -> bool:
         """Load a FreqTrade strategy."""
         try:
             from freqtrade.resolvers import StrategyResolver
-            
+
             strategy = StrategyResolver.load_strategy(self._build_config())
             self._strategies[strategy_name] = strategy
             logger.info(f"Strategy '{strategy_name}' loaded")
@@ -192,38 +189,35 @@ class FreqTradeCore:
         except Exception as e:
             logger.error(f"Failed to load strategy '{strategy_name}': {e}")
             return False
-    
+
     async def run_strategy(
-        self,
-        strategy_name: str,
-        pair: str,
-        dataframe: Any
+        self, strategy_name: str, pair: str, dataframe: Any
     ) -> Optional[StrategyResult]:
         """Run strategy on data and get signals."""
         strategy = self._strategies.get(strategy_name)
         if not strategy:
             logger.warning(f"Strategy '{strategy_name}' not loaded")
             return None
-        
+
         try:
             # Populate indicators
             df = strategy.populate_indicators(dataframe, {"pair": pair})
-            
+
             # Get entry signals
             df = strategy.populate_entry_trend(df, {"pair": pair})
-            
+
             # Get exit signals
             df = strategy.populate_exit_trend(df, {"pair": pair})
-            
+
             # Get last row
             last = df.iloc[-1]
-            
+
             signal = "neutral"
             if last.get("enter_long", 0) == 1:
                 signal = "buy"
             elif last.get("exit_long", 0) == 1:
                 signal = "sell"
-            
+
             return StrategyResult(
                 strategy_name=strategy_name,
                 pair=pair,
@@ -233,12 +227,12 @@ class FreqTradeCore:
                     col: float(last[col])
                     for col in df.columns
                     if col not in ["date", "open", "high", "low", "close", "volume"]
-                }
+                },
             )
         except Exception as e:
             logger.error(f"Strategy execution error: {e}")
             return None
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Get FreqTrade core status."""
         return {
@@ -258,4 +252,3 @@ class FreqTradeCore:
 def get_freqtrade_core(config: Optional[FreqTradeConfig] = None) -> FreqTradeCore:
     """Get FreqTrade core singleton."""
     return FreqTradeCore.get_instance(config)
-

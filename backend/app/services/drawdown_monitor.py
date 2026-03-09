@@ -9,7 +9,7 @@ Monitors:
 - Underwater periods
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Tuple
 import numpy as np
@@ -21,6 +21,7 @@ logger = structlog.get_logger()
 @dataclass
 class DrawdownPeriod:
     """Represents a single drawdown period."""
+
     start_date: datetime
     start_equity: float
     trough_date: Optional[datetime] = None
@@ -30,7 +31,7 @@ class DrawdownPeriod:
     max_drawdown_pct: float = 0.0
     duration_days: int = 0
     recovery_days: Optional[int] = None
-    
+
     @property
     def is_recovered(self) -> bool:
         return self.end_date is not None
@@ -39,6 +40,7 @@ class DrawdownPeriod:
 @dataclass
 class DrawdownStats:
     """Summary statistics for drawdown analysis."""
+
     current_drawdown_pct: float
     max_drawdown_pct: float
     max_drawdown_dollars: float
@@ -54,20 +56,20 @@ class DrawdownStats:
 class DrawdownMonitor:
     """
     Real-time drawdown monitoring for backtesting.
-    
+
     Tracks equity curve and identifies drawdown periods,
     calculates statistics, and can trigger alerts.
     """
-    
+
     def __init__(
         self,
         initial_capital: float,
         max_drawdown_limit: float = 20.0,  # Alert at 20% drawdown
-        alert_threshold: float = 10.0       # Warning at 10%
+        alert_threshold: float = 10.0,  # Warning at 10%
     ):
         """
         Initialize drawdown monitor.
-        
+
         Args:
             initial_capital: Starting capital
             max_drawdown_limit: Maximum allowed drawdown % before halt
@@ -76,41 +78,41 @@ class DrawdownMonitor:
         self.initial_capital = initial_capital
         self.max_drawdown_limit = max_drawdown_limit
         self.alert_threshold = alert_threshold
-        
+
         # Tracking state
         self.equity_curve: List[Tuple[datetime, float]] = []
         self.peak_equity = initial_capital
         self.peak_date: Optional[datetime] = None
         self.current_equity = initial_capital
-        
+
         # Drawdown periods
         self.drawdown_periods: List[DrawdownPeriod] = []
         self.current_drawdown: Optional[DrawdownPeriod] = None
-        
+
         # Statistics
         self.max_drawdown_pct = 0.0
         self.max_drawdown_dollars = 0.0
-    
+
     def update(self, timestamp: datetime, equity: float) -> Optional[str]:
         """
         Update monitor with new equity value.
-        
+
         Args:
             timestamp: Current timestamp
             equity: Current portfolio equity
-            
+
         Returns:
             Alert message if threshold breached, None otherwise
         """
         self.equity_curve.append((timestamp, equity))
         self.current_equity = equity
         alert = None
-        
+
         # Check if new peak
         if equity >= self.peak_equity:
             self.peak_equity = equity
             self.peak_date = timestamp
-            
+
             # Close current drawdown period if exists
             if self.current_drawdown is not None:
                 self.current_drawdown.end_date = timestamp
@@ -125,30 +127,32 @@ class DrawdownMonitor:
             # We're in a drawdown
             drawdown_pct = ((self.peak_equity - equity) / self.peak_equity) * 100
             drawdown_dollars = self.peak_equity - equity
-            
+
             # Update max drawdown
             if drawdown_pct > self.max_drawdown_pct:
                 self.max_drawdown_pct = drawdown_pct
                 self.max_drawdown_dollars = drawdown_dollars
-            
+
             # Start new drawdown period if needed
             if self.current_drawdown is None:
                 self.current_drawdown = DrawdownPeriod(
                     start_date=self.peak_date or timestamp,
-                    start_equity=self.peak_equity
+                    start_equity=self.peak_equity,
                 )
-            
+
             # Update trough if this is lower
-            if (self.current_drawdown.trough_equity is None or 
-                equity < self.current_drawdown.trough_equity):
+            if (
+                self.current_drawdown.trough_equity is None
+                or equity < self.current_drawdown.trough_equity
+            ):
                 self.current_drawdown.trough_date = timestamp
                 self.current_drawdown.trough_equity = equity
                 self.current_drawdown.max_drawdown_pct = drawdown_pct
-            
+
             self.current_drawdown.duration_days = (
                 timestamp - self.current_drawdown.start_date
             ).days
-            
+
             # Check alerts
             if drawdown_pct >= self.max_drawdown_limit:
                 alert = f"CRITICAL: Drawdown {drawdown_pct:.1f}% exceeds limit {self.max_drawdown_limit}%"
@@ -176,7 +180,9 @@ class DrawdownMonitor:
             avg_dd = np.mean([p.max_drawdown_pct for p in all_periods])
             longest_dd = max(p.duration_days for p in all_periods)
             recovered = [p for p in all_periods if p.recovery_days is not None]
-            avg_recovery = np.mean([p.recovery_days for p in recovered]) if recovered else 0
+            avg_recovery = (
+                np.mean([p.recovery_days for p in recovered]) if recovered else 0
+            )
             total_underwater = sum(p.duration_days for p in all_periods)
         else:
             avg_dd = 0
@@ -194,7 +200,7 @@ class DrawdownMonitor:
             total_underwater_days=total_underwater,
             drawdown_periods=all_periods,
             peak_equity=self.peak_equity,
-            current_equity=self.current_equity
+            current_equity=self.current_equity,
         )
 
     def get_underwater_curve(self) -> List[Tuple[datetime, float]]:
@@ -208,7 +214,11 @@ class DrawdownMonitor:
         for timestamp, equity in self.equity_curve:
             if equity > running_peak:
                 running_peak = equity
-            dd_pct = ((running_peak - equity) / running_peak) * 100 if running_peak > 0 else 0
+            dd_pct = (
+                ((running_peak - equity) / running_peak) * 100
+                if running_peak > 0
+                else 0
+            )
             underwater.append((timestamp, -dd_pct))  # Negative for plotting below zero
 
         return underwater
@@ -230,4 +240,3 @@ class DrawdownMonitor:
         self.max_drawdown_pct = 0.0
         self.max_drawdown_dollars = 0.0
         logger.info("drawdown_monitor_reset", capital=capital)
-

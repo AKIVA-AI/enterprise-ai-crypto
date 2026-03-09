@@ -17,7 +17,10 @@ from app.api.schemas.backtest_schemas import (
     TradesResponse,
 )
 from app.models.backtest_result import BacktestResult, PerformanceMetrics
-from app.services.institutional_backtester import BacktestConfig, InstitutionalBacktester
+from app.services.institutional_backtester import (
+    BacktestConfig,
+    InstitutionalBacktester,
+)
 from app.services.cache import TTLCache
 
 logger = logging.getLogger(__name__)
@@ -59,6 +62,7 @@ def _get_strategy_class(strategy_name: str):
     In production, this would load from the strategy registry.
     For now, returns a mock strategy.
     """
+
     class MockStrategy:
         def populate_indicators(self, dataframe, metadata):
             return dataframe
@@ -153,7 +157,9 @@ async def run_backtest(request: BacktestRequest):
     Returns a summary of results. Use /backtest/{id} for full details.
     """
     try:
-        logger.info("Starting backtest: %s on %s", request.strategy_name, request.instruments)
+        logger.info(
+            "Starting backtest: %s on %s", request.strategy_name, request.instruments
+        )
 
         # 1. Load strategy
         strategy = _get_strategy_class(request.strategy_name)
@@ -238,7 +244,9 @@ async def run_backtest(request: BacktestRequest):
 )
 async def get_equity_curve(
     backtest_id: str,
-    sample_rate: int = Query(default=1, ge=1, le=100, description="Sample every Nth point"),
+    sample_rate: int = Query(
+        default=1, ge=1, le=100, description="Sample every Nth point"
+    ),
 ):
     """Get equity curve data for visualization."""
     if backtest_id not in _backtest_results:

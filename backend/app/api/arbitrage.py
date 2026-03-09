@@ -1,8 +1,9 @@
 """
 API routes for arbitrage operations.
 """
+
 from fastapi import APIRouter, HTTPException
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/arbitrage", tags=["arbitrage"])
@@ -10,6 +11,7 @@ router = APIRouter(prefix="/api/arbitrage", tags=["arbitrage"])
 
 class ArbitrageConfigRequest(BaseModel):
     """Configuration for arbitrage strategies."""
+
     enable_funding_rate: bool = True
     enable_cross_exchange: bool = True
     enable_statistical: bool = True
@@ -22,29 +24,29 @@ async def get_arbitrage_status():
     """Get arbitrage engine status."""
     try:
         from app.arbitrage import get_arbitrage_engine
+
         engine = get_arbitrage_engine()
         return engine.get_status()
     except Exception as e:
         return {
             "status": "not_initialized",
             "error": str(e),
-            "message": "Arbitrage engine not yet initialized"
+            "message": "Arbitrage engine not yet initialized",
         }
 
 
 @router.get("/opportunities")
 async def get_opportunities(
-    strategy: Optional[str] = None,
-    min_profit_bps: float = 0,
-    limit: int = 50
+    strategy: Optional[str] = None, min_profit_bps: float = 0, limit: int = 50
 ):
     """Get current arbitrage opportunities."""
     try:
         from app.arbitrage import get_arbitrage_engine
+
         engine = get_arbitrage_engine()
-        
+
         opportunities = engine.get_all_opportunities()
-        
+
         # Filter by strategy if specified
         if strategy:
             strategy_map = {
@@ -55,42 +57,39 @@ async def get_opportunities(
             }
             target_type = strategy_map.get(strategy)
             if target_type:
-                opportunities = [o for o in opportunities if type(o).__name__ == target_type]
-        
+                opportunities = [
+                    o for o in opportunities if type(o).__name__ == target_type
+                ]
+
         # Convert to dict and filter by profit
         results = []
         for opp in opportunities[:limit]:
             opp_dict = {
                 "type": type(opp).__name__,
-                "timestamp": opp.timestamp.isoformat() if hasattr(opp, 'timestamp') else None,
+                "timestamp": opp.timestamp.isoformat()
+                if hasattr(opp, "timestamp")
+                else None,
             }
-            
+
             # Add type-specific fields
-            if hasattr(opp, 'symbol'):
+            if hasattr(opp, "symbol"):
                 opp_dict["symbol"] = opp.symbol
-            if hasattr(opp, 'exchange'):
+            if hasattr(opp, "exchange"):
                 opp_dict["exchange"] = opp.exchange
-            if hasattr(opp, 'annualized_return'):
+            if hasattr(opp, "annualized_return"):
                 opp_dict["annualized_return"] = opp.annualized_return
-            if hasattr(opp, 'profit_bps'):
+            if hasattr(opp, "profit_bps"):
                 opp_dict["profit_bps"] = opp.profit_bps
-            if hasattr(opp, 'expected_profit_pct'):
+            if hasattr(opp, "expected_profit_pct"):
                 opp_dict["expected_profit_pct"] = opp.expected_profit_pct
-            if hasattr(opp, 'confidence'):
+            if hasattr(opp, "confidence"):
                 opp_dict["confidence"] = opp.confidence
-            
+
             results.append(opp_dict)
-        
-        return {
-            "count": len(results),
-            "opportunities": results
-        }
+
+        return {"count": len(results), "opportunities": results}
     except Exception as e:
-        return {
-            "count": 0,
-            "opportunities": [],
-            "error": str(e)
-        }
+        return {"count": 0, "opportunities": [], "error": str(e)}
 
 
 @router.get("/funding-rates")
@@ -98,8 +97,9 @@ async def get_funding_rates(exchange: Optional[str] = None):
     """Get current funding rates."""
     try:
         from app.arbitrage import get_arbitrage_engine
+
         engine = get_arbitrage_engine()
-        
+
         if engine.funding_rate:
             opportunities = engine.funding_rate.get_opportunities()
             return {
@@ -115,7 +115,7 @@ async def get_funding_rates(exchange: Optional[str] = None):
                     }
                     for o in opportunities
                     if not exchange or o.exchange == exchange
-                ]
+                ],
             }
         return {"count": 0, "rates": []}
     except Exception as e:
@@ -127,9 +127,10 @@ async def get_arbitrage_stats():
     """Get aggregated arbitrage statistics."""
     try:
         from app.arbitrage import get_arbitrage_engine
+
         engine = get_arbitrage_engine()
         stats = engine.get_stats()
-        
+
         return {
             "total_opportunities": stats.total_opportunities,
             "by_strategy": {
@@ -143,11 +144,7 @@ async def get_arbitrage_stats():
             "total_pnl_usd": stats.total_pnl_usd,
         }
     except Exception as e:
-        return {
-            "total_opportunities": 0,
-            "by_strategy": {},
-            "error": str(e)
-        }
+        return {"total_opportunities": 0, "by_strategy": {}, "error": str(e)}
 
 
 @router.post("/start")
@@ -155,7 +152,7 @@ async def start_arbitrage(config: Optional[ArbitrageConfigRequest] = None):
     """Start arbitrage engine."""
     try:
         from app.arbitrage import ArbitrageEngine
-        
+
         kwargs = {}
         if config:
             kwargs = {
@@ -165,10 +162,10 @@ async def start_arbitrage(config: Optional[ArbitrageConfigRequest] = None):
                 "enable_triangular": config.enable_triangular,
                 "exchanges": config.exchanges,
             }
-        
+
         engine = ArbitrageEngine.get_instance(**kwargs)
         await engine.start()
-        
+
         return {"status": "started", "config": kwargs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -179,9 +176,9 @@ async def stop_arbitrage():
     """Stop arbitrage engine."""
     try:
         from app.arbitrage import get_arbitrage_engine
+
         engine = get_arbitrage_engine()
         await engine.stop()
         return {"status": "stopped"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

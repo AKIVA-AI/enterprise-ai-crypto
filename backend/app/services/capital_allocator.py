@@ -1,6 +1,7 @@
 """
 Capital Allocator Service - dynamic allocation across strategy types.
 """
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import structlog
 
@@ -49,7 +50,9 @@ class CapitalAllocatorService:
     """Allocator that controls strategy capital and risk multipliers."""
 
     def __init__(self, config_path: Optional[Path] = None):
-        self.config_path = config_path or (settings.CONFIG_DIR / "capital_allocator.json")
+        self.config_path = config_path or (
+            settings.CONFIG_DIR / "capital_allocator.json"
+        )
         self.config = self._load_config()
 
     def _load_config(self) -> AllocationConfig:
@@ -65,7 +68,9 @@ class CapitalAllocatorService:
             risk_bias_scalars=raw["risk_bias_scalars"],
         )
 
-    async def run_allocation(self, books: List[Book], total_capital: float) -> List[AllocationResult]:
+    async def run_allocation(
+        self, books: List[Book], total_capital: float
+    ) -> List[AllocationResult]:
         tenant_id = settings.tenant_id
         if not tenant_id:
             return []
@@ -108,18 +113,27 @@ class CapitalAllocatorService:
         adjusted: List[TradeIntent] = []
         for intent in intents:
             allocation = allocation_map.get(str(intent.strategy_id))
-            if not allocation or allocation["allocation_pct"] <= 0 or not allocation["enabled"]:
+            if (
+                not allocation
+                or allocation["allocation_pct"] <= 0
+                or not allocation["enabled"]
+            ):
                 continue
 
             max_notional = allocation["allocated_capital"]
             if allocation["max_notional"] > 0:
                 max_notional = min(max_notional, allocation["max_notional"])
 
-            if allocation["min_notional"] > 0 and max_notional < allocation["min_notional"]:
+            if (
+                allocation["min_notional"] > 0
+                and max_notional < allocation["min_notional"]
+            ):
                 continue
 
             original = intent.target_exposure_usd
-            intent.target_exposure_usd = min(original, max_notional) * allocation["risk_multiplier"]
+            intent.target_exposure_usd = (
+                min(original, max_notional) * allocation["risk_multiplier"]
+            )
             if original > 0:
                 scale = intent.target_exposure_usd / original
                 intent.max_loss_usd = intent.max_loss_usd * scale
@@ -160,13 +174,22 @@ class CapitalAllocatorService:
                 perf_multiplier *= 0.6
 
             regime_multiplier = 1.0
-            if regime.volatility == "high_vol" and strategy_type in ("basis", "spot_arb"):
+            if regime.volatility == "high_vol" and strategy_type in (
+                "basis",
+                "spot_arb",
+            ):
                 regime_multiplier *= 1.2
-            if regime.volatility == "high_vol" and strategy_type in ("futures_scalp", "spot"):
+            if regime.volatility == "high_vol" and strategy_type in (
+                "futures_scalp",
+                "spot",
+            ):
                 regime_multiplier *= 0.6
             if regime.direction == "range_bound" and strategy_type == "futures_scalp":
                 regime_multiplier *= 1.1
-            if regime.direction in ("trending_up", "trending_down") and strategy_type == "spot":
+            if (
+                regime.direction in ("trending_up", "trending_down")
+                and strategy_type == "spot"
+            ):
                 regime_multiplier *= 1.1
 
             risk_bias_scalar = config.risk_bias_scalars.get(regime.risk_bias, 1.0)
@@ -214,16 +237,25 @@ class CapitalAllocatorService:
 
     def _load_strategies(self, tenant_id: str) -> List[Dict]:
         supabase = get_supabase()
-        result = supabase.table("strategies").select(
-            "id, strategy_type, enabled, max_notional, min_notional, capacity_estimate"
-        ).eq("tenant_id", tenant_id).execute()
+        result = (
+            supabase.table("strategies")
+            .select(
+                "id, strategy_type, enabled, max_notional, min_notional, capacity_estimate"
+            )
+            .eq("tenant_id", tenant_id)
+            .execute()
+        )
         return result.data or []
 
     def _load_latest_performance(self, tenant_id: str) -> Dict[str, Dict]:
         supabase = get_supabase()
-        rows = supabase.table("strategy_performance").select(
-            "strategy_id, sharpe, max_drawdown"
-        ).eq("tenant_id", tenant_id).order("ts", desc=True).execute()
+        rows = (
+            supabase.table("strategy_performance")
+            .select("strategy_id, sharpe, max_drawdown")
+            .eq("tenant_id", tenant_id)
+            .order("ts", desc=True)
+            .execute()
+        )
         perf = {}
         for row in rows.data:
             if row["strategy_id"] not in perf:
@@ -232,52 +264,66 @@ class CapitalAllocatorService:
 
     def _load_latest_risk(self, tenant_id: str) -> Dict[str, Dict]:
         supabase = get_supabase()
-        rows = supabase.table("strategy_risk_metrics").select(
-            "strategy_id, correlation_cluster"
-        ).eq("tenant_id", tenant_id).order("ts", desc=True).execute()
+        rows = (
+            supabase.table("strategy_risk_metrics")
+            .select("strategy_id, correlation_cluster")
+            .eq("tenant_id", tenant_id)
+            .order("ts", desc=True)
+            .execute()
+        )
         risk = {}
         for row in rows.data:
             if row["strategy_id"] not in risk:
                 risk[row["strategy_id"]] = row
         return risk
 
-    async def _store_allocations(self, tenant_id: str, allocations: List[AllocationResult], regime: RegimeState) -> None:
+    async def _store_allocations(
+        self, tenant_id: str, allocations: List[AllocationResult], regime: RegimeState
+    ) -> None:
         supabase = get_supabase()
         decision_id = str(uuid4())
         snapshot = []
         for allocation in allocations:
-            supabase.table("strategy_allocations").upsert({
-                "tenant_id": tenant_id,
-                "strategy_id": allocation.strategy_id,
-                "allocated_capital": allocation.allocated_capital,
-                "allocation_pct": allocation.allocation_pct,
-                "leverage_cap": allocation.leverage_cap,
-                "risk_multiplier": allocation.risk_multiplier,
-                "updated_at": datetime.utcnow().isoformat(),
-            }).execute()
-            supabase.table("strategies").update({
-                "enabled": allocation.enabled,
-            }).eq("id", allocation.strategy_id).execute()
-            snapshot.append({
-                "strategy_id": allocation.strategy_id,
-                "allocation_pct": allocation.allocation_pct,
-                "allocated_capital": allocation.allocated_capital,
-                "risk_multiplier": allocation.risk_multiplier,
-            })
+            supabase.table("strategy_allocations").upsert(
+                {
+                    "tenant_id": tenant_id,
+                    "strategy_id": allocation.strategy_id,
+                    "allocated_capital": allocation.allocated_capital,
+                    "allocation_pct": allocation.allocation_pct,
+                    "leverage_cap": allocation.leverage_cap,
+                    "risk_multiplier": allocation.risk_multiplier,
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ).execute()
+            supabase.table("strategies").update(
+                {
+                    "enabled": allocation.enabled,
+                }
+            ).eq("id", allocation.strategy_id).execute()
+            snapshot.append(
+                {
+                    "strategy_id": allocation.strategy_id,
+                    "allocation_pct": allocation.allocation_pct,
+                    "allocated_capital": allocation.allocated_capital,
+                    "risk_multiplier": allocation.risk_multiplier,
+                }
+            )
 
-        supabase.table("allocator_decisions").insert({
-            "tenant_id": tenant_id,
-            "decision_id": decision_id,
-            "regime_state": {
-                "direction": regime.direction,
-                "volatility": regime.volatility,
-                "liquidity": regime.liquidity,
-                "risk_bias": regime.risk_bias,
-            },
-            "allocation_snapshot_json": snapshot,
-            "rationale_json": [a.rationale for a in allocations],
-            "ts": datetime.utcnow().isoformat(),
-        }).execute()
+        supabase.table("allocator_decisions").insert(
+            {
+                "tenant_id": tenant_id,
+                "decision_id": decision_id,
+                "regime_state": {
+                    "direction": regime.direction,
+                    "volatility": regime.volatility,
+                    "liquidity": regime.liquidity,
+                    "risk_bias": regime.risk_bias,
+                },
+                "allocation_snapshot_json": snapshot,
+                "rationale_json": [a.rationale for a in allocations],
+                "ts": datetime.utcnow().isoformat(),
+            }
+        ).execute()
 
         for allocation in allocations:
             allocation.rationale["decision_id"] = decision_id
@@ -291,18 +337,31 @@ class CapitalAllocatorService:
 
     def _load_allocation_map(self, tenant_id: str) -> Dict[str, Dict]:
         supabase = get_supabase()
-        allocations = supabase.table("strategy_allocations").select(
-            "strategy_id, allocation_pct, allocated_capital, risk_multiplier, leverage_cap"
-        ).eq("tenant_id", tenant_id).execute()
-        strategies = supabase.table("strategies").select(
-            "id, enabled, max_notional, min_notional"
-        ).eq("tenant_id", tenant_id).execute()
+        allocations = (
+            supabase.table("strategy_allocations")
+            .select(
+                "strategy_id, allocation_pct, allocated_capital, risk_multiplier, leverage_cap"
+            )
+            .eq("tenant_id", tenant_id)
+            .execute()
+        )
+        strategies = (
+            supabase.table("strategies")
+            .select("id, enabled, max_notional, min_notional")
+            .eq("tenant_id", tenant_id)
+            .execute()
+        )
 
         strategy_map = {row["id"]: row for row in strategies.data}
         allocation_map = {}
-        decision = supabase.table("allocator_decisions").select("decision_id").eq(
-            "tenant_id", tenant_id
-        ).order("ts", desc=True).limit(1).execute()
+        decision = (
+            supabase.table("allocator_decisions")
+            .select("decision_id")
+            .eq("tenant_id", tenant_id)
+            .order("ts", desc=True)
+            .limit(1)
+            .execute()
+        )
         decision_id = decision.data[0]["decision_id"] if decision.data else None
 
         for row in allocations.data:

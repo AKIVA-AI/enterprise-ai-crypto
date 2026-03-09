@@ -1,6 +1,7 @@
 """
 Strategy Registry - loads strategy definitions and scanner configuration.
 """
+
 from __future__ import annotations
 
 import json
@@ -113,7 +114,9 @@ class StrategyRegistry:
     def get_enabled_strategies(self) -> List[StrategyDefinition]:
         if not self._strategies:
             self.load()
-        combined = list(self._strategies.values()) + list(self._runtime_strategies.values())
+        combined = list(self._strategies.values()) + list(
+            self._runtime_strategies.values()
+        )
         return [s for s in combined if s.enabled]
 
     def get_strategy(self, name: str) -> Optional[StrategyDefinition]:

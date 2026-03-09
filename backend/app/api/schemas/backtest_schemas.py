@@ -6,14 +6,23 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class BacktestRequest(BaseModel):
     """Request model for running a backtest."""
+
     strategy_name: str = Field(..., description="Name of the strategy to backtest")
-    instruments: List[str] = Field(..., description="List of trading pairs", min_length=1)
+    instruments: List[str] = Field(
+        ..., description="List of trading pairs", min_length=1
+    )
     start_date: datetime = Field(..., description="Backtest start date")
     end_date: datetime = Field(..., description="Backtest end date")
-    initial_capital: float = Field(default=100000.0, gt=0, description="Starting capital")
+    initial_capital: float = Field(
+        default=100000.0, gt=0, description="Starting capital"
+    )
     timeframe: str = Field(default="1h", description="Candle timeframe")
-    slippage_bps: float = Field(default=5.0, ge=0, description="Slippage in basis points")
-    commission_bps: float = Field(default=10.0, ge=0, description="Commission in basis points")
+    slippage_bps: float = Field(
+        default=5.0, ge=0, description="Slippage in basis points"
+    )
+    commission_bps: float = Field(
+        default=10.0, ge=0, description="Commission in basis points"
+    )
 
     @field_validator("end_date")
     @classmethod
@@ -48,6 +57,7 @@ class BacktestRequest(BaseModel):
 
 class EquityPointResponse(BaseModel):
     """Single point on equity curve."""
+
     timestamp: datetime
     equity: float
     drawdown: float
@@ -57,6 +67,7 @@ class EquityPointResponse(BaseModel):
 
 class TradeResponse(BaseModel):
     """Single trade record."""
+
     id: str
     timestamp_open: datetime
     timestamp_close: Optional[datetime]
@@ -72,6 +83,7 @@ class TradeResponse(BaseModel):
 
 class PerformanceMetricsResponse(BaseModel):
     """Performance metrics summary."""
+
     # Returns
     total_return: float
     annualized_return: float
@@ -102,6 +114,7 @@ class PerformanceMetricsResponse(BaseModel):
 
 class BacktestSummaryResponse(BaseModel):
     """Summary response for backtest (without full equity curve)."""
+
     id: str
     strategy_name: str
     status: str  # 'completed', 'failed', 'running'
@@ -130,6 +143,7 @@ class BacktestSummaryResponse(BaseModel):
 
 class BacktestDetailResponse(BaseModel):
     """Full backtest response with all data."""
+
     id: str
     strategy_name: str
     strategy_config: Dict[str, Any]
@@ -158,6 +172,7 @@ class BacktestDetailResponse(BaseModel):
 
 class EquityCurveResponse(BaseModel):
     """Equity curve data for charting."""
+
     backtest_id: str
     strategy_name: str
     data: List[EquityPointResponse]
@@ -165,6 +180,7 @@ class EquityCurveResponse(BaseModel):
 
 class TradesResponse(BaseModel):
     """List of trades from backtest."""
+
     backtest_id: str
     strategy_name: str
     total_trades: int
@@ -173,6 +189,7 @@ class TradesResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Standard error response."""
+
     error: str
     detail: Optional[str] = None
     code: str

@@ -5,10 +5,14 @@ Provides endpoints for controlling and monitoring agents.
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import logging
 
-from ..agents.agent_orchestrator import orchestrator, start_trading_system, stop_trading_system
+from ..agents.agent_orchestrator import (
+    orchestrator,
+    start_trading_system,
+    stop_trading_system,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -57,13 +61,12 @@ async def stop_agents():
 async def send_agent_command(cmd: AgentCommand):
     """Send command to agents (pause, resume, etc.)"""
     valid_commands = ["pause", "resume", "shutdown"]
-    
+
     if cmd.command not in valid_commands:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid command. Valid commands: {valid_commands}"
+            status_code=400, detail=f"Invalid command. Valid commands: {valid_commands}"
         )
-    
+
     try:
         await orchestrator.send_command(cmd.command, cmd.target_agent)
         return {"status": "command_sent", "command": cmd.command}
@@ -76,11 +79,11 @@ async def send_agent_command(cmd: AgentCommand):
 async def get_agent_metrics():
     """Get metrics for all agents"""
     status = orchestrator.get_status()
-    
+
     metrics = {}
     for agent_id, agent_status in status.get("agents", {}).items():
         metrics[agent_id] = agent_status.get("metrics", {})
-    
+
     return metrics
 
 
@@ -89,14 +92,14 @@ async def get_agent_detail(agent_id: str):
     """Get detailed status for a specific agent"""
     if agent_id not in orchestrator._agents:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
-    
+
     agent = orchestrator._agents[agent_id]
     task = orchestrator._tasks.get(agent_id)
-    
+
     return {
         "agent_id": agent_id,
         "agent_type": agent.agent_type,
         "running": task is not None and not task.done(),
         "subscribed_channels": [ch.value for ch in agent.subscribed_channels],
-        "metrics": agent._metrics
+        "metrics": agent._metrics,
     }

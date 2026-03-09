@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BacktestConfig:
     """Configuration for a backtest run."""
+
     strategy_name: str
     instruments: List[str]
     start_date: datetime
@@ -27,13 +28,13 @@ class BacktestConfig:
     timeframe: str = "1h"
 
     # Execution costs (in basis points)
-    slippage_bps: float = 5.0      # 5 bps = 0.05%
-    commission_bps: float = 10.0   # 10 bps round-trip = 0.10%
+    slippage_bps: float = 5.0  # 5 bps = 0.05%
+    commission_bps: float = 10.0  # 10 bps round-trip = 0.10%
 
     # Data splits for walk-forward validation
-    train_ratio: float = 0.6       # 60% in-sample
-    validate_ratio: float = 0.2    # 20% validation
-    test_ratio: float = 0.2        # 20% out-of-sample
+    train_ratio: float = 0.6  # 60% in-sample
+    validate_ratio: float = 0.2  # 20% validation
+    test_ratio: float = 0.2  # 20% out-of-sample
 
     # Position sizing
     max_position_pct: float = 0.1  # Max 10% of capital per position
@@ -52,6 +53,7 @@ class BacktestConfig:
 @dataclass
 class Position:
     """Tracks an open position."""
+
     instrument: str
     side: str  # 'long' or 'short'
     size: float
@@ -121,14 +123,10 @@ class InstitutionalBacktester:
 
         # 4. Combine results
         all_equity = (
-            train_result["equity"]
-            + validate_result["equity"]
-            + test_result["equity"]
+            train_result["equity"] + validate_result["equity"] + test_result["equity"]
         )
         all_trades = (
-            train_result["trades"]
-            + validate_result["trades"]
-            + test_result["trades"]
+            train_result["trades"] + validate_result["trades"] + test_result["trades"]
         )
 
         # 5. Calculate overall metrics
@@ -149,9 +147,7 @@ class InstitutionalBacktester:
             instruments=self.config.instruments,
             timeframe=self.config.timeframe,
             final_equity=(
-                all_equity[-1].equity
-                if all_equity
-                else self.config.initial_capital
+                all_equity[-1].equity if all_equity else self.config.initial_capital
             ),
             equity_curve=all_equity,
             trades=all_trades,

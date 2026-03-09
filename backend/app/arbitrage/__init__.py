@@ -25,7 +25,7 @@ __all__ = [
     "FundingRateArbitrage",
     "FundingRateOpportunity",
     # Cross-Exchange
-    "CrossExchangeArbitrage", 
+    "CrossExchangeArbitrage",
     "CrossExchangeOpportunity",
     # Statistical
     "StatisticalArbitrage",
@@ -37,4 +37,3 @@ __all__ = [
     "ArbitrageEngine",
     "get_arbitrage_engine",
 ]
-

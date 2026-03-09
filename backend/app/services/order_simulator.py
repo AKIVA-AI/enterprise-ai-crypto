@@ -1,6 +1,7 @@
 """
 Order simulator with slippage and fees.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ from uuid import UUID, uuid4
 @dataclass
 class OrderFill:
     """Represents a fill event."""
+
     quantity: float
     price: float
     fee: float
@@ -21,6 +23,7 @@ class OrderFill:
 @dataclass
 class Order:
     """Order representation."""
+
     id: UUID
     instrument: str
     side: str  # 'buy' or 'sell'
@@ -109,9 +112,13 @@ class OrderSimulator:
         effective_price = self._apply_slippage(order.side, market_price)
 
         if order.order_type == "limit":
-            if not self._limit_fill_allowed(order.side, effective_price, order.limit_price):
+            if not self._limit_fill_allowed(
+                order.side, effective_price, order.limit_price
+            ):
                 return order
-            fill_price = self._limit_fill_price(order.side, effective_price, order.limit_price)
+            fill_price = self._limit_fill_price(
+                order.side, effective_price, order.limit_price
+            )
         elif order.order_type == "stop":
             if not self._stop_triggered(order.side, market_price, order.stop_price):
                 return order
@@ -157,7 +164,9 @@ class OrderSimulator:
         return market_price + slippage if side == "buy" else market_price - slippage
 
     @staticmethod
-    def _limit_fill_allowed(side: str, effective_price: float, limit_price: Optional[float]) -> bool:
+    def _limit_fill_allowed(
+        side: str, effective_price: float, limit_price: Optional[float]
+    ) -> bool:
         if limit_price is None:
             return False
         if side == "buy":
@@ -165,7 +174,9 @@ class OrderSimulator:
         return effective_price >= limit_price
 
     @staticmethod
-    def _limit_fill_price(side: str, effective_price: float, limit_price: Optional[float]) -> float:
+    def _limit_fill_price(
+        side: str, effective_price: float, limit_price: Optional[float]
+    ) -> float:
         if limit_price is None:
             return effective_price
         if side == "buy":
@@ -173,7 +184,9 @@ class OrderSimulator:
         return max(limit_price, effective_price)
 
     @staticmethod
-    def _stop_triggered(side: str, market_price: float, stop_price: Optional[float]) -> bool:
+    def _stop_triggered(
+        side: str, market_price: float, stop_price: Optional[float]
+    ) -> bool:
         if stop_price is None:
             return False
         if side == "buy":

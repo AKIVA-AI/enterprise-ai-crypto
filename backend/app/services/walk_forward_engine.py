@@ -1,21 +1,26 @@
 """
 Walk-forward optimization engine.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 
 from app.models.backtest_result import BacktestResult, PerformanceMetrics
-from app.services.institutional_backtester import BacktestConfig, InstitutionalBacktester
+from app.services.institutional_backtester import (
+    BacktestConfig,
+    InstitutionalBacktester,
+)
 from app.services.performance_metrics import PerformanceMetricsCalculator
 
 
 @dataclass
 class WalkForwardConfig:
     """Configuration for walk-forward analysis."""
+
     train_window: int
     test_window: int
     step_size: int
@@ -28,6 +33,7 @@ class WalkForwardConfig:
 @dataclass
 class WalkForwardResult:
     """Aggregated walk-forward results."""
+
     window_results: List[BacktestResult]
     aggregate_metrics: Optional[PerformanceMetrics]
     total_windows: int
@@ -66,8 +72,12 @@ class WalkForwardEngine:
             start_date = pd.to_datetime(window_data.iloc[0]["date"])
             end_date = pd.to_datetime(window_data.iloc[-1]["date"])
 
-            train_ratio = self.config.train_window / (self.config.train_window + self.config.test_window)
-            test_ratio = self.config.test_window / (self.config.train_window + self.config.test_window)
+            train_ratio = self.config.train_window / (
+                self.config.train_window + self.config.test_window
+            )
+            test_ratio = self.config.test_window / (
+                self.config.train_window + self.config.test_window
+            )
 
             window_config = BacktestConfig(
                 strategy_name=base_config.strategy_name,

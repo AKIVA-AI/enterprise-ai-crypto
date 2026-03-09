@@ -1,6 +1,7 @@
 """
 Opportunity Scanner - multi-timeframe screening for spot, futures, and arbitrage.
 """
+
 from __future__ import annotations
 
 from typing import Dict, List, Optional
@@ -64,7 +65,9 @@ class OpportunityScanner:
 
         return intents
 
-    async def _scan_directional(self, strategy: StrategyDefinition) -> List[Opportunity]:
+    async def _scan_directional(
+        self, strategy: StrategyDefinition
+    ) -> List[Opportunity]:
         opportunities: List[Opportunity] = []
         for instrument in strategy.universe:
             stack = await self._build_signal_stack(instrument, strategy)
@@ -72,22 +75,35 @@ class OpportunityScanner:
                 continue
             if stack.confidence < strategy.min_confidence:
                 continue
-            if strategy.min_edge_bps and stack.expected_edge_bps < strategy.min_edge_bps:
+            if (
+                strategy.min_edge_bps
+                and stack.expected_edge_bps < strategy.min_edge_bps
+            ):
                 continue
 
             snapshot = await self.market_data.get_price(
                 strategy.venue_routing[0] if strategy.venue_routing else "coinbase",
                 instrument,
             )
-            data_quality = snapshot.get("data_quality", "derived") if snapshot else "unavailable"
+            data_quality = (
+                snapshot.get("data_quality", "derived") if snapshot else "unavailable"
+            )
 
-            direction = OrderSide.BUY if stack.fast_direction == "bullish" else OrderSide.SELL
+            direction = (
+                OrderSide.BUY if stack.fast_direction == "bullish" else OrderSide.SELL
+            )
             opportunities.append(
                 Opportunity(
-                    type=OpportunityType.FUTURES if strategy.type == "futures" else OpportunityType.SPOT,
+                    type=OpportunityType.FUTURES
+                    if strategy.type == "futures"
+                    else OpportunityType.SPOT,
                     instrument=instrument,
                     direction=direction,
-                    venue=(strategy.venue_routing[0] if strategy.venue_routing else "coinbase"),
+                    venue=(
+                        strategy.venue_routing[0]
+                        if strategy.venue_routing
+                        else "coinbase"
+                    ),
                     confidence=stack.confidence,
                     expected_edge_bps=stack.expected_edge_bps,
                     horizon_minutes=strategy.expected_holding_minutes,
@@ -159,12 +175,28 @@ class OpportunityScanner:
         medium_signal = self._trend_signal(medium)
         slow_signal = self._trend_signal(slow)
 
-        directions = {fast_signal["direction"], medium_signal["direction"], slow_signal["direction"]}
+        directions = {
+            fast_signal["direction"],
+            medium_signal["direction"],
+            slow_signal["direction"],
+        }
         if "neutral" in directions or len(directions) > 1:
             return None
 
-        confidence = min(1.0, (fast_signal["confidence"] + medium_signal["confidence"] + slow_signal["confidence"]) / 3)
-        expected_edge_bps = (fast_signal["strength_bps"] + medium_signal["strength_bps"] + slow_signal["strength_bps"]) / 3
+        confidence = min(
+            1.0,
+            (
+                fast_signal["confidence"]
+                + medium_signal["confidence"]
+                + slow_signal["confidence"]
+            )
+            / 3,
+        )
+        expected_edge_bps = (
+            fast_signal["strength_bps"]
+            + medium_signal["strength_bps"]
+            + slow_signal["strength_bps"]
+        ) / 3
 
         return SignalStack(
             fast_timeframe=strategy.timeframes.fast,
@@ -187,10 +219,18 @@ class OpportunityScanner:
         delta = (current - sma) / sma
         strength_bps = abs(delta) * 10000
         if abs(delta) < 0.0005:
-            return {"direction": "neutral", "confidence": 0.0, "strength_bps": strength_bps}
+            return {
+                "direction": "neutral",
+                "confidence": 0.0,
+                "strength_bps": strength_bps,
+            }
         direction = "bullish" if delta > 0 else "bearish"
         confidence = min(1.0, abs(delta) * 200)
-        return {"direction": direction, "confidence": confidence, "strength_bps": strength_bps}
+        return {
+            "direction": direction,
+            "confidence": confidence,
+            "strength_bps": strength_bps,
+        }
 
     async def _price_provider(self, venue: str, instrument: str) -> Optional[Dict]:
         return await self.market_data.get_price(venue, instrument)
@@ -198,7 +238,9 @@ class OpportunityScanner:
     def _score_opportunity(self, opportunity: Opportunity) -> float:
         return opportunity.expected_edge_bps * opportunity.confidence
 
-    def _find_strategy_for_opportunity(self, opportunity: Opportunity) -> Optional[StrategyDefinition]:
+    def _find_strategy_for_opportunity(
+        self, opportunity: Opportunity
+    ) -> Optional[StrategyDefinition]:
         strategies = self.registry.get_enabled_strategies()
         for strategy in strategies:
             if strategy.name == opportunity.metadata.get("strategy"):
@@ -207,7 +249,9 @@ class OpportunityScanner:
                 return strategy
         return strategies[0] if strategies else None
 
-    def _select_book(self, strategy: StrategyDefinition, books: List[Book]) -> Optional[Book]:
+    def _select_book(
+        self, strategy: StrategyDefinition, books: List[Book]
+    ) -> Optional[Book]:
         if strategy.book_id:
             return next((b for b in books if b.id == strategy.book_id), None)
         if strategy.book_type:
@@ -216,7 +260,10 @@ class OpportunityScanner:
                     b
                     for b in books
                     if (
-                        (hasattr(b.type, "value") and b.type.value == strategy.book_type)
+                        (
+                            hasattr(b.type, "value")
+                            and b.type.value == strategy.book_type
+                        )
                         or str(b.type).lower() == strategy.book_type
                     )
                 ),

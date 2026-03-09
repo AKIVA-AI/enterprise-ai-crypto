@@ -1,9 +1,25 @@
 """
 API Routes - Combined router for all API endpoints
 """
+
 from fastapi import APIRouter
 
-from . import trading, risk, venues, meme, system, agents, arbitrage, market, strategies, websocket, screener, backtest, execution, ml_signals
+from . import (
+    trading,
+    risk,
+    venues,
+    meme,
+    system,
+    agents,
+    arbitrage,
+    market,
+    strategies,
+    websocket,
+    screener,
+    backtest,
+    execution,
+    ml_signals,
+)
 
 # Create main API router
 api_router = APIRouter()

@@ -9,51 +9,51 @@ Enterprise-grade access control with:
 """
 
 import logging
-from typing import Dict, List, Set, Optional, Any
-from dataclasses import dataclass, field
+from typing import Dict, Set, Optional
+from dataclasses import dataclass
 from enum import Enum
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class Permission(str, Enum):
     """System permissions."""
+
     # Trading permissions
     TRADE_VIEW = "trade:view"
     TRADE_CREATE = "trade:create"
     TRADE_APPROVE = "trade:approve"
     TRADE_EXECUTE = "trade:execute"
     TRADE_CANCEL = "trade:cancel"
-    
+
     # Portfolio permissions
     PORTFOLIO_VIEW = "portfolio:view"
     PORTFOLIO_MANAGE = "portfolio:manage"
     PORTFOLIO_REBALANCE = "portfolio:rebalance"
-    
+
     # Strategy permissions
     STRATEGY_VIEW = "strategy:view"
     STRATEGY_CREATE = "strategy:create"
     STRATEGY_MODIFY = "strategy:modify"
     STRATEGY_DELETE = "strategy:delete"
     STRATEGY_BACKTEST = "strategy:backtest"
-    
+
     # Risk permissions
     RISK_VIEW = "risk:view"
     RISK_MODIFY = "risk:modify"
     RISK_OVERRIDE = "risk:override"
     KILL_SWITCH = "risk:kill_switch"
-    
+
     # Arbitrage permissions
     ARBITRAGE_VIEW = "arbitrage:view"
     ARBITRAGE_EXECUTE = "arbitrage:execute"
     ARBITRAGE_CONFIGURE = "arbitrage:configure"
-    
+
     # Agent permissions
     AGENT_VIEW = "agent:view"
     AGENT_CONTROL = "agent:control"
     AGENT_CONFIGURE = "agent:configure"
-    
+
     # Admin permissions
     USER_VIEW = "user:view"
     USER_MANAGE = "user:manage"
@@ -64,6 +64,7 @@ class Permission(str, Enum):
 @dataclass
 class Role:
     """User role with permissions."""
+
     name: str
     description: str
     permissions: Set[Permission]
@@ -237,10 +238,7 @@ class RBACManager:
         return False
 
     def check_trade_limits(
-        self,
-        user_id: str,
-        trade_size: float,
-        daily_volume: float = 0
+        self, user_id: str, trade_size: float, daily_volume: float = 0
     ) -> tuple[bool, str]:
         """Check if trade is within user's limits."""
         role = self.get_user_role(user_id)
@@ -248,10 +246,16 @@ class RBACManager:
             return False, "No role assigned"
 
         if trade_size > role.max_trade_size:
-            return False, f"Trade size ${trade_size:,.2f} exceeds limit ${role.max_trade_size:,.2f}"
+            return (
+                False,
+                f"Trade size ${trade_size:,.2f} exceeds limit ${role.max_trade_size:,.2f}",
+            )
 
         if daily_volume > role.max_daily_volume:
-            return False, f"Daily volume ${daily_volume:,.2f} exceeds limit ${role.max_daily_volume:,.2f}"
+            return (
+                False,
+                f"Daily volume ${daily_volume:,.2f} exceeds limit ${role.max_daily_volume:,.2f}",
+            )
 
         return True, "OK"
 
@@ -279,4 +283,3 @@ class RBACManager:
 
 # Global RBAC manager
 rbac_manager = RBACManager()
-

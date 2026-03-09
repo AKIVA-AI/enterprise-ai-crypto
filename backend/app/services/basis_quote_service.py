@@ -1,6 +1,7 @@
 """
 Basis Quote Service - builds basis quotes for spot vs derivatives.
 """
+
 from __future__ import annotations
 
 from collections import defaultdict, deque
@@ -97,7 +98,9 @@ class BasisQuoteService:
                 },
             )
 
-            instrument_id = self._get_instrument_id(tenant_id, spot_venue_id, instrument)
+            instrument_id = self._get_instrument_id(
+                tenant_id, spot_venue_id, instrument
+            )
             if instrument_id:
                 self._store_quote(
                     tenant_id=tenant_id,
@@ -118,35 +121,53 @@ class BasisQuoteService:
         variance = sum((x - mean) ** 2 for x in history) / len(history)
         if variance == 0:
             return 0.0
-        return (latest - mean) / variance ** 0.5
+        return (latest - mean) / variance**0.5
 
     def _get_venue_id(self, venue_name: str) -> Optional[str]:
         if venue_name in self._venue_cache:
             return self._venue_cache[venue_name]
         try:
             supabase = get_supabase()
-            result = supabase.table("venues").select("id").ilike("name", venue_name).single().execute()
+            result = (
+                supabase.table("venues")
+                .select("id")
+                .ilike("name", venue_name)
+                .single()
+                .execute()
+            )
             if result.data:
                 self._venue_cache[venue_name] = result.data["id"]
                 return result.data["id"]
         except Exception as exc:
-            logger.warning("basis_quote_venue_lookup_failed", venue=venue_name, error=str(exc))
+            logger.warning(
+                "basis_quote_venue_lookup_failed", venue=venue_name, error=str(exc)
+            )
         return None
 
-    def _get_instrument_id(self, tenant_id: str, venue_id: str, symbol: str) -> Optional[str]:
+    def _get_instrument_id(
+        self, tenant_id: str, venue_id: str, symbol: str
+    ) -> Optional[str]:
         cache_key = (venue_id, symbol)
         if cache_key in self._instrument_cache:
             return self._instrument_cache[cache_key]
         try:
             supabase = get_supabase()
-            result = supabase.table("instruments").select("id").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).ilike("venue_symbol", symbol).single().execute()
+            result = (
+                supabase.table("instruments")
+                .select("id")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .ilike("venue_symbol", symbol)
+                .single()
+                .execute()
+            )
             if result.data:
                 self._instrument_cache[cache_key] = result.data["id"]
                 return result.data["id"]
         except Exception as exc:
-            logger.warning("basis_quote_instrument_lookup_failed", symbol=symbol, error=str(exc))
+            logger.warning(
+                "basis_quote_instrument_lookup_failed", symbol=symbol, error=str(exc)
+            )
         return None
 
     def _store_quote(
@@ -159,18 +180,20 @@ class BasisQuoteService:
     ) -> None:
         try:
             supabase = get_supabase()
-            supabase.table("basis_quotes").insert({
-                "tenant_id": tenant_id,
-                "spot_venue_id": spot_venue_id,
-                "deriv_venue_id": deriv_venue_id,
-                "instrument_id": instrument_id,
-                "spot_bid": quote.spot_bid,
-                "spot_ask": quote.spot_ask,
-                "perp_bid": quote.perp_bid,
-                "perp_ask": quote.perp_ask,
-                "basis_bps": quote.basis_bps_bid,
-                "basis_z": quote.basis_z,
-                "ts": quote.timestamp.isoformat(),
-            }).execute()
+            supabase.table("basis_quotes").insert(
+                {
+                    "tenant_id": tenant_id,
+                    "spot_venue_id": spot_venue_id,
+                    "deriv_venue_id": deriv_venue_id,
+                    "instrument_id": instrument_id,
+                    "spot_bid": quote.spot_bid,
+                    "spot_ask": quote.spot_ask,
+                    "perp_bid": quote.perp_bid,
+                    "perp_ask": quote.perp_ask,
+                    "basis_bps": quote.basis_bps_bid,
+                    "basis_z": quote.basis_z,
+                    "ts": quote.timestamp.isoformat(),
+                }
+            ).execute()
         except Exception as exc:
             logger.warning("basis_quote_store_failed", error=str(exc))

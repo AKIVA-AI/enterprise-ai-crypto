@@ -1,6 +1,7 @@
 """
 Spot Quote Service - normalizes best bid/ask across venues.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,7 +37,9 @@ class SpotQuoteService:
         self._venue_cache: Dict[str, str] = {}
         self._instrument_cache: Dict[tuple[str, str], str] = {}
 
-    async def get_quotes(self, venues: List[str], instruments: List[str]) -> List[SpotQuote]:
+    async def get_quotes(
+        self, venues: List[str], instruments: List[str]
+    ) -> List[SpotQuote]:
         quotes: List[SpotQuote] = []
         now = datetime.utcnow()
 
@@ -86,20 +89,24 @@ class SpotQuoteService:
             supabase = get_supabase()
             for quote in quotes:
                 venue_id = self._get_venue_id(quote.venue)
-                instrument_id = self._get_instrument_id(tenant_id, venue_id, quote.instrument)
+                instrument_id = self._get_instrument_id(
+                    tenant_id, venue_id, quote.instrument
+                )
                 if not venue_id or not instrument_id:
                     continue
-                supabase.table("spot_quotes").insert({
-                    "tenant_id": tenant_id,
-                    "venue_id": venue_id,
-                    "instrument_id": instrument_id,
-                    "bid_price": quote.bid_price,
-                    "ask_price": quote.ask_price,
-                    "bid_size": quote.bid_size,
-                    "ask_size": quote.ask_size,
-                    "spread_bps": quote.spread_bps,
-                    "ts": quote.timestamp.isoformat(),
-                }).execute()
+                supabase.table("spot_quotes").insert(
+                    {
+                        "tenant_id": tenant_id,
+                        "venue_id": venue_id,
+                        "instrument_id": instrument_id,
+                        "bid_price": quote.bid_price,
+                        "ask_price": quote.ask_price,
+                        "bid_size": quote.bid_size,
+                        "ask_size": quote.ask_size,
+                        "spread_bps": quote.spread_bps,
+                        "ts": quote.timestamp.isoformat(),
+                    }
+                ).execute()
         except Exception as exc:
             logger.warning("spot_quote_store_failed", error=str(exc))
 
@@ -108,15 +115,25 @@ class SpotQuoteService:
             return self._venue_cache[venue_name]
         try:
             supabase = get_supabase()
-            result = supabase.table("venues").select("id").ilike("name", venue_name).single().execute()
+            result = (
+                supabase.table("venues")
+                .select("id")
+                .ilike("name", venue_name)
+                .single()
+                .execute()
+            )
             if result.data:
                 self._venue_cache[venue_name] = result.data["id"]
                 return result.data["id"]
         except Exception as exc:
-            logger.warning("spot_quote_venue_lookup_failed", venue=venue_name, error=str(exc))
+            logger.warning(
+                "spot_quote_venue_lookup_failed", venue=venue_name, error=str(exc)
+            )
         return None
 
-    def _get_instrument_id(self, tenant_id: str, venue_id: Optional[str], symbol: str) -> Optional[str]:
+    def _get_instrument_id(
+        self, tenant_id: str, venue_id: Optional[str], symbol: str
+    ) -> Optional[str]:
         if not venue_id:
             return None
         cache_key = (venue_id, symbol)
@@ -124,14 +141,22 @@ class SpotQuoteService:
             return self._instrument_cache[cache_key]
         try:
             supabase = get_supabase()
-            result = supabase.table("instruments").select("id").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).ilike("venue_symbol", symbol).single().execute()
+            result = (
+                supabase.table("instruments")
+                .select("id")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .ilike("venue_symbol", symbol)
+                .single()
+                .execute()
+            )
             if result.data:
                 self._instrument_cache[cache_key] = result.data["id"]
                 return result.data["id"]
         except Exception as exc:
-            logger.warning("spot_quote_instrument_lookup_failed", symbol=symbol, error=str(exc))
+            logger.warning(
+                "spot_quote_instrument_lookup_failed", symbol=symbol, error=str(exc)
+            )
         return None
 
 

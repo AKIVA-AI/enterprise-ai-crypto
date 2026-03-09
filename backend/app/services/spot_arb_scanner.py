@@ -1,6 +1,7 @@
 """
 Cross-Venue Spot Arbitrage Scanner.
 """
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
+from uuid import uuid4, uuid5, NAMESPACE_URL
 
 import structlog
 
@@ -75,7 +76,9 @@ class SpotArbScanner:
         if not book:
             return []
 
-        quotes = await spot_quote_service.get_quotes(self.config.venues, self.config.instruments)
+        quotes = await spot_quote_service.get_quotes(
+            self.config.venues, self.config.instruments
+        )
         quote_map = self._group_quotes(quotes)
         intents: List[TradeIntent] = []
 
@@ -145,15 +148,24 @@ class SpotArbScanner:
                         },
                     )
                     intents.append(intent)
-                    await self._store_spread(tenant_id, instrument, buy_venue, sell_venue, edge, buy_quote, sell_quote)
+                    await self._store_spread(
+                        tenant_id,
+                        instrument,
+                        buy_venue,
+                        sell_venue,
+                        edge,
+                        buy_quote,
+                        sell_quote,
+                    )
 
         return intents
 
     def _select_book(self, books: List[Book]) -> Optional[Book]:
         for book in books:
-            if (hasattr(book.type, "value") and book.type.value.lower() == self.config.book_type) or (
-                str(book.type).lower() == self.config.book_type
-            ):
+            if (
+                hasattr(book.type, "value")
+                and book.type.value.lower() == self.config.book_type
+            ) or (str(book.type).lower() == self.config.book_type):
                 return book
         return books[0] if books else None
 
@@ -168,7 +180,9 @@ class SpotArbScanner:
             return 0.0
         return self.config.max_notional_usd / price
 
-    def _determine_execution_mode(self, tenant_id: str, venue: str, instrument: str, size: float) -> str:
+    def _determine_execution_mode(
+        self, tenant_id: str, venue: str, instrument: str, size: float
+    ) -> str:
         if self.config.execution_mode_preference != "inventory":
             return "legged"
         inventory = self._get_inventory(tenant_id, venue, instrument)
@@ -181,19 +195,37 @@ class SpotArbScanner:
             return self._inventory_cache[cache_key]
         try:
             supabase = get_supabase()
-            venue_row = supabase.table("venues").select("id").ilike("name", venue).single().execute()
+            venue_row = (
+                supabase.table("venues")
+                .select("id")
+                .ilike("name", venue)
+                .single()
+                .execute()
+            )
             if not venue_row.data:
                 return 0.0
             venue_id = venue_row.data["id"]
-            instrument_row = supabase.table("instruments").select("id").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).ilike("venue_symbol", instrument).single().execute()
+            instrument_row = (
+                supabase.table("instruments")
+                .select("id")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .ilike("venue_symbol", instrument)
+                .single()
+                .execute()
+            )
             if not instrument_row.data:
                 return 0.0
             instrument_id = instrument_row.data["id"]
-            inventory = supabase.table("venue_inventory").select("available_qty").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).eq("instrument_id", instrument_id).single().execute()
+            inventory = (
+                supabase.table("venue_inventory")
+                .select("available_qty")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .eq("instrument_id", instrument_id)
+                .single()
+                .execute()
+            )
             if inventory.data:
                 value = float(inventory.data.get("available_qty", 0))
                 self._inventory_cache[cache_key] = value
@@ -246,28 +278,48 @@ class SpotArbScanner:
     ) -> None:
         try:
             supabase = get_supabase()
-            buy_venue_id = supabase.table("venues").select("id").ilike("name", buy_venue).single().execute()
-            sell_venue_id = supabase.table("venues").select("id").ilike("name", sell_venue).single().execute()
+            buy_venue_id = (
+                supabase.table("venues")
+                .select("id")
+                .ilike("name", buy_venue)
+                .single()
+                .execute()
+            )
+            sell_venue_id = (
+                supabase.table("venues")
+                .select("id")
+                .ilike("name", sell_venue)
+                .single()
+                .execute()
+            )
             if not buy_venue_id.data or not sell_venue_id.data:
                 return
             venue_id = buy_venue_id.data["id"]
-            instrument_row = supabase.table("instruments").select("id").eq(
-                "tenant_id", tenant_id
-            ).eq("venue_id", venue_id).ilike("venue_symbol", instrument).single().execute()
+            instrument_row = (
+                supabase.table("instruments")
+                .select("id")
+                .eq("tenant_id", tenant_id)
+                .eq("venue_id", venue_id)
+                .ilike("venue_symbol", instrument)
+                .single()
+                .execute()
+            )
             if not instrument_row.data:
                 return
             instrument_id = instrument_row.data["id"]
-            supabase.table("arb_spreads").insert({
-                "tenant_id": tenant_id,
-                "instrument_id": instrument_id,
-                "buy_venue_id": buy_venue_id.data["id"],
-                "sell_venue_id": sell_venue_id.data["id"],
-                "executable_spread_bps": edge.executable_spread_bps,
-                "net_edge_bps": edge.net_edge_bps,
-                "liquidity_score": min(buy_quote.ask_size, sell_quote.bid_size),
-                "latency_score": max(buy_quote.age_ms, sell_quote.age_ms),
-                "ts": datetime.now(timezone.utc).isoformat(),
-            }).execute()
+            supabase.table("arb_spreads").insert(
+                {
+                    "tenant_id": tenant_id,
+                    "instrument_id": instrument_id,
+                    "buy_venue_id": buy_venue_id.data["id"],
+                    "sell_venue_id": sell_venue_id.data["id"],
+                    "executable_spread_bps": edge.executable_spread_bps,
+                    "net_edge_bps": edge.net_edge_bps,
+                    "liquidity_score": min(buy_quote.ask_size, sell_quote.bid_size),
+                    "latency_score": max(buy_quote.age_ms, sell_quote.age_ms),
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                }
+            ).execute()
         except Exception as exc:
             logger.warning("arb_spread_store_failed", error=str(exc))
 

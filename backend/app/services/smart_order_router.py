@@ -10,17 +10,12 @@ Implements institutional-grade order routing and execution algorithms:
 """
 
 import numpy as np
-import pandas as pd
-from scipy import stats
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from uuid import UUID
 import asyncio
 import structlog
 
-from app.database import get_supabase
-from app.config import settings
 
 logger = structlog.get_logger()
 
@@ -28,6 +23,7 @@ logger = structlog.get_logger()
 @dataclass
 class VenueLiquidity:
     """Venue liquidity profile."""
+
     venue_id: str
     venue_name: str
     daily_volume: float
@@ -42,6 +38,7 @@ class VenueLiquidity:
 @dataclass
 class ExecutionAlgorithm:
     """Algorithmic execution parameters."""
+
     algorithm_type: str  # 'twap', 'vwap', 'pov', 'iceberg', 'adaptive'
     total_quantity: float
     time_horizon_minutes: int
@@ -56,6 +53,7 @@ class ExecutionAlgorithm:
 @dataclass
 class RoutingDecision:
     """Order routing decision."""
+
     instrument: str
     side: str
     quantity: float
@@ -71,6 +69,7 @@ class RoutingDecision:
 @dataclass
 class ExecutionQuality:
     """Execution quality metrics."""
+
     order_id: str
     instrument: str
     side: str
@@ -109,7 +108,7 @@ class SmartOrderRouter:
         side: str,
         quantity: float,
         order_type: str = "market",
-        constraints: Optional[Dict[str, Any]] = None
+        constraints: Optional[Dict[str, Any]] = None,
     ) -> RoutingDecision:
         """
         Route order to optimal venue with execution algorithm selection.
@@ -130,7 +129,9 @@ class SmartOrderRouter:
         # Score each venue for this order
         venue_scores = []
         for venue in venues:
-            score = await self._score_venue_for_order(venue, instrument, side, quantity, constraints)
+            score = await self._score_venue_for_order(
+                venue, instrument, side, quantity, constraints
+            )
             venue_scores.append((venue, score))
 
         # Select best venue
@@ -162,15 +163,11 @@ class SmartOrderRouter:
             estimated_slippage=slippage,
             expected_execution_time=execution_time,
             confidence_score=best_score,
-            reasoning=f"Selected {best_venue.venue_name} with {algorithm.algorithm_type} algorithm"
+            reasoning=f"Selected {best_venue.venue_name} with {algorithm.algorithm_type} algorithm",
         )
 
     async def execute_algorithmic_order(
-        self,
-        algorithm: ExecutionAlgorithm,
-        instrument: str,
-        side: str,
-        venue_id: str
+        self, algorithm: ExecutionAlgorithm, instrument: str, side: str, venue_id: str
     ) -> List[Dict[str, Any]]:
         """
         Execute order using specified algorithmic strategy.
@@ -194,7 +191,7 @@ class SmartOrderRouter:
         self,
         order_id: str,
         executed_trades: List[Dict[str, Any]],
-        benchmark_price: float
+        benchmark_price: float,
     ) -> ExecutionQuality:
         """
         Measure and analyze execution quality against benchmarks.
@@ -215,25 +212,27 @@ class SmartOrderRouter:
                 timing_risk=0,
                 execution_time_seconds=0,
                 completion_rate=0,
-                isq_score=0
+                isq_score=0,
             )
 
         # Aggregate execution statistics
-        total_quantity = sum(trade['quantity'] for trade in executed_trades)
-        executed_quantity = sum(trade['executed_quantity'] for trade in executed_trades)
-        total_value = sum(trade['price'] * trade['executed_quantity'] for trade in executed_trades)
+        total_quantity = sum(trade["quantity"] for trade in executed_trades)
+        executed_quantity = sum(trade["executed_quantity"] for trade in executed_trades)
+        total_value = sum(
+            trade["price"] * trade["executed_quantity"] for trade in executed_trades
+        )
         average_price = total_value / executed_quantity if executed_quantity > 0 else 0
 
         # Calculate price improvement
         price_improvement = (benchmark_price - average_price) / benchmark_price
-        if executed_trades[0]['side'] == 'sell':  # Reverse for sell orders
+        if executed_trades[0]["side"] == "sell":  # Reverse for sell orders
             price_improvement = -price_improvement
 
         # Estimate market impact
         market_impact = await self._calculate_market_impact(executed_trades)
 
         # Calculate timing risk
-        execution_times = [trade['timestamp'] for trade in executed_trades]
+        execution_times = [trade["timestamp"] for trade in executed_trades]
         timing_risk = self._calculate_timing_risk(execution_times)
 
         # Calculate ISQ score (0-100 scale)
@@ -250,8 +249,8 @@ class SmartOrderRouter:
 
         return ExecutionQuality(
             order_id=order_id,
-            instrument=executed_trades[0]['instrument'],
-            side=executed_trades[0]['side'],
+            instrument=executed_trades[0]["instrument"],
+            side=executed_trades[0]["side"],
             total_quantity=total_quantity,
             executed_quantity=executed_quantity,
             average_price=average_price,
@@ -261,15 +260,11 @@ class SmartOrderRouter:
             timing_risk=timing_risk,
             execution_time_seconds=int(execution_duration),
             completion_rate=completion_rate,
-            isq_score=isq_score
+            isq_score=isq_score,
         )
 
     async def analyze_market_impact(
-        self,
-        instrument: str,
-        side: str,
-        quantity: float,
-        venue_id: str
+        self, instrument: str, side: str, quantity: float, venue_id: str
     ) -> Dict[str, float]:
         """
         Analyze expected market impact of an order.
@@ -286,7 +281,7 @@ class SmartOrderRouter:
         participation_rate = min(quantity / venue.daily_volume * 365, 1.0)  # Annualized
 
         # Almgren-Chriss permanent impact
-        sigma = market_data.get('volatility', 0.02)
+        sigma = market_data.get("volatility", 0.02)
         adv = venue.daily_volume / 252  # Average daily volume
 
         permanent_impact = 0.5 * sigma * (quantity / adv) ** 0.5
@@ -301,11 +296,11 @@ class SmartOrderRouter:
         total_impact = permanent_impact + temporary_impact
 
         return {
-            'permanent_impact': permanent_impact,
-            'temporary_impact': temporary_impact,
-            'total_impact': total_impact,
-            'participation_rate': participation_rate,
-            'estimated_slippage_bps': total_impact * 10000
+            "permanent_impact": permanent_impact,
+            "temporary_impact": temporary_impact,
+            "total_impact": total_impact,
+            "participation_rate": participation_rate,
+            "estimated_slippage_bps": total_impact * 10000,
         }
 
     # Private methods
@@ -321,9 +316,9 @@ class SmartOrderRouter:
                 spread_bps=2.0,
                 market_depth=0.8,
                 latency_ms=50,
-                fee_structure={'maker': 0.001, 'taker': 0.001},
+                fee_structure={"maker": 0.001, "taker": 0.001},
                 reliability_score=0.95,
-                max_order_size=1000000
+                max_order_size=1000000,
             ),
             VenueLiquidity(
                 venue_id="coinbase",
@@ -332,9 +327,9 @@ class SmartOrderRouter:
                 spread_bps=3.0,
                 market_depth=0.7,
                 latency_ms=60,
-                fee_structure={'maker': 0.005, 'taker': 0.005},
+                fee_structure={"maker": 0.005, "taker": 0.005},
                 reliability_score=0.92,
-                max_order_size=500000
+                max_order_size=500000,
             ),
             VenueLiquidity(
                 venue_id="kraken",
@@ -343,10 +338,10 @@ class SmartOrderRouter:
                 spread_bps=4.0,
                 market_depth=0.6,
                 latency_ms=70,
-                fee_structure={'maker': 0.002, 'taker': 0.003},
+                fee_structure={"maker": 0.002, "taker": 0.003},
                 reliability_score=0.88,
-                max_order_size=200000
-            )
+                max_order_size=200000,
+            ),
         ]
 
         return venues
@@ -357,7 +352,7 @@ class SmartOrderRouter:
         instrument: str,
         side: str,
         quantity: float,
-        constraints: Optional[Dict[str, Any]]
+        constraints: Optional[Dict[str, Any]],
     ) -> float:
         """Score venue suitability for specific order."""
         score = 0.0
@@ -368,12 +363,14 @@ class SmartOrderRouter:
         score += liquidity_score * 0.4
 
         # Fee score (20% weight) - lower fees better
-        fee_rate = venue.fee_structure.get('taker', 0.005)
+        fee_rate = venue.fee_structure.get("taker", 0.005)
         fee_score = max(0, 1.0 - (fee_rate / 0.01))  # Normalize against 100bps
         score += fee_score * 0.2
 
         # Latency score (20% weight) - lower latency better
-        latency_score = max(0, 1.0 - (venue.latency_ms / 200))  # Normalize against 200ms
+        latency_score = max(
+            0, 1.0 - (venue.latency_ms / 200)
+        )  # Normalize against 200ms
         score += latency_score * 0.2
 
         # Reliability score (20% weight)
@@ -381,11 +378,17 @@ class SmartOrderRouter:
 
         # Check constraints
         if constraints:
-            if 'max_fee' in constraints and fee_rate > constraints['max_fee']:
+            if "max_fee" in constraints and fee_rate > constraints["max_fee"]:
                 score *= 0.5  # Penalty for high fees
-            if 'min_reliability' in constraints and venue.reliability_score < constraints['min_reliability']:
+            if (
+                "min_reliability" in constraints
+                and venue.reliability_score < constraints["min_reliability"]
+            ):
                 score *= 0.3  # Heavy penalty for low reliability
-            if 'venue_restrictions' in constraints and venue.venue_id in constraints['venue_restrictions']:
+            if (
+                "venue_restrictions" in constraints
+                and venue.venue_id in constraints["venue_restrictions"]
+            ):
                 return 0.0  # Completely exclude restricted venues
 
         return score
@@ -396,16 +399,18 @@ class SmartOrderRouter:
         side: str,
         quantity: float,
         venue: VenueLiquidity,
-        constraints: Optional[Dict[str, Any]]
+        constraints: Optional[Dict[str, Any]],
     ) -> ExecutionAlgorithm:
         """Select optimal execution algorithm based on order characteristics."""
         # Determine time horizon based on quantity and market conditions
-        market_impact_analysis = await self.analyze_market_impact(instrument, side, quantity, venue.venue_id)
-        participation_rate = market_impact_analysis['participation_rate']
+        market_impact_analysis = await self.analyze_market_impact(
+            instrument, side, quantity, venue.venue_id
+        )
+        participation_rate = market_impact_analysis["participation_rate"]
 
         # Select algorithm based on participation rate and constraints
         if participation_rate > 0.1:  # Large order
-            if constraints and constraints.get('time_horizon_minutes', 60) > 30:
+            if constraints and constraints.get("time_horizon_minutes", 60) > 30:
                 algorithm_type = "vwap"
             else:
                 algorithm_type = "twap"
@@ -415,7 +420,9 @@ class SmartOrderRouter:
             algorithm_type = "market"  # Immediate execution
 
         # Set algorithm parameters
-        time_horizon = constraints.get('time_horizon_minutes', 30) if constraints else 30
+        time_horizon = (
+            constraints.get("time_horizon_minutes", 30) if constraints else 30
+        )
 
         return ExecutionAlgorithm(
             algorithm_type=algorithm_type,
@@ -426,19 +433,17 @@ class SmartOrderRouter:
             participation_rate=None,
             iceberg_size=quantity * 0.1 if algorithm_type == "iceberg" else None,
             price_limit=None,
-            venue_restrictions=None
+            venue_restrictions=None,
         )
 
     async def _estimate_price_impact(
-        self,
-        instrument: str,
-        side: str,
-        quantity: float,
-        venue: VenueLiquidity
+        self, instrument: str, side: str, quantity: float, venue: VenueLiquidity
     ) -> float:
         """Estimate price impact of order."""
-        impact_analysis = await self.analyze_market_impact(instrument, side, quantity, venue.venue_id)
-        return impact_analysis['total_impact']
+        impact_analysis = await self.analyze_market_impact(
+            instrument, side, quantity, venue.venue_id
+        )
+        return impact_analysis["total_impact"]
 
     async def _estimate_slippage(
         self,
@@ -446,23 +451,22 @@ class SmartOrderRouter:
         side: str,
         quantity: float,
         venue: VenueLiquidity,
-        order_type: str
+        order_type: str,
     ) -> float:
         """Estimate slippage for order."""
         if order_type == "market":
             # Market orders have higher slippage
             base_slippage = venue.spread_bps / 10000  # Spread in decimal
-            impact_slippage = await self._estimate_price_impact(instrument, side, quantity, venue)
+            impact_slippage = await self._estimate_price_impact(
+                instrument, side, quantity, venue
+            )
             return base_slippage + impact_slippage
         else:
             # Limit orders have lower slippage
             return venue.spread_bps / 20000  # Half the spread
 
     async def _estimate_execution_time(
-        self,
-        quantity: float,
-        venue: VenueLiquidity,
-        algorithm: ExecutionAlgorithm
+        self, quantity: float, venue: VenueLiquidity, algorithm: ExecutionAlgorithm
     ) -> int:
         """Estimate execution time in seconds."""
         if algorithm.algorithm_type == "market":
@@ -472,16 +476,14 @@ class SmartOrderRouter:
         elif algorithm.algorithm_type == "iceberg":
             # Estimate based on iceberg size and market conditions
             num_slices = max(1, int(quantity / (algorithm.iceberg_size or quantity)))
-            return min(algorithm.time_horizon_minutes * 60, num_slices * 30)  # 30s per slice
+            return min(
+                algorithm.time_horizon_minutes * 60, num_slices * 30
+            )  # 30s per slice
         else:
             return algorithm.time_horizon_minutes * 30  # Conservative estimate
 
     async def _execute_twap(
-        self,
-        algorithm: ExecutionAlgorithm,
-        instrument: str,
-        side: str,
-        venue_id: str
+        self, algorithm: ExecutionAlgorithm, instrument: str, side: str, venue_id: str
     ) -> List[Dict[str, Any]]:
         """Execute Time-Weighted Average Price algorithm."""
         time_slices = algorithm.time_horizon_minutes
@@ -493,28 +495,26 @@ class SmartOrderRouter:
             await asyncio.sleep(60)  # Wait 1 minute between slices
 
             order = {
-                'instrument': instrument,
-                'side': side,
-                'quantity': quantity_per_slice,
-                'venue_id': venue_id,
-                'algorithm': 'twap',
-                'slice_number': i + 1,
-                'timestamp': datetime.utcnow()
+                "instrument": instrument,
+                "side": side,
+                "quantity": quantity_per_slice,
+                "venue_id": venue_id,
+                "algorithm": "twap",
+                "slice_number": i + 1,
+                "timestamp": datetime.utcnow(),
             }
             orders.append(order)
 
         return orders
 
     async def _execute_vwap(
-        self,
-        algorithm: ExecutionAlgorithm,
-        instrument: str,
-        side: str,
-        venue_id: str
+        self, algorithm: ExecutionAlgorithm, instrument: str, side: str, venue_id: str
     ) -> List[Dict[str, Any]]:
         """Execute Volume-Weighted Average Price algorithm."""
         # VWAP execution - adjust based on volume profile
-        volume_profile = await self._get_volume_profile(instrument, algorithm.time_horizon_minutes)
+        volume_profile = await self._get_volume_profile(
+            instrument, algorithm.time_horizon_minutes
+        )
 
         orders = []
         remaining_quantity = algorithm.total_quantity
@@ -528,12 +528,12 @@ class SmartOrderRouter:
             quantity = min(remaining_quantity, interval_volume * participation_rate)
 
             order = {
-                'instrument': instrument,
-                'side': side,
-                'quantity': quantity,
-                'venue_id': venue_id,
-                'algorithm': 'vwap',
-                'timestamp': datetime.utcnow()
+                "instrument": instrument,
+                "side": side,
+                "quantity": quantity,
+                "venue_id": venue_id,
+                "algorithm": "vwap",
+                "timestamp": datetime.utcnow(),
             }
             orders.append(order)
 
@@ -543,11 +543,7 @@ class SmartOrderRouter:
         return orders
 
     async def _execute_pov(
-        self,
-        algorithm: ExecutionAlgorithm,
-        instrument: str,
-        side: str,
-        venue_id: str
+        self, algorithm: ExecutionAlgorithm, instrument: str, side: str, venue_id: str
     ) -> List[Dict[str, Any]]:
         """Execute Percentage of Volume algorithm."""
         participation_rate = algorithm.participation_rate or 0.1  # 10% default
@@ -563,12 +559,12 @@ class SmartOrderRouter:
             quantity = min(remaining_quantity, market_volume * participation_rate)
 
             order = {
-                'instrument': instrument,
-                'side': side,
-                'quantity': quantity,
-                'venue_id': venue_id,
-                'algorithm': 'pov',
-                'timestamp': datetime.utcnow()
+                "instrument": instrument,
+                "side": side,
+                "quantity": quantity,
+                "venue_id": venue_id,
+                "algorithm": "pov",
+                "timestamp": datetime.utcnow(),
             }
             orders.append(order)
 
@@ -578,11 +574,7 @@ class SmartOrderRouter:
         return orders
 
     async def _execute_iceberg(
-        self,
-        algorithm: ExecutionAlgorithm,
-        instrument: str,
-        side: str,
-        venue_id: str
+        self, algorithm: ExecutionAlgorithm, instrument: str, side: str, venue_id: str
     ) -> List[Dict[str, Any]]:
         """Execute Iceberg algorithm (hidden orders)."""
         iceberg_size = algorithm.iceberg_size or (algorithm.total_quantity * 0.1)
@@ -595,13 +587,15 @@ class SmartOrderRouter:
             visible_quantity = min(iceberg_size, remaining_quantity)
 
             order = {
-                'instrument': instrument,
-                'side': side,
-                'quantity': visible_quantity,
-                'venue_id': venue_id,
-                'algorithm': 'iceberg',
-                'iceberg_total': min(iceberg_size * 3, remaining_quantity),  # Hide 3x visible
-                'timestamp': datetime.utcnow()
+                "instrument": instrument,
+                "side": side,
+                "quantity": visible_quantity,
+                "venue_id": venue_id,
+                "algorithm": "iceberg",
+                "iceberg_total": min(
+                    iceberg_size * 3, remaining_quantity
+                ),  # Hide 3x visible
+                "timestamp": datetime.utcnow(),
             }
             orders.append(order)
 
@@ -611,11 +605,7 @@ class SmartOrderRouter:
         return orders
 
     async def _execute_adaptive(
-        self,
-        algorithm: ExecutionAlgorithm,
-        instrument: str,
-        side: str,
-        venue_id: str
+        self, algorithm: ExecutionAlgorithm, instrument: str, side: str, venue_id: str
     ) -> List[Dict[str, Any]]:
         """Execute adaptive algorithm based on market conditions."""
         orders = []
@@ -625,11 +615,11 @@ class SmartOrderRouter:
             # Adapt execution based on current market conditions
             market_conditions = await self._assess_market_conditions(instrument)
 
-            if market_conditions['volatility'] > 0.05:  # High volatility
+            if market_conditions["volatility"] > 0.05:  # High volatility
                 # Slow down execution
                 quantity = min(remaining_quantity, algorithm.total_quantity * 0.02)
                 wait_time = 120  # 2 minutes
-            elif market_conditions['liquidity'] < 0.3:  # Low liquidity
+            elif market_conditions["liquidity"] < 0.3:  # Low liquidity
                 # Reduce order size
                 quantity = min(remaining_quantity, algorithm.total_quantity * 0.01)
                 wait_time = 300  # 5 minutes
@@ -639,13 +629,13 @@ class SmartOrderRouter:
                 wait_time = 60  # 1 minute
 
             order = {
-                'instrument': instrument,
-                'side': side,
-                'quantity': quantity,
-                'venue_id': venue_id,
-                'algorithm': 'adaptive',
-                'market_conditions': market_conditions,
-                'timestamp': datetime.utcnow()
+                "instrument": instrument,
+                "side": side,
+                "quantity": quantity,
+                "venue_id": venue_id,
+                "algorithm": "adaptive",
+                "market_conditions": market_conditions,
+                "timestamp": datetime.utcnow(),
             }
             orders.append(order)
 
@@ -654,7 +644,9 @@ class SmartOrderRouter:
 
         return orders
 
-    async def _get_venue_liquidity(self, venue_id: str, instrument: str) -> VenueLiquidity:
+    async def _get_venue_liquidity(
+        self, venue_id: str, instrument: str
+    ) -> VenueLiquidity:
         """Get liquidity information for venue and instrument."""
         # Return cached or fetch venue data
         if venue_id in self.venue_cache:
@@ -668,9 +660,9 @@ class SmartOrderRouter:
             spread_bps=2.5,
             market_depth=0.75,
             latency_ms=55,
-            fee_structure={'maker': 0.001, 'taker': 0.002},
+            fee_structure={"maker": 0.001, "taker": 0.002},
             reliability_score=0.9,
-            max_order_size=1000000
+            max_order_size=1000000,
         )
 
         self.venue_cache[venue_id] = venue
@@ -680,11 +672,11 @@ class SmartOrderRouter:
         """Get current market data for instrument."""
         # Mock market data
         return {
-            'volatility': 0.025,
-            'liquidity': 0.8,
-            'spread_bps': 2.5,
-            'last_price': 50000,
-            'daily_volume': 1000000000
+            "volatility": 0.025,
+            "liquidity": 0.8,
+            "spread_bps": 2.5,
+            "last_price": 50000,
+            "daily_volume": 1000000000,
         }
 
     async def _get_volume_profile(self, instrument: str, minutes: int) -> List[float]:
@@ -700,21 +692,23 @@ class SmartOrderRouter:
 
     async def _assess_market_conditions(self, instrument: str) -> Dict[str, float]:
         """Assess current market conditions."""
-        return {
-            'volatility': 0.02,
-            'liquidity': 0.8,
-            'trend': 0.1,
-            'momentum': 0.05
-        }
+        return {"volatility": 0.02, "liquidity": 0.8, "trend": 0.1, "momentum": 0.05}
 
-    async def _calculate_market_impact(self, executed_trades: List[Dict[str, Any]]) -> float:
+    async def _calculate_market_impact(
+        self, executed_trades: List[Dict[str, Any]]
+    ) -> float:
         """Calculate realized market impact."""
         if not executed_trades:
             return 0.0
 
         # Simple market impact calculation
-        total_quantity = sum(trade['executed_quantity'] for trade in executed_trades)
-        avg_price = sum(trade['price'] * trade['executed_quantity'] for trade in executed_trades) / total_quantity
+        total_quantity = sum(trade["executed_quantity"] for trade in executed_trades)
+        avg_price = (
+            sum(
+                trade["price"] * trade["executed_quantity"] for trade in executed_trades
+            )
+            / total_quantity
+        )
 
         # Estimate benchmark price (simplified)
         benchmark_price = avg_price * 0.998  # Assume slight adverse selection
@@ -732,20 +726,17 @@ class SmartOrderRouter:
         total_duration = (max(execution_times) - start_time).total_seconds()
 
         # Ideal timing would be uniform distribution
-        ideal_interval = total_duration / len(execution_times)
+        total_duration / len(execution_times)
         actual_intervals = [(t - start_time).total_seconds() for t in execution_times]
 
         # Calculate variance from ideal timing
         timing_variance = np.var(actual_intervals)
-        normalized_timing_risk = min(timing_variance / (total_duration ** 2), 1.0)
+        normalized_timing_risk = min(timing_variance / (total_duration**2), 1.0)
 
         return normalized_timing_risk
 
     def _calculate_isq_score(
-        self,
-        price_improvement: float,
-        market_impact: float,
-        timing_risk: float
+        self, price_improvement: float, market_impact: float, timing_risk: float
     ) -> float:
         """Calculate Implementation Shortfall Quality score (0-100)."""
         # Weight the components
@@ -755,14 +746,18 @@ class SmartOrderRouter:
 
         # Normalize to 0-100 scale
         price_score = max(0, min(100, 50 + (price_improvement * 1000)))  # Center at 50
-        impact_score = max(0, 100 - (market_impact * 10000))  # Lower impact = higher score
-        timing_score = max(0, 100 - (timing_risk * 100))  # Lower timing risk = higher score
+        impact_score = max(
+            0, 100 - (market_impact * 10000)
+        )  # Lower impact = higher score
+        timing_score = max(
+            0, 100 - (timing_risk * 100)
+        )  # Lower timing risk = higher score
 
         # Weighted average
         isq_score = (
-            price_score * price_weight +
-            impact_score * impact_weight +
-            timing_score * timing_weight
+            price_score * price_weight
+            + impact_score * impact_weight
+            + timing_score * timing_weight
         )
 
         return round(isq_score, 1)

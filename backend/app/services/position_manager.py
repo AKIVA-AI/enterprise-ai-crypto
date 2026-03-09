@@ -1,9 +1,10 @@
 """
 Position manager for tracking open and closed positions.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID, uuid4
@@ -12,6 +13,7 @@ from uuid import UUID, uuid4
 @dataclass
 class Position:
     """Position representation."""
+
     id: UUID
     instrument: str
     side: str  # 'long' or 'short'

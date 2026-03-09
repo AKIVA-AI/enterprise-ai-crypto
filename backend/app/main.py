@@ -9,7 +9,6 @@ Production-grade institutional trading system with:
 - Enterprise security
 """
 
-import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import uuid
@@ -39,10 +38,9 @@ from app.middleware.security import (
 
 # FreqTrade Integration
 from app.services.freqtrade_integration import (
-    get_freqtrade_hub,
     initialize_freqtrade_integration,
     shutdown_freqtrade_integration,
-    get_freqtrade_status
+    get_freqtrade_status,
 )
 
 # Arbitrage Engine
@@ -50,6 +48,7 @@ from app.arbitrage import get_arbitrage_engine
 
 # Setup structured logging
 logger = configure_logging()
+
 
 # Lifespan context manager for startup/shutdown events
 @asynccontextmanager
@@ -112,6 +111,7 @@ async def lifespan(app: FastAPI):
         await close_db()
         logger.info("Services stopped")
 
+
 # Create FastAPI application
 app = FastAPI(
     title="Hedge Fund Trading Platform",
@@ -120,7 +120,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Security
@@ -147,10 +147,8 @@ app.add_middleware(
 
 # Trusted host middleware (production only)
 if not settings.DEBUG:
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=settings.ALLOWED_HOSTS
-    )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+
 
 # Global exception handler
 @app.exception_handler(Exception)
@@ -161,17 +159,22 @@ async def global_exception_handler(request: Request, exc: Exception):
         exc_info=exc,
         path=request.url.path,
         method=request.method,
-        client_ip=getattr(request.client, 'host', 'unknown') if request.client else 'unknown'
+        client_ip=getattr(request.client, "host", "unknown")
+        if request.client
+        else "unknown",
     )
 
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal server error",
-            "message": "An unexpected error occurred" if not settings.DEBUG else str(exc),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+            "message": "An unexpected error occurred"
+            if not settings.DEBUG
+            else str(exc),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
     )
+
 
 # Request ID + metrics middleware
 @app.middleware("http")
@@ -186,25 +189,36 @@ async def request_context_middleware(request: Request, call_next):
     structlog.contextvars.clear_contextvars()
     return response
 
+
 # FreqTrade health check endpoint
 @app.get("/health/freqtrade")
 async def freqtrade_health_check():
     """FreqTrade-specific health check endpoint."""
     return get_freqtrade_status()
 
+
 # FreqTrade components health check
 @app.get("/health/freqtrade/components")
 async def freqtrade_components_health():
     """Detailed FreqTrade component health status."""
     status = get_freqtrade_status()
-    return status.get('component_health', {})
+    return status.get("component_health", {})
+
 
 # Authentication middleware
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Authentication middleware for protected routes."""
     # Skip auth for health checks, readiness probes, and docs
-    if request.url.path in ["/health", "/ready", "/metrics", "/metrics/prometheus", "/docs", "/redoc", "/openapi.json"] or request.url.path.startswith("/health/"):
+    if request.url.path in [
+        "/health",
+        "/ready",
+        "/metrics",
+        "/metrics/prometheus",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+    ] or request.url.path.startswith("/health/"):
         return await call_next(request)
 
     # Skip auth for OPTIONS requests
@@ -231,7 +245,7 @@ async def auth_middleware(request: Request, call_next):
             user_id=user["id"],
             role=user.get("role"),
             path=request.url.path,
-            method=request.method
+            method=request.method,
         )
 
     except Exception as e:
@@ -241,13 +255,13 @@ async def auth_middleware(request: Request, call_next):
     response = await call_next(request)
     return response
 
+
 # API routes
 app.include_router(
-    api_router,
-    prefix="/api/v1",
-    dependencies=[Depends(get_current_user)]
+    api_router, prefix="/api/v1", dependencies=[Depends(get_current_user)]
 )
 app.include_router(health_router)
+
 
 # Root endpoint
 @app.get("/")
@@ -258,8 +272,9 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
         "health": "/health",
-        "status": "operational"
+        "status": "operational",
     }
+
 
 # System info endpoint (admin only)
 @app.get("/system/info")
@@ -279,12 +294,17 @@ async def system_info(request: Request):
             "risk_engine": "ready",
             "strategy_engine": "freqtrade",  # Now using FreqTrade
             "order_router": "ready",
-            "freqtrade_integration": freqtrade_status.get('freqtrade_integration', {}).get('status', 'unknown')
+            "freqtrade_integration": freqtrade_status.get(
+                "freqtrade_integration", {}
+            ).get("status", "unknown"),
         },
         "freqtrade_enhanced": True,
-        "freqtrade_components": list(freqtrade_status.get('component_health', {}).keys()),
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "freqtrade_components": list(
+            freqtrade_status.get("component_health", {}).keys()
+        ),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
 
 if __name__ == "__main__":
     # Development server
@@ -293,5 +313,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=settings.DEBUG,
-        log_level="info"
+        log_level="info",
     )

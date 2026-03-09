@@ -23,12 +23,10 @@ import logging
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, UTC
 from concurrent.futures import ThreadPoolExecutor
-import json
 
 # FreqTrade WebSocket imports
 from freqtrade.exchange import Exchange
 from freqtrade.exchange.exchange_ws import ExchangeWS
-from freqtrade.configuration import TimeRange
 from freqtrade.enums import CandleType
 
 # Local imports
@@ -65,37 +63,37 @@ class EnhancedMarketDataService(MarketDataService):
     def _build_exchange_configs(self) -> Dict[str, Dict[str, Any]]:
         """Build exchange configurations for FreqTrade integration."""
         return {
-            'binance': {
-                'name': 'binance',
-                'api_key': settings.BINANCE_API_KEY,
-                'secret': settings.BINANCE_SECRET_KEY,
-                'enable_ws': True,
-                'ccxt_config': {},
-                'ccxt_async_config': {},
+            "binance": {
+                "name": "binance",
+                "api_key": settings.BINANCE_API_KEY,
+                "secret": settings.BINANCE_SECRET_KEY,
+                "enable_ws": True,
+                "ccxt_config": {},
+                "ccxt_async_config": {},
             },
-            'coinbase': {
-                'name': 'coinbase',
-                'api_key': settings.COINBASE_API_KEY,
-                'secret': settings.COINBASE_SECRET_KEY,
-                'enable_ws': True,
-                'ccxt_config': {},
-                'ccxt_async_config': {},
+            "coinbase": {
+                "name": "coinbase",
+                "api_key": settings.COINBASE_API_KEY,
+                "secret": settings.COINBASE_SECRET_KEY,
+                "enable_ws": True,
+                "ccxt_config": {},
+                "ccxt_async_config": {},
             },
-            'kraken': {
-                'name': 'kraken',
-                'api_key': settings.KRAKEN_API_KEY or '',
-                'secret': settings.KRAKEN_SECRET_KEY or '',
-                'enable_ws': True,
-                'ccxt_config': {},
-                'ccxt_async_config': {},
+            "kraken": {
+                "name": "kraken",
+                "api_key": settings.KRAKEN_API_KEY or "",
+                "secret": settings.KRAKEN_SECRET_KEY or "",
+                "enable_ws": True,
+                "ccxt_config": {},
+                "ccxt_async_config": {},
             },
-            'bybit': {
-                'name': 'bybit',
-                'api_key': settings.BYBIT_API_KEY or '',
-                'secret': settings.BYBIT_SECRET_KEY or '',
-                'enable_ws': True,
-                'ccxt_config': {},
-                'ccxt_async_config': {},
+            "bybit": {
+                "name": "bybit",
+                "api_key": settings.BYBIT_API_KEY or "",
+                "secret": settings.BYBIT_SECRET_KEY or "",
+                "enable_ws": True,
+                "ccxt_config": {},
+                "ccxt_async_config": {},
             },
         }
 
@@ -110,11 +108,13 @@ class EnhancedMarketDataService(MarketDataService):
                 exchange = Exchange(
                     config=ft_config,
                     exchange_config=config,
-                    validate=False  # Skip validation for now
+                    validate=False,  # Skip validation for now
                 )
 
                 # Create WebSocket client if exchange supports it
-                if exchange.exchange_has('watchOHLCV') and config.get('enable_ws', True):
+                if exchange.exchange_has("watchOHLCV") and config.get(
+                    "enable_ws", True
+                ):
                     ws_client = ExchangeWS(ft_config, exchange._api_async)
                     self.websocket_clients[exchange_name] = ws_client
                     logger.info(f"Initialized WebSocket client for {exchange_name}")
@@ -124,17 +124,19 @@ class EnhancedMarketDataService(MarketDataService):
             except Exception as e:
                 logger.error(f"Failed to initialize {exchange_name} WebSocket: {e}")
 
-    def _create_freqtrade_config(self, exchange_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_freqtrade_config(
+        self, exchange_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Create FreqTrade-compatible configuration."""
         return {
-            'exchange': exchange_config,
-            'dry_run': settings.DRY_RUN,
-            'timeframe': '5m',
-            'stake_currency': 'USDT',
-            'user_data_dir': str(settings.DATA_DIR / 'freqtrade'),
-            'datadir': str(settings.DATA_DIR / 'historical'),
-            'runmode': 'live' if not settings.DRY_RUN else 'dry_run',
-            'candle_type_def': CandleType.SPOT,
+            "exchange": exchange_config,
+            "dry_run": settings.DRY_RUN,
+            "timeframe": "5m",
+            "stake_currency": "USDT",
+            "user_data_dir": str(settings.DATA_DIR / "freqtrade"),
+            "datadir": str(settings.DATA_DIR / "historical"),
+            "runmode": "live" if not settings.DRY_RUN else "dry_run",
+            "candle_type_def": CandleType.SPOT,
         }
 
     async def start_websocket_streams(self):
@@ -162,14 +164,18 @@ class EnhancedMarketDataService(MarketDataService):
 
             await asyncio.gather(*connection_tasks, return_exceptions=True)
 
-            logger.info(f"Started WebSocket streams for {len(self.websocket_clients)} exchanges")
+            logger.info(
+                f"Started WebSocket streams for {len(self.websocket_clients)} exchanges"
+            )
 
         except Exception as e:
             logger.error(f"Failed to start WebSocket streams: {e}")
             self.is_running = False
             raise
 
-    async def _start_exchange_websocket(self, exchange_name: str, ws_client: ExchangeWS):
+    async def _start_exchange_websocket(
+        self, exchange_name: str, ws_client: ExchangeWS
+    ):
         """Start WebSocket connection for a specific exchange."""
         try:
             # Subscribe to different data feeds
@@ -198,7 +204,9 @@ class EnhancedMarketDataService(MarketDataService):
             await ws_client.subscribe_tickers(pairs)
 
             # Set up ticker data handler
-            ws_client.on_ticker = lambda ticker: self._handle_ticker_data(exchange_name, ticker)
+            ws_client.on_ticker = lambda ticker: self._handle_ticker_data(
+                exchange_name, ticker
+            )
 
             logger.info(f"Subscribed to {len(pairs)} ticker feeds for {exchange_name}")
 
@@ -215,8 +223,8 @@ class EnhancedMarketDataService(MarketDataService):
                 await ws_client.subscribe_orderbook(pair, depth=20)
 
             # Set up orderbook data handler
-            ws_client.on_orderbook = lambda orderbook, pair: self._handle_orderbook_data(
-                exchange_name, pair, orderbook
+            ws_client.on_orderbook = lambda orderbook, pair: (
+                self._handle_orderbook_data(exchange_name, pair, orderbook)
             )
 
             logger.info(f"Subscribed to orderbook feeds for {exchange_name}")
@@ -248,13 +256,13 @@ class EnhancedMarketDataService(MarketDataService):
         # This would typically query exchange APIs or use cached popular pairs
         # For now, return some default popular pairs
         popular_pairs = {
-            'binance': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'DOT/USDT', 'LINK/USDT'],
-            'coinbase': ['BTC/USD', 'ETH/USD', 'ADA/USD', 'DOT/USD', 'LINK/USD'],
-            'kraken': ['BTC/USD', 'ETH/USD', 'ADA/USD', 'DOT/USD'],
-            'bybit': ['BTC/USDT', 'ETH/USDT', 'ADA/USDT', 'DOT/USDT'],
+            "binance": ["BTC/USDT", "ETH/USDT", "ADA/USDT", "DOT/USDT", "LINK/USDT"],
+            "coinbase": ["BTC/USD", "ETH/USD", "ADA/USD", "DOT/USD", "LINK/USD"],
+            "kraken": ["BTC/USD", "ETH/USD", "ADA/USD", "DOT/USD"],
+            "bybit": ["BTC/USDT", "ETH/USDT", "ADA/USDT", "DOT/USDT"],
         }
 
-        return popular_pairs.get(exchange_name, ['BTC/USDT', 'ETH/USDT'])
+        return popular_pairs.get(exchange_name, ["BTC/USDT", "ETH/USDT"])
 
     def _handle_ticker_data(self, exchange_name: str, ticker_data: Dict[str, Any]):
         """Handle incoming ticker data."""
@@ -262,78 +270,80 @@ class EnhancedMarketDataService(MarketDataService):
             # Process ticker data
             ticker = TickerData(
                 exchange=exchange_name,
-                pair=ticker_data.get('symbol', ''),
+                pair=ticker_data.get("symbol", ""),
                 timestamp=datetime.now(UTC),
-                bid=ticker_data.get('bid'),
-                ask=ticker_data.get('ask'),
-                last=ticker_data.get('last'),
-                volume_24h=ticker_data.get('quoteVolume'),
-                price_change_24h=ticker_data.get('percentage'),
-                high_24h=ticker_data.get('high'),
-                low_24h=ticker_data.get('low'),
+                bid=ticker_data.get("bid"),
+                ask=ticker_data.get("ask"),
+                last=ticker_data.get("last"),
+                volume_24h=ticker_data.get("quoteVolume"),
+                price_change_24h=ticker_data.get("percentage"),
+                high_24h=ticker_data.get("high"),
+                low_24h=ticker_data.get("low"),
             )
 
             # Save to database asynchronously
             asyncio.create_task(self._save_ticker_data(ticker))
 
             # Notify callbacks
-            self._notify_callbacks('ticker', {
-                'exchange': exchange_name,
-                'ticker': ticker_data
-            })
+            self._notify_callbacks(
+                "ticker", {"exchange": exchange_name, "ticker": ticker_data}
+            )
 
         except Exception as e:
             logger.error(f"Error handling ticker data from {exchange_name}: {e}")
 
-    def _handle_orderbook_data(self, exchange_name: str, pair: str, orderbook_data: Dict[str, Any]):
+    def _handle_orderbook_data(
+        self, exchange_name: str, pair: str, orderbook_data: Dict[str, Any]
+    ):
         """Handle incoming orderbook data."""
         try:
             orderbook = OrderBook(
                 exchange=exchange_name,
                 pair=pair,
                 timestamp=datetime.now(UTC),
-                bids=orderbook_data.get('bids', []),
-                asks=orderbook_data.get('asks', []),
-                bid_volume=sum(bid[1] for bid in orderbook_data.get('bids', [])[:10]),
-                ask_volume=sum(ask[1] for ask in orderbook_data.get('asks', [])[:10]),
+                bids=orderbook_data.get("bids", []),
+                asks=orderbook_data.get("asks", []),
+                bid_volume=sum(bid[1] for bid in orderbook_data.get("bids", [])[:10]),
+                ask_volume=sum(ask[1] for ask in orderbook_data.get("asks", [])[:10]),
             )
 
             # Save to database asynchronously
             asyncio.create_task(self._save_orderbook_data(orderbook))
 
             # Notify callbacks
-            self._notify_callbacks('orderbook', {
-                'exchange': exchange_name,
-                'pair': pair,
-                'orderbook': orderbook_data
-            })
+            self._notify_callbacks(
+                "orderbook",
+                {"exchange": exchange_name, "pair": pair, "orderbook": orderbook_data},
+            )
 
         except Exception as e:
             logger.error(f"Error handling orderbook data from {exchange_name}: {e}")
 
-    def _handle_trade_data(self, exchange_name: str, pair: str, trade_data: Dict[str, Any]):
+    def _handle_trade_data(
+        self, exchange_name: str, pair: str, trade_data: Dict[str, Any]
+    ):
         """Handle incoming trade data."""
         try:
             # Convert to our market data format
             market_data = MarketData(
                 exchange=exchange_name,
                 pair=pair,
-                timestamp=datetime.fromtimestamp(trade_data.get('timestamp', 0) / 1000, UTC),
-                price=trade_data.get('price'),
-                volume=trade_data.get('amount'),
-                side=trade_data.get('side'),
-                trade_id=trade_data.get('id'),
+                timestamp=datetime.fromtimestamp(
+                    trade_data.get("timestamp", 0) / 1000, UTC
+                ),
+                price=trade_data.get("price"),
+                volume=trade_data.get("amount"),
+                side=trade_data.get("side"),
+                trade_id=trade_data.get("id"),
             )
 
             # Save to database asynchronously
             asyncio.create_task(self._save_market_data(market_data))
 
             # Notify callbacks
-            self._notify_callbacks('trade', {
-                'exchange': exchange_name,
-                'pair': pair,
-                'trade': trade_data
-            })
+            self._notify_callbacks(
+                "trade", {"exchange": exchange_name, "pair": pair, "trade": trade_data}
+            )
 
         except Exception as e:
             logger.error(f"Error handling trade data from {exchange_name}: {e}")
@@ -373,7 +383,9 @@ class EnhancedMarketDataService(MarketDataService):
             except Exception as e:
                 logger.error(f"Error in data callback: {e}")
 
-    async def get_realtime_price(self, pair: str, exchange: str = 'binance') -> Optional[float]:
+    async def get_realtime_price(
+        self, pair: str, exchange: str = "binance"
+    ) -> Optional[float]:
         """
         Get real-time price from WebSocket data.
 
@@ -393,15 +405,18 @@ class EnhancedMarketDataService(MarketDataService):
 
             # Get latest ticker from WebSocket
             ticker = await ws_client.get_ticker(pair)
-            return ticker.get('last')
+            return ticker.get("last")
 
         except Exception as e:
-            logger.warning(f"Failed to get real-time price from {exchange} WebSocket: {e}")
+            logger.warning(
+                f"Failed to get real-time price from {exchange} WebSocket: {e}"
+            )
             # Fall back to REST API
             return await super().get_realtime_price(pair, exchange)
 
-    async def get_orderbook_snapshot(self, pair: str, exchange: str = 'binance',
-                                   depth: int = 20) -> Optional[Dict[str, Any]]:
+    async def get_orderbook_snapshot(
+        self, pair: str, exchange: str = "binance", depth: int = 20
+    ) -> Optional[Dict[str, Any]]:
         """
         Get real-time orderbook snapshot from WebSocket.
 
@@ -441,15 +456,15 @@ class EnhancedMarketDataService(MarketDataService):
                 last_message = datetime.now(UTC)  # ws_client.last_message_time
 
                 status[exchange_name] = {
-                    'connected': is_connected,
-                    'last_message': last_message.isoformat(),
-                    'active_subscriptions': [],  # ws_client.get_active_subscriptions()
+                    "connected": is_connected,
+                    "last_message": last_message.isoformat(),
+                    "active_subscriptions": [],  # ws_client.get_active_subscriptions()
                 }
 
             except Exception as e:
                 status[exchange_name] = {
-                    'connected': False,
-                    'error': str(e),
+                    "connected": False,
+                    "error": str(e),
                 }
 
         return status

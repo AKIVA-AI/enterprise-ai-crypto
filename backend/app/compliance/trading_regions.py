@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class TradingRegion(Enum):
     """Supported trading regions."""
+
     US = "us"
     INTERNATIONAL = "international"
 
@@ -33,13 +34,14 @@ class TradingRegion(Enum):
 @dataclass
 class ExchangeConfig:
     """Exchange configuration per region."""
+
     name: str
     class_name: str
     spot: bool = True
     futures: bool = False
     margin: bool = False
     restricted_pairs: List[str] = None
-    
+
     def __post_init__(self):
         if self.restricted_pairs is None:
             self.restricted_pairs = []
@@ -139,50 +141,50 @@ INTERNATIONAL_EXCHANGES: Dict[str, ExchangeConfig] = {
 
 # Restricted tokens for US users
 US_RESTRICTED_TOKENS = [
-    "XMR",   # Monero - privacy coin
-    "ZEC",   # Zcash - privacy features
+    "XMR",  # Monero - privacy coin
+    "ZEC",  # Zcash - privacy features
     "DASH",  # Dash - privacy features
-    "XVG",   # Verge - privacy coin
+    "XVG",  # Verge - privacy coin
 ]
 
 
 class TradingRegionManager:
     """Manages trading region compliance."""
-    
+
     def __init__(self, region: TradingRegion = TradingRegion.INTERNATIONAL):
         self.region = region
         logger.info(f"Trading region set to: {region.value}")
-    
+
     def get_available_exchanges(self) -> Dict[str, ExchangeConfig]:
         """Get exchanges available for current region."""
         if self.region == TradingRegion.US:
             return US_EXCHANGES
         return INTERNATIONAL_EXCHANGES
-    
+
     def is_exchange_allowed(self, exchange: str) -> bool:
         """Check if exchange is allowed in current region."""
         exchanges = self.get_available_exchanges()
         return exchange.lower() in exchanges
-    
+
     def is_futures_allowed(self) -> bool:
         """Check if futures trading is allowed."""
         return self.region == TradingRegion.INTERNATIONAL
-    
+
     def is_margin_allowed(self) -> bool:
         """Check if margin trading is allowed."""
         return self.region == TradingRegion.INTERNATIONAL
-    
+
     def is_token_allowed(self, token: str) -> bool:
         """Check if token is allowed in current region."""
         if self.region == TradingRegion.US:
             return token.upper() not in US_RESTRICTED_TOKENS
         return True
-    
+
     def filter_pairs(self, pairs: List[str]) -> List[str]:
         """Filter trading pairs based on region restrictions."""
         if self.region != TradingRegion.US:
             return pairs
-        
+
         allowed = []
         for pair in pairs:
             base = pair.split("/")[0] if "/" in pair else pair.split("USDT")[0]
@@ -191,33 +193,37 @@ class TradingRegionManager:
             else:
                 logger.warning(f"Pair {pair} restricted in US region")
         return allowed
-    
+
     def get_config_for_exchange(self, exchange: str) -> Optional[ExchangeConfig]:
         """Get configuration for specific exchange."""
         exchanges = self.get_available_exchanges()
         return exchanges.get(exchange.lower())
-    
-    def validate_strategy_for_region(self, strategy_config: Dict[str, Any]) -> Dict[str, Any]:
+
+    def validate_strategy_for_region(
+        self, strategy_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Validate and adjust strategy config for region compliance."""
         result = {
             "valid": True,
             "warnings": [],
             "adjustments": [],
         }
-        
+
         # Check if strategy requires shorting (futures)
         if strategy_config.get("can_short", False) and not self.is_futures_allowed():
             result["warnings"].append("Shorting disabled - not available in US region")
             result["adjustments"].append({"can_short": False})
-        
+
         # Check trading mode
         trading_mode = strategy_config.get("trading_mode", "spot")
         if trading_mode != "spot" and not self.is_futures_allowed():
-            result["warnings"].append(f"{trading_mode} mode not available in US - defaulting to spot")
+            result["warnings"].append(
+                f"{trading_mode} mode not available in US - defaulting to spot"
+            )
             result["adjustments"].append({"trading_mode": "spot"})
-        
+
         return result
-    
+
     def get_status(self) -> Dict[str, Any]:
         """Get current region status."""
         exchanges = self.get_available_exchanges()
@@ -228,4 +234,3 @@ class TradingRegionManager:
             "available_exchanges": list(exchanges.keys()),
             "exchange_count": len(exchanges),
         }
-

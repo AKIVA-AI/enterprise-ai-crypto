@@ -1,6 +1,7 @@
 """
 Backtest result data models for strategy evaluation.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -57,6 +58,7 @@ def _coalesce_number(value: Optional[float], default: float) -> float:
 @dataclass
 class EquityPoint:
     """Single point on equity curve."""
+
     timestamp: datetime
     equity: float
     drawdown: float
@@ -67,6 +69,7 @@ class EquityPoint:
 @dataclass
 class TradeRecord:
     """Record of a single trade."""
+
     id: UUID
     timestamp_open: datetime
     timestamp_close: Optional[datetime]
@@ -84,6 +87,7 @@ class TradeRecord:
 @dataclass
 class PerformanceMetrics:
     """Comprehensive performance metrics."""
+
     # Returns
     total_return: float
     annualized_return: float
@@ -181,6 +185,7 @@ class PerformanceMetrics:
 @dataclass
 class BacktestResult:
     """Complete backtest result."""
+
     id: UUID = field(default_factory=uuid4)
     strategy_name: str = ""
     strategy_config: dict = field(default_factory=dict)
@@ -283,7 +288,8 @@ class BacktestResult:
                 continue
             equity_curve.append(
                 EquityPoint(
-                    timestamp=_parse_datetime(point.get("timestamp")) or datetime.now(timezone.utc),
+                    timestamp=_parse_datetime(point.get("timestamp"))
+                    or datetime.now(timezone.utc),
                     equity=_coalesce_number(point.get("equity"), 0.0),
                     drawdown=_coalesce_number(point.get("drawdown"), 0.0),
                     position_value=_coalesce_number(point.get("position_value"), 0.0),
@@ -302,7 +308,8 @@ class BacktestResult:
                 TradeRecord(
                     id=_parse_uuid(trade.get("id")) or uuid4(),
                     timestamp_open=(
-                        _parse_datetime(trade.get("timestamp_open")) or datetime.now(timezone.utc)
+                        _parse_datetime(trade.get("timestamp_open"))
+                        or datetime.now(timezone.utc)
                     ),
                     timestamp_close=_parse_datetime(trade.get("timestamp_close")),
                     instrument=trade.get("instrument") or "",
@@ -319,8 +326,12 @@ class BacktestResult:
 
         metrics = PerformanceMetrics.from_dict(data.get("metrics"))
         in_sample_metrics = PerformanceMetrics.from_dict(data.get("in_sample_metrics"))
-        out_sample_metrics = PerformanceMetrics.from_dict(data.get("out_sample_metrics"))
-        validation_metrics = PerformanceMetrics.from_dict(data.get("validation_metrics"))
+        out_sample_metrics = PerformanceMetrics.from_dict(
+            data.get("out_sample_metrics")
+        )
+        validation_metrics = PerformanceMetrics.from_dict(
+            data.get("validation_metrics")
+        )
 
         return cls(
             id=_parse_uuid(data.get("id")) or uuid4(),
@@ -335,7 +346,8 @@ class BacktestResult:
             equity_curve=equity_curve,
             trades=trades,
             metrics=metrics,
-            created_at=_parse_datetime(data.get("created_at")) or datetime.now(timezone.utc),
+            created_at=_parse_datetime(data.get("created_at"))
+            or datetime.now(timezone.utc),
             execution_time_seconds=_coalesce_number(
                 data.get("execution_time_seconds"), 0.0
             ),

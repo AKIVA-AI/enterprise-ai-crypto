@@ -1,6 +1,7 @@
 """
 Simple in-memory TTL cache for hot data.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

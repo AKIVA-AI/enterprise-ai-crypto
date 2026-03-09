@@ -1,6 +1,7 @@
 """
 Core domain models for the trading engine.
 """
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List
@@ -47,8 +48,10 @@ class VenueStatus(str, Enum):
 
 # === Instrument ===
 
+
 class Instrument(BaseModel):
     """Unified instrument representation across venues."""
+
     symbol: str  # e.g., "BTC-USD"
     base_asset: str  # e.g., "BTC"
     quote_asset: str  # e.g., "USD"
@@ -65,11 +68,13 @@ class Instrument(BaseModel):
 
 # === Trade Intent ===
 
+
 class TradeIntent(BaseModel):
     """
     A proposal from a strategy for a trade.
     Agents/strategies produce these; only the OMS can execute actual orders.
     """
+
     id: Optional[UUID] = None
     book_id: UUID
     strategy_id: UUID
@@ -87,8 +92,10 @@ class TradeIntent(BaseModel):
 
 # === Risk Check Result ===
 
+
 class RiskCheckResult(BaseModel):
     """Result of risk engine evaluation."""
+
     decision: RiskDecision
     intent_id: Optional[UUID] = None
     original_intent: Optional[TradeIntent] = None
@@ -101,8 +108,10 @@ class RiskCheckResult(BaseModel):
 
 # === Order ===
 
+
 class Order(BaseModel):
     """An order to be executed on a venue."""
+
     id: Optional[UUID] = None
     book_id: UUID
     strategy_id: Optional[UUID] = None
@@ -124,8 +133,10 @@ class Order(BaseModel):
 
 # === Position ===
 
+
 class Position(BaseModel):
     """A trading position."""
+
     id: Optional[UUID] = None
     book_id: UUID
     strategy_id: Optional[UUID] = None
@@ -146,8 +157,10 @@ class Position(BaseModel):
 
 # === Venue Health ===
 
+
 class VenueHealth(BaseModel):
     """Health status of a trading venue."""
+
     venue_id: UUID
     name: str
     status: VenueStatus
@@ -160,8 +173,10 @@ class VenueHealth(BaseModel):
 
 # === Book ===
 
+
 class Book(BaseModel):
     """A trading book with capital allocation."""
+
     id: UUID
     name: str
     type: BookType
@@ -174,6 +189,7 @@ class Book(BaseModel):
 
 # === Meme Project ===
 
+
 class MemeProjectStage(str, Enum):
     OPPORTUNITY = "opportunity"
     DUE_DILIGENCE = "due_diligence"
@@ -185,6 +201,7 @@ class MemeProjectStage(str, Enum):
 
 class MemeProject(BaseModel):
     """A meme coin venture project."""
+
     id: Optional[UUID] = None
     name: str
     ticker: str

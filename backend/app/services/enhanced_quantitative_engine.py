@@ -21,7 +21,7 @@ Integration Benefits:
 import logging
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Any
 from datetime import datetime, UTC
 from pathlib import Path
 import asyncio
@@ -34,16 +34,13 @@ from freqtrade.freqai.prediction_models import (
     XGBoostRegressor,
     LightGBMRegressor,
     TensorFlowRegressor,
-    PyTorchRegressor
+    PyTorchRegressor,
 )
 from freqtrade.configuration import TimeRange
-from freqtrade.data.dataprovider import DataProvider
 
 # Local imports
 from app.core.config import settings
 from app.services.market_data_service import MarketDataService
-from app.database import get_db_session
-from app.models import TradingSignal, MarketData
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +105,13 @@ class FreqAIEnhancedEngine:
             "timeframe": "5m",
             "exchange": {
                 "name": "binance",
-                "pair_whitelist": ["BTC/USDT", "ETH/USDT", "ADA/USDT", "DOT/USDT", "LINK/USDT"],
+                "pair_whitelist": [
+                    "BTC/USDT",
+                    "ETH/USDT",
+                    "ADA/USDT",
+                    "DOT/USDT",
+                    "LINK/USDT",
+                ],
             },
             "stake_currency": "USDT",
             "dry_run": settings.DRY_RUN,
@@ -121,19 +124,19 @@ class FreqAIEnhancedEngine:
             self.data_kitchen = FreqaiDataKitchen(
                 config=self.freqai_config,
                 live=False,  # Start in backtesting mode
-                pair="BTC/USDT"
+                pair="BTC/USDT",
             )
 
             # Initialize different ML models
             self.models = {
-                'xgboost': XGBoostRegressor(self.freqai_config),
-                'lightgbm': LightGBMRegressor(self.freqai_config),
-                'tensorflow': TensorFlowRegressor(self.freqai_config),
-                'pytorch': PyTorchRegressor(self.freqai_config),
+                "xgboost": XGBoostRegressor(self.freqai_config),
+                "lightgbm": LightGBMRegressor(self.freqai_config),
+                "tensorflow": TensorFlowRegressor(self.freqai_config),
+                "pytorch": PyTorchRegressor(self.freqai_config),
             }
 
             # Set default active model
-            self.active_model = self.models['lightgbm']
+            self.active_model = self.models["lightgbm"]
 
             logger.info("FreqAI components initialized successfully")
 
@@ -141,7 +144,9 @@ class FreqAIEnhancedEngine:
             logger.error(f"Failed to initialize FreqAI: {e}")
             raise
 
-    async def train_models(self, pair: str, start_date: datetime, end_date: datetime) -> Dict[str, float]:
+    async def train_models(
+        self, pair: str, start_date: datetime, end_date: datetime
+    ) -> Dict[str, float]:
         """
         Train ML models on historical data.
 
@@ -156,10 +161,7 @@ class FreqAIEnhancedEngine:
         try:
             # Get historical data
             historical_data = await self.market_data_service.get_historical_data(
-                pair=pair,
-                start_date=start_date,
-                end_date=end_date,
-                timeframe="5m"
+                pair=pair, start_date=start_date, end_date=end_date, timeframe="5m"
             )
 
             if historical_data.empty:
@@ -171,8 +173,7 @@ class FreqAIEnhancedEngine:
 
             # Set training timerange
             train_timerange = TimeRange(
-                startts=int(start_date.timestamp()),
-                stopts=int(end_date.timestamp())
+                startts=int(start_date.timestamp()), stopts=int(end_date.timestamp())
             )
 
             # Train models asynchronously
@@ -180,7 +181,9 @@ class FreqAIEnhancedEngine:
             training_tasks = []
 
             for model_name, model in self.models.items():
-                task = self._train_single_model(model_name, model, dataframe, pair, train_timerange)
+                task = self._train_single_model(
+                    model_name, model, dataframe, pair, train_timerange
+                )
                 training_tasks.append(task)
 
             # Wait for all training to complete
@@ -198,7 +201,9 @@ class FreqAIEnhancedEngine:
             best_model = max(training_results.items(), key=lambda x: x[1])
             self.active_model = self.models[best_model[0]]
 
-            logger.info(f"Model training completed. Best model: {best_model[0]} with score: {best_model[1]}")
+            logger.info(
+                f"Model training completed. Best model: {best_model[0]} with score: {best_model[1]}"
+            )
 
             return training_results
 
@@ -206,10 +211,16 @@ class FreqAIEnhancedEngine:
             logger.error(f"Model training failed: {e}")
             return {}
 
-    async def _train_single_model(self, model_name: str, model: IFreqaiModel,
-                                dataframe: pd.DataFrame, pair: str,
-                                timerange: TimeRange) -> float:
+    async def _train_single_model(
+        self,
+        model_name: str,
+        model: IFreqaiModel,
+        dataframe: pd.DataFrame,
+        pair: str,
+        timerange: TimeRange,
+    ) -> float:
         """Train a single model asynchronously."""
+
         def train_sync():
             try:
                 # Use thread pool for CPU-intensive training
@@ -223,7 +234,7 @@ class FreqAIEnhancedEngine:
                     self.data_kitchen.find_labels(dataframe)
 
                     # Train model
-                    trained_model = model.train(dataframe, pair, self.data_kitchen)
+                    model.train(dataframe, pair, self.data_kitchen)
 
                     # Calculate performance metric (placeholder - implement proper metric)
                     performance_score = 0.85  # Replace with actual metric calculation
@@ -265,8 +276,8 @@ class FreqAIEnhancedEngine:
             signals = self._convert_predictions_to_signals(predictions, do_predict)
 
             # Add confidence scores and feature importance
-            signals['confidence'] = self._calculate_prediction_confidence(predictions)
-            signals['feature_importance'] = self._get_feature_importance()
+            signals["confidence"] = self._calculate_prediction_confidence(predictions)
+            signals["feature_importance"] = self._get_feature_importance()
 
             return signals
 
@@ -274,45 +285,49 @@ class FreqAIEnhancedEngine:
             logger.error(f"Prediction failed: {e}")
             return {}
 
-    def _convert_to_freqtrade_format(self, data: pd.DataFrame, pair: str) -> pd.DataFrame:
+    def _convert_to_freqtrade_format(
+        self, data: pd.DataFrame, pair: str
+    ) -> pd.DataFrame:
         """Convert our data format to FreqTrade format."""
         # Ensure required columns exist
-        required_cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
 
         # Rename columns if necessary
         column_mapping = {
-            'date': 'timestamp',
-            'volume_base': 'volume',
-            'volume_quote': 'quote_volume'
+            "date": "timestamp",
+            "volume_base": "volume",
+            "volume_quote": "quote_volume",
         }
 
         df = data.copy()
         df = df.rename(columns=column_mapping)
 
         # Ensure timestamp is in milliseconds
-        if 'timestamp' in df.columns:
-            if isinstance(df['timestamp'].iloc[0], pd.Timestamp):
-                df['timestamp'] = df['timestamp'].astype(int) // 10**9 * 1000
-            elif isinstance(df['timestamp'].iloc[0], datetime):
-                df['timestamp'] = df['timestamp'].astype(int) // 10**9 * 1000
+        if "timestamp" in df.columns:
+            if isinstance(df["timestamp"].iloc[0], pd.Timestamp):
+                df["timestamp"] = df["timestamp"].astype(int) // 10**9 * 1000
+            elif isinstance(df["timestamp"].iloc[0], datetime):
+                df["timestamp"] = df["timestamp"].astype(int) // 10**9 * 1000
 
         # Add date column for FreqTrade
-        df['date'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
 
         # Set FreqAI target (price prediction)
-        df['&-target'] = df['close'].shift(-24) / df['close']  # Predict 24 candles ahead
+        df["&-target"] = (
+            df["close"].shift(-24) / df["close"]
+        )  # Predict 24 candles ahead
 
         return df
 
-    def _convert_predictions_to_signals(self, predictions: pd.DataFrame,
-                                      do_predict: np.ndarray) -> Dict[str, Any]:
+    def _convert_predictions_to_signals(
+        self, predictions: pd.DataFrame, do_predict: np.ndarray
+    ) -> Dict[str, Any]:
         """Convert ML predictions to trading signals."""
         signals = {
-            'long_signal': False,
-            'short_signal': False,
-            'hold_signal': True,
-            'prediction_value': 0.0,
-            'prediction_std': 0.0,
+            "long_signal": False,
+            "short_signal": False,
+            "hold_signal": True,
+            "prediction_value": 0.0,
+            "prediction_std": 0.0,
         }
 
         if len(predictions) == 0:
@@ -322,26 +337,32 @@ class FreqAIEnhancedEngine:
         latest_pred = predictions.iloc[-1]
 
         # Calculate prediction statistics
-        pred_mean = latest_pred.mean() if hasattr(latest_pred, 'mean') else float(latest_pred)
-        pred_std = latest_pred.std() if hasattr(latest_pred, 'std') else 0.0
+        pred_mean = (
+            latest_pred.mean() if hasattr(latest_pred, "mean") else float(latest_pred)
+        )
+        pred_std = latest_pred.std() if hasattr(latest_pred, "std") else 0.0
 
         # Generate signals based on prediction confidence
         confidence_threshold = 0.02  # 2% threshold
 
         if pred_mean > confidence_threshold and do_predict[-1]:
-            signals.update({
-                'long_signal': True,
-                'hold_signal': False,
-                'prediction_value': pred_mean,
-                'prediction_std': pred_std,
-            })
+            signals.update(
+                {
+                    "long_signal": True,
+                    "hold_signal": False,
+                    "prediction_value": pred_mean,
+                    "prediction_std": pred_std,
+                }
+            )
         elif pred_mean < -confidence_threshold and do_predict[-1]:
-            signals.update({
-                'short_signal': True,
-                'hold_signal': False,
-                'prediction_value': pred_mean,
-                'prediction_std': pred_std,
-            })
+            signals.update(
+                {
+                    "short_signal": True,
+                    "hold_signal": False,
+                    "prediction_value": pred_mean,
+                    "prediction_std": pred_std,
+                }
+            )
 
         return signals
 
@@ -359,18 +380,18 @@ class FreqAIEnhancedEngine:
 
     def _get_feature_importance(self) -> Dict[str, float]:
         """Get feature importance from the active model."""
-        if not hasattr(self.active_model, 'model') or self.active_model.model is None:
+        if not hasattr(self.active_model, "model") or self.active_model.model is None:
             return {}
 
         try:
             # This would be model-specific implementation
             # Placeholder for actual feature importance extraction
             return {
-                'rsi': 0.15,
-                'macd': 0.12,
-                'volume': 0.10,
-                'price_change': 0.08,
-                'volatility': 0.07
+                "rsi": 0.15,
+                "macd": 0.12,
+                "volume": 0.10,
+                "price_change": 0.08,
+                "volatility": 0.07,
             }
         except Exception as e:
             logger.warning(f"Could not get feature importance: {e}")
@@ -392,17 +413,14 @@ class FreqAIEnhancedEngine:
             start_date = end_date - pd.Timedelta(days=7)  # Last 7 days
 
             recent_data = await self.market_data_service.get_historical_data(
-                pair=pair,
-                start_date=start_date,
-                end_date=end_date,
-                timeframe="5m"
+                pair=pair, start_date=start_date, end_date=end_date, timeframe="5m"
             )
 
             if recent_data.empty:
                 return False
 
             # Update models with new data
-            dataframe = self._convert_to_freqtrade_format(recent_data, pair)
+            self._convert_to_freqtrade_format(recent_data, pair)
 
             # This would trigger FreqAI's continual learning
             # Implementation depends on specific FreqAI continual learning API
@@ -416,22 +434,28 @@ class FreqAIEnhancedEngine:
     def get_model_performance_metrics(self) -> Dict[str, Any]:
         """Get comprehensive model performance metrics."""
         metrics = {
-            'active_model': type(self.active_model).__name__ if self.active_model else None,
-            'available_models': list(self.models.keys()),
-            'training_status': 'initialized',
-            'feature_count': len(self.data_kitchen.feature_list) if self.data_kitchen else 0,
+            "active_model": type(self.active_model).__name__
+            if self.active_model
+            else None,
+            "available_models": list(self.models.keys()),
+            "training_status": "initialized",
+            "feature_count": len(self.data_kitchen.feature_list)
+            if self.data_kitchen
+            else 0,
         }
 
         # Add model-specific metrics if available
-        if self.active_model and hasattr(self.active_model, 'dd'):
+        if self.active_model and hasattr(self.active_model, "dd"):
             try:
                 historic_predictions = self.active_model.dd.historic_predictions
                 if historic_predictions:
-                    metrics.update({
-                        'total_predictions': len(historic_predictions),
-                        'avg_prediction_confidence': 0.85,  # Placeholder
-                        'model_accuracy': 0.78,  # Placeholder
-                    })
+                    metrics.update(
+                        {
+                            "total_predictions": len(historic_predictions),
+                            "avg_prediction_confidence": 0.85,  # Placeholder
+                            "model_accuracy": 0.78,  # Placeholder
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Could not get model metrics: {e}")
 

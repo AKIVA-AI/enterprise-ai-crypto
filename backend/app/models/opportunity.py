@@ -1,6 +1,7 @@
 """
 Opportunity schemas for multi-venue scanning and execution planning.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -26,6 +27,7 @@ class ExecutionMode(str, Enum):
 
 class ExecutionLeg(BaseModel):
     """Single execution leg for a multi-leg plan."""
+
     id: UUID = Field(default_factory=uuid4)
     venue: str
     instrument: str
@@ -39,6 +41,7 @@ class ExecutionLeg(BaseModel):
 
 class ExecutionPlan(BaseModel):
     """Execution plan for a trade intent."""
+
     id: UUID = Field(default_factory=uuid4)
     mode: ExecutionMode = ExecutionMode.LEGGED
     legs: List[ExecutionLeg]
@@ -50,6 +53,7 @@ class ExecutionPlan(BaseModel):
 
 class SignalStack(BaseModel):
     """Multi-timeframe signal stack for opportunity reasoning."""
+
     fast_timeframe: str
     medium_timeframe: str
     slow_timeframe: str
@@ -63,6 +67,7 @@ class SignalStack(BaseModel):
 
 class Opportunity(BaseModel):
     """Unified opportunity returned by the scanner."""
+
     id: UUID = Field(default_factory=uuid4)
     type: OpportunityType
     instrument: str

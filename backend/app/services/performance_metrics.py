@@ -1,6 +1,7 @@
 """
 Performance metrics calculator for backtest results.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -51,19 +52,19 @@ class PerformanceMetricsCalculator:
         returns = self.calculate_returns(equity_series)
 
         final_equity = (
-            float(equity_series.iloc[-1]) if not equity_series.empty else initial_capital
+            float(equity_series.iloc[-1])
+            if not equity_series.empty
+            else initial_capital
         )
-        total_return = (final_equity / initial_capital) - 1.0 if initial_capital else 0.0
-        annualized_return = self._annualized_return(
-            total_return, equity_series.index
+        total_return = (
+            (final_equity / initial_capital) - 1.0 if initial_capital else 0.0
         )
+        annualized_return = self._annualized_return(total_return, equity_series.index)
 
         sharpe_ratio = self.calculate_sharpe_ratio(returns)
         sortino_ratio = self.calculate_sortino_ratio(returns)
         max_drawdown = self.calculate_max_drawdown(equity_series)
-        max_drawdown_duration_days = self.calculate_max_drawdown_duration(
-            equity_series
-        )
+        max_drawdown_duration_days = self.calculate_max_drawdown_duration(equity_series)
         avg_drawdown = self._average_drawdown(equity_series)
         calmar_ratio = self.calculate_calmar_ratio(annualized_return, max_drawdown)
 
@@ -151,9 +152,7 @@ class PerformanceMetricsCalculator:
         if downside_deviation == 0 or np.isnan(downside_deviation):
             return 0.0
         sortino = (
-            excess.mean()
-            / downside_deviation
-            * np.sqrt(self.TRADING_DAYS_PER_YEAR)
+            excess.mean() / downside_deviation * np.sqrt(self.TRADING_DAYS_PER_YEAR)
         )
         return float(sortino) if np.isfinite(sortino) else 0.0
 
@@ -341,17 +340,13 @@ class PerformanceMetricsCalculator:
 
         gross_profit = wins.sum() if wins.size > 0 else 0.0
         gross_loss = abs(losses.sum()) if losses.size > 0 else 0.0
-        profit_factor = (
-            gross_profit / gross_loss if gross_loss > 0 else 0.0
-        )
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0.0
         avg_win = wins.mean() if wins.size > 0 else 0.0
         avg_loss = losses.mean() if losses.size > 0 else 0.0
         largest_win = wins.max() if wins.size > 0 else 0.0
         largest_loss = losses.min() if losses.size > 0 else 0.0
 
-        avg_trade_duration_hours = (
-            float(np.mean(durations)) if durations else 0.0
-        )
+        avg_trade_duration_hours = float(np.mean(durations)) if durations else 0.0
 
         return {
             "total_trades": total_trades,
@@ -391,9 +386,7 @@ class PerformanceMetricsCalculator:
         series = series[~series.index.duplicated(keep="last")]
         return series
 
-    def _annualized_return(
-        self, total_return: float, index: pd.Index
-    ) -> float:
+    def _annualized_return(self, total_return: float, index: pd.Index) -> float:
         if index.empty or not isinstance(index, pd.DatetimeIndex):
             return 0.0
         start = index[0]
@@ -403,9 +396,7 @@ class PerformanceMetricsCalculator:
         days = max((end - start).days, 0)
         if days == 0:
             return 0.0
-        annualized = (1.0 + total_return) ** (
-            self.TRADING_DAYS_PER_YEAR / days
-        ) - 1.0
+        annualized = (1.0 + total_return) ** (self.TRADING_DAYS_PER_YEAR / days) - 1.0
         return float(annualized) if np.isfinite(annualized) else 0.0
 
     def _average_drawdown(self, equity_curve: pd.Series) -> float:

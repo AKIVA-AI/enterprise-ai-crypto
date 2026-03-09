@@ -20,13 +20,17 @@ _market_data_cache = TTLCache(max_size=128)
 
 class StrategyRegisterRequest(BaseModel):
     """Request body for registering a strategy."""
+
     name: str = Field(..., description="Strategy name")
     description: str = Field(default="", description="Strategy description")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Parameter definitions")
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict, description="Parameter definitions"
+    )
 
 
 class StrategyResponse(BaseModel):
     """Strategy metadata response."""
+
     name: str
     description: str
     parameters: Dict[str, Any]
@@ -34,6 +38,7 @@ class StrategyResponse(BaseModel):
 
 class WalkForwardRequest(BaseModel):
     """Request body for walk-forward analysis."""
+
     strategy_name: str
     instruments: List[str]
     start_date: datetime
@@ -47,6 +52,7 @@ class WalkForwardRequest(BaseModel):
 
 class WalkForwardResponse(BaseModel):
     """Walk-forward response summary."""
+
     strategy_name: str
     total_windows: int
     aggregate_metrics: Optional[Dict[str, Any]]
@@ -124,6 +130,7 @@ async def _fetch_market_data(
 )
 async def register_strategy(request: StrategyRegisterRequest):
     """Register a new strategy."""
+
     class RegisteredStrategy:
         def populate_indicators(self, dataframe, metadata):
             return dataframe
@@ -167,7 +174,9 @@ async def register_strategy(request: StrategyRegisterRequest):
 )
 async def list_strategies():
     """List registered strategies."""
-    strategies = strategy_registry.list_strategies(include_config=False, include_runtime=True)
+    strategies = strategy_registry.list_strategies(
+        include_config=False, include_runtime=True
+    )
     return [
         StrategyResponse(
             name=meta.name,
@@ -200,7 +209,9 @@ async def run_walk_forward(request: WalkForwardRequest):
         request.timeframe,
     )
     if data.empty:
-        raise HTTPException(status_code=400, detail="No market data for requested window")
+        raise HTTPException(
+            status_code=400, detail="No market data for requested window"
+        )
 
     engine = WalkForwardEngine(
         WalkForwardConfig(

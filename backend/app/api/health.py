@@ -7,11 +7,12 @@ Provides:
 - /metrics - Basic application metrics (JSON)
 - /metrics/prometheus - Prometheus-format metrics export
 """
+
 import time
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse, PlainTextResponse
 import structlog
 
@@ -132,6 +133,7 @@ async def health_check() -> Dict[str, Any]:
     # Redis check
     try:
         import redis as redis_lib
+
         r = redis_lib.from_url(settings.redis_url, socket_timeout=2)
         r.ping()
         result["redis"] = "connected"
@@ -160,7 +162,7 @@ async def readiness_check() -> JSONResponse:
     # Check database connectivity
     try:
         supabase = get_supabase()
-        result = supabase.table("venues").select("id").limit(1).execute()
+        supabase.table("venues").select("id").limit(1).execute()
         checks["database"] = "connected"
     except Exception as e:
         logger.warning("readiness_check_db_failed", error=str(e))
@@ -170,6 +172,7 @@ async def readiness_check() -> JSONResponse:
     # Check Redis connectivity
     try:
         import redis as redis_lib
+
         r = redis_lib.from_url(settings.redis_url, socket_timeout=2)
         r.ping()
         checks["redis"] = "connected"
@@ -187,7 +190,7 @@ async def readiness_check() -> JSONResponse:
             "status": "ready" if all_ready else "not_ready",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "checks": checks,
-        }
+        },
     )
 
 

@@ -27,7 +27,7 @@ class TradingConfig:
     3. Hardcoded defaults (fallback)
     """
 
-    _instance: Optional['TradingConfig'] = None
+    _instance: Optional["TradingConfig"] = None
     _config: Dict[str, Any] = {}
 
     def __new__(cls):
@@ -44,7 +44,9 @@ class TradingConfig:
                     self._config = json.load(f)
                 logger.info(f"Loaded trading config from {_TRADING_CONFIG_PATH}")
             else:
-                logger.warning(f"Trading config not found at {_TRADING_CONFIG_PATH}, using defaults")
+                logger.warning(
+                    f"Trading config not found at {_TRADING_CONFIG_PATH}, using defaults"
+                )
                 self._config = {}
         except Exception as e:
             logger.error(f"Failed to load trading config: {e}")
