@@ -317,12 +317,11 @@ class RiskEngine:
         # Structured transition log
         logger.warning(
             "circuit_breaker_transition",
-            event="circuit_breaker_transition",
             breaker_type=breaker_type,
             prev_state=prev_state,
             new_state=new_state,
             reason=reason,
-            timestamp=datetime.utcnow().isoformat(),
+            transition_timestamp=datetime.utcnow().isoformat(),
             book_id=str(book_id) if book_id else None,
         )
 
@@ -362,12 +361,11 @@ class RiskEngine:
         # Structured transition log
         logger.info(
             "circuit_breaker_transition",
-            event="circuit_breaker_transition",
             breaker_type=breaker_type,
             prev_state=prev_state,
             new_state=new_state,
             reason=reason,
-            timestamp=datetime.utcnow().isoformat(),
+            transition_timestamp=datetime.utcnow().isoformat(),
         )
 
         await audit_log(
