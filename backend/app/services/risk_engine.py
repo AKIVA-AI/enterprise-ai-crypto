@@ -310,7 +310,21 @@ class RiskEngine:
         self, breaker_type: str, reason: str, book_id: Optional[UUID] = None
     ):
         """Activate a circuit breaker."""
+        prev_state = "closed" if not self._circuit_breakers.get(breaker_type) else "open"
         self._circuit_breakers[breaker_type] = True
+        new_state = "open"
+
+        # Structured transition log
+        logger.warning(
+            "circuit_breaker_transition",
+            event="circuit_breaker_transition",
+            breaker_type=breaker_type,
+            prev_state=prev_state,
+            new_state=new_state,
+            reason=reason,
+            timestamp=datetime.utcnow().isoformat(),
+            book_id=str(book_id) if book_id else None,
+        )
 
         await create_alert(
             title=f"Circuit Breaker Activated: {breaker_type}",
@@ -329,28 +343,44 @@ class RiskEngine:
             resource_id=breaker_type,
             severity="critical",
             book_id=str(book_id) if book_id else None,
-            after_state={"active": True, "reason": reason},
+            after_state={
+                "active": True,
+                "reason": reason,
+                "prev_state": prev_state,
+                "new_state": new_state,
+            },
         )
 
-        logger.warning(
-            "circuit_breaker_activated",
-            breaker_type=breaker_type,
-            reason=reason,
-            book_id=str(book_id) if book_id else None,
-        )
-
-    async def deactivate_circuit_breaker(self, breaker_type: str):
+    async def deactivate_circuit_breaker(
+        self, breaker_type: str, reason: str = "Manual deactivation"
+    ):
         """Deactivate a circuit breaker."""
+        prev_state = "open" if self._circuit_breakers.get(breaker_type) else "closed"
         self._circuit_breakers[breaker_type] = False
+        new_state = "closed"
+
+        # Structured transition log
+        logger.info(
+            "circuit_breaker_transition",
+            event="circuit_breaker_transition",
+            breaker_type=breaker_type,
+            prev_state=prev_state,
+            new_state=new_state,
+            reason=reason,
+            timestamp=datetime.utcnow().isoformat(),
+        )
 
         await audit_log(
             action="circuit_breaker_deactivated",
             resource_type="circuit_breaker",
             resource_id=breaker_type,
-            after_state={"active": False},
+            after_state={
+                "active": False,
+                "reason": reason,
+                "prev_state": prev_state,
+                "new_state": new_state,
+            },
         )
-
-        logger.info("circuit_breaker_deactivated", breaker_type=breaker_type)
 
     async def activate_kill_switch(
         self,
