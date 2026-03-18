@@ -19,6 +19,12 @@ from uuid import uuid4
 import redis.asyncio as redis
 import httpx
 
+from app.core.agent_identity import (
+    AgentIdentity,
+    create_agent_identity,
+    verify_agent_signature,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,6 +54,7 @@ class AgentMessage:
     channel: str
     payload: Dict[str, Any]
     correlation_id: Optional[str] = None
+    signature: Optional[str] = None  # HMAC signature for Zero Trust verification
 
     def to_json(self) -> str:
         return json.dumps(asdict(self))
@@ -99,6 +106,9 @@ class BaseAgent(ABC):
         self.subscribed_channels = subscribed_channels or []
         self.capabilities = capabilities or []
 
+        # Per-agent identity (Zero Trust — each agent has unique signing key)
+        self._identity = create_agent_identity(agent_id, agent_type)
+
         self._redis: Optional[redis.Redis] = None
         self._pubsub: Optional[redis.client.PubSub] = None
         self._running = False
@@ -110,6 +120,7 @@ class BaseAgent(ABC):
             "cycles_run": 0,
             "errors": 0,
             "last_heartbeat": None,
+            "signature_failures": 0,
         }
 
         # Redis resilience
@@ -219,6 +230,9 @@ class BaseAgent(ABC):
             payload=payload,
             correlation_id=correlation_id,
         )
+
+        # Sign message for Zero Trust verification
+        message.signature = self._identity.sign_message(message.to_json())
 
         try:
             await self._redis.publish(channel.value, message.to_json())
@@ -419,8 +433,17 @@ class BaseAgent(ABC):
         """Register a message handler for a specific channel"""
         self._message_handlers[channel.value] = handler
 
+    # Channels that require valid signature for Zero Trust
+    SIGNED_CHANNELS = frozenset({
+        AgentChannel.EXECUTION.value,
+        AgentChannel.RISK_CHECK.value,
+        AgentChannel.RISK_APPROVED.value,
+        AgentChannel.RISK_REJECTED.value,
+        AgentChannel.CONTROL.value,
+    })
+
     async def _process_message(self, raw_message: Dict):
-        """Process incoming message from pub/sub"""
+        """Process incoming message from pub/sub with signature verification."""
         try:
             if raw_message["type"] != "message":
                 return
@@ -435,6 +458,29 @@ class BaseAgent(ABC):
 
             message = AgentMessage.from_json(data)
             self._metrics["messages_received"] += 1
+
+            # Zero Trust: verify signature on critical channels
+            if channel in self.SIGNED_CHANNELS and message.signature:
+                # Build unsigned payload for verification
+                unsigned = AgentMessage(
+                    id=message.id,
+                    timestamp=message.timestamp,
+                    source_agent=message.source_agent,
+                    target_agent=message.target_agent,
+                    channel=message.channel,
+                    payload=message.payload,
+                    correlation_id=message.correlation_id,
+                    signature=None,
+                )
+                if not verify_agent_signature(
+                    message.source_agent, unsigned.to_json(), message.signature
+                ):
+                    self._metrics["signature_failures"] += 1
+                    logger.warning(
+                        f"[{self.agent_id}] Rejected message with invalid signature "
+                        f"from {message.source_agent} on {channel}"
+                    )
+                    return
 
             # Handle control messages
             if channel == AgentChannel.CONTROL.value:

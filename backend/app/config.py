@@ -95,6 +95,10 @@ class Settings:
 
         # ========== Redis ==========
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        self.redis_password = self._get_secret("REDIS_PASSWORD", "")
+
+        # ========== Agent Identity (Zero Trust) ==========
+        self.agent_signing_key = self._get_secret("AGENT_SIGNING_KEY", "")
 
         # ========== API Server ==========
         self.api_host = os.getenv("API_HOST", "0.0.0.0")  # nosec B104
