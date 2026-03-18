@@ -142,3 +142,56 @@ async def train_model(model_name: str, pair: str = "BTC-USD", timeframe: str = "
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Model Registry endpoints (D13 AI/ML) ──
+
+
+@router.get("/registry")
+async def list_registry_models(
+    name: Optional[str] = None,
+    framework: Optional[str] = None,
+):
+    """List all registered model versions with metadata and metrics."""
+    from app.services.model_registry import model_registry
+
+    models = model_registry.list_models(name=name, framework=framework)
+    return [
+        {
+            "model_id": m.model_id,
+            "name": m.name,
+            "version": m.version,
+            "framework": m.framework,
+            "status": m.status.value,
+            "created_at": m.created_at,
+            "metrics": m.metrics,
+            "input_schema": m.input_schema,
+            "output_schema": m.output_schema,
+            "tags": m.tags,
+            "description": m.description,
+        }
+        for m in models
+    ]
+
+
+@router.get("/registry/{model_id}")
+async def get_registry_model(model_id: str):
+    """Get details for a specific registered model version."""
+    from app.services.model_registry import model_registry
+
+    model = model_registry.get_model(model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    from dataclasses import asdict
+
+    return asdict(model)
+
+
+@router.post("/registry/{model_id}/metrics")
+async def record_model_metrics(model_id: str, metrics: Dict[str, float]):
+    """Record performance metrics for a model version."""
+    from app.services.model_registry import model_registry
+
+    if not model_registry.record_metrics(model_id, metrics):
+        raise HTTPException(status_code=404, detail="Model not found")
+    return {"status": "recorded", "model_id": model_id, "metrics": metrics}
