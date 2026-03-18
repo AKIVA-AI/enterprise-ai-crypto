@@ -31,12 +31,19 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 
-# FreqTrade configuration imports
+# FreqTrade configuration imports (optional — CI uses requirements-ci.txt which excludes freqtrade)
 try:
     from freqtrade.configuration.config_validation import validate_config_schema
 except (ImportError, ModuleNotFoundError):
-    validate_config_schema = None  # FreqTrade schema validation not available
-from freqtrade.exceptions import ConfigurationError
+    validate_config_schema = None
+try:
+    from freqtrade.exceptions import ConfigurationError
+except (ImportError, ModuleNotFoundError):
+
+    class ConfigurationError(Exception):  # type: ignore[no-redef]
+        """Fallback when freqtrade is not installed."""
+
+        pass
 
 # Local imports
 from app.core.config import settings
