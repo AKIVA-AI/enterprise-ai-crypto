@@ -73,3 +73,12 @@ slowapi>=0.1.9
 # Monitoring and metrics
 prometheus-client>=0.19.0
 
+# Distributed tracing (OpenTelemetry)
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-instrumentation-fastapi>=0.41b0
+opentelemetry-exporter-otlp-proto-grpc>=1.20.0
+
+# Error tracking
+sentry-sdk[fastapi]>=1.40.0
+

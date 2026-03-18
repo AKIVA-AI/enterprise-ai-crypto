@@ -35,6 +35,7 @@ from app.middleware.security import (
     RequestValidationMiddleware,
     setup_rate_limiting,
 )
+from app.core.observability import init_sentry, init_tracing
 
 # FreqTrade Integration
 from app.services.freqtrade_integration import (
@@ -48,6 +49,9 @@ from app.arbitrage import get_arbitrage_engine
 
 # Setup structured logging
 logger = configure_logging()
+
+# Initialize Sentry error tracking (before app creation so it captures startup errors)
+init_sentry()
 
 
 # Lifespan context manager for startup/shutdown events
@@ -261,6 +265,9 @@ app.include_router(
     api_router, prefix="/api/v1", dependencies=[Depends(get_current_user)]
 )
 app.include_router(health_router)
+
+# Initialize OpenTelemetry distributed tracing (after app + routes are registered)
+init_tracing(app)
 
 
 # Root endpoint
