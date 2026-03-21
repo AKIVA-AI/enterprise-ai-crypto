@@ -33,7 +33,7 @@ export function useWebSocketStream({
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const connect = useCallback(() => {
     if (!url) return;
