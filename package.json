@@ -80,7 +80,7 @@
   },
   "overrides": {
     "@remix-run/router": "1.23.2",
-    "flatted": "3.4.1",
+    "flatted": "3.4.2",
     "h3": "1.15.6",
     "minimatch": "10.2.4",
     "rollup": "4.59.0"
