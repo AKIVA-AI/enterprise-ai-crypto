@@ -4,11 +4,31 @@ import { OrderHistoryTable } from '@/components/orders/OrderHistoryTable';
 import { TradingAlertsPanel } from '@/components/alerts/TradingAlertsPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Crosshair, AlertOctagon, ClipboardList, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Execution() {
   const [killSwitchActive, setKillSwitchActive] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+
+  const handleKillSwitchClick = () => {
+    setConfirmDialogOpen(true);
+  };
+
+  const handleConfirm = () => {
+    setKillSwitchActive(!killSwitchActive);
+    setConfirmDialogOpen(false);
+  };
 
   return (
     <MainLayout>
@@ -25,7 +45,7 @@ export default function Execution() {
           <Button
             variant={killSwitchActive ? 'default' : 'destructive'}
             className={cn('gap-2', killSwitchActive && 'bg-success hover:bg-success/90')}
-            onClick={() => setKillSwitchActive(!killSwitchActive)}
+            onClick={handleKillSwitchClick}
           >
             <AlertOctagon className="h-4 w-4" />
             {killSwitchActive ? 'Resume Trading' : 'Kill Switch'}
@@ -65,6 +85,31 @@ export default function Execution() {
             <TradingAlertsPanel />
           </TabsContent>
         </Tabs>
+
+        {/* Kill Switch Confirmation Dialog */}
+        <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {killSwitchActive ? 'Resume Trading?' : 'Activate Kill Switch?'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {killSwitchActive
+                  ? 'This will resume all trading operations. Pending orders will begin processing again. Ensure market conditions are stable before resuming.'
+                  : 'This will immediately halt ALL trading operations. All pending orders will be cancelled and no new orders will be accepted. This is an emergency action.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirm}
+                className={killSwitchActive ? '' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}
+              >
+                {killSwitchActive ? 'Resume Trading' : 'Activate Kill Switch'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

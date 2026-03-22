@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { AdvancedAuditSearch } from '@/components/audit/AdvancedAuditSearch';
@@ -484,8 +485,18 @@ export default function AuditLog() {
               </CardHeader>
               <CardContent className="p-0">
                 {isLoading ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    Loading events...
+                  <div className="p-4 space-y-4">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-start gap-3 p-3">
+                        <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-48" />
+                          <Skeleton className="h-3 w-32" />
+                          <Skeleton className="h-3 w-64" />
+                        </div>
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                    ))}
                   </div>
                 ) : filteredEvents.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">

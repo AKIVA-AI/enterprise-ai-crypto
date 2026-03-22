@@ -36,6 +36,7 @@ from app.middleware.security import (
     setup_rate_limiting,
 )
 from app.core.observability import init_sentry, init_tracing
+from app.core.error_handlers import register_error_handlers
 
 # FreqTrade Integration
 from app.services.freqtrade_integration import (
@@ -154,30 +155,8 @@ if not settings.DEBUG:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
 
-# Global exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for consistent error responses."""
-    logger.error(
-        "Unhandled exception",
-        exc_info=exc,
-        path=request.url.path,
-        method=request.method,
-        client_ip=getattr(request.client, "host", "unknown")
-        if request.client
-        else "unknown",
-    )
-
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "message": "An unexpected error occurred"
-            if not settings.DEBUG
-            else str(exc),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        },
-    )
+# Register standardized error handlers (HTTPException, ValidationError, generic)
+register_error_handlers(app)
 
 
 # Request ID + metrics middleware

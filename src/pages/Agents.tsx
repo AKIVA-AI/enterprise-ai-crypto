@@ -12,6 +12,7 @@ import { Bot, RefreshCw, Power, Settings, Cpu, HardDrive, Clock, Zap, Loader2, I
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { AGENT_ROLES, AgentRole, getAgentStatusColor } from '@/lib/agentRoles';
+import { AgentTimeline } from '@/components/agents/AgentTimeline';
 
 const agentTypeLabels: Record<string, string> = {
   'market-data': 'Market Data',
@@ -51,7 +52,7 @@ export default function Agents() {
   const updateStatus = useUpdateAgentStatus();
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState<AgentRole | null>(null);
-  const [tab, setTab] = useState<'registry' | 'roles'>('registry');
+  const [tab, setTab] = useState<'registry' | 'roles' | 'timeline'>('registry');
 
   const handleRefresh = () => {
     refetch();
@@ -92,10 +93,11 @@ export default function Agents() {
           </Button>
         </div>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'registry' | 'roles')}>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'registry' | 'roles' | 'timeline')}>
           <TabsList>
             <TabsTrigger value="registry">Live Agents</TabsTrigger>
             <TabsTrigger value="roles">Agent Roles</TabsTrigger>
+            <TabsTrigger value="timeline">Decision Timeline</TabsTrigger>
           </TabsList>
 
           <TabsContent value="registry" className="mt-6">
@@ -270,8 +272,8 @@ export default function Agents() {
                     <span className="text-2xl">{role.icon}</span>
                     <div>
                       <h3 className="font-semibold">{role.name}</h3>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={cn('text-xs', getAgentStatusColor(role.status))}
                       >
                         {role.status}
@@ -285,6 +287,10 @@ export default function Agents() {
                 </div>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="timeline" className="mt-6">
+            <AgentTimeline />
           </TabsContent>
         </Tabs>
 
