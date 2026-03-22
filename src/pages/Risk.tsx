@@ -6,6 +6,7 @@ import { useBooks } from '@/hooks/useBooks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, AlertTriangle, Settings, Power, Loader2, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -46,26 +47,37 @@ export default function Risk() {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="metric-card">
-            <p className="text-sm text-muted-foreground">Total Capital</p>
-            <p className="text-2xl font-mono font-semibold">${totalCapital.toLocaleString()}</p>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="metric-card">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-32" />
+              </div>
+            ))}
           </div>
-          <div className="metric-card">
-            <p className="text-sm text-muted-foreground">Total Exposure</p>
-            <p className="text-2xl font-mono font-semibold">${totalExposure.toLocaleString()}</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="metric-card">
+              <p className="text-sm text-muted-foreground">Total Capital</p>
+              <p className="text-2xl font-mono font-semibold">${totalCapital.toLocaleString()}</p>
+            </div>
+            <div className="metric-card">
+              <p className="text-sm text-muted-foreground">Total Exposure</p>
+              <p className="text-2xl font-mono font-semibold">${totalExposure.toLocaleString()}</p>
+            </div>
+            <div className="metric-card">
+              <p className="text-sm text-muted-foreground">Utilization</p>
+              <p className="text-2xl font-mono font-semibold text-warning">
+                {totalCapital > 0 ? ((totalExposure / totalCapital) * 100).toFixed(1) : 0}%
+              </p>
+            </div>
+            <div className="metric-card">
+              <p className="text-sm text-muted-foreground">Active Books</p>
+              <p className="text-2xl font-mono font-semibold">{books.filter(b => b.status === 'active').length}</p>
+            </div>
           </div>
-          <div className="metric-card">
-            <p className="text-sm text-muted-foreground">Utilization</p>
-            <p className="text-2xl font-mono font-semibold text-warning">
-              {totalCapital > 0 ? ((totalExposure / totalCapital) * 100).toFixed(1) : 0}%
-            </p>
-          </div>
-          <div className="metric-card">
-            <p className="text-sm text-muted-foreground">Active Books</p>
-            <p className="text-2xl font-mono font-semibold">{books.filter(b => b.status === 'active').length}</p>
-          </div>
-        </div>
+        )}
 
         <Tabs defaultValue="analytics" className="space-y-4">
           <TabsList>

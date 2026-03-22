@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -341,8 +342,39 @@ export function PositionManagementPanel() {
 
   if (isLoading) {
     return (
-      <div className="glass-panel rounded-xl p-6 flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        {/* Skeleton summary cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="glass-panel rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-8 w-32 mt-2" />
+            </div>
+          ))}
+        </div>
+        {/* Skeleton position rows */}
+        <div className="glass-panel rounded-xl p-4 space-y-3">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-8 w-24" />
+          </div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-5 w-14" />
+              </div>
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
