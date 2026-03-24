@@ -6,13 +6,22 @@ on:
     types: [completed]
     branches: [main]
 
+permissions:
+  actions: read
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   heal:
-    uses: AKIVA-AI/radar-ci/.github/workflows/shared-radar-healing.yml@v0.2.5
-    with:
-      python_version: '3.11'
-      source_run_id: ${{ github.event.workflow_run.id }}
-      source_run_url: ${{ github.event.workflow_run.html_url }}
-      source_head_branch: ${{ github.event.workflow_run.head_branch }}
-      source_head_sha: ${{ github.event.workflow_run.head_sha }}
-      source_conclusion: ${{ github.event.workflow_run.conclusion }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run RADAR hosted healing
+        uses: AKIVA-AI/radar-ci/actions/hosted-heal@v0.2.6
+        with:
+          python_version: "3.11"
+          source_run_id: ${{ github.event.workflow_run.id }}
+          source_run_url: ${{ github.event.workflow_run.html_url }}
+          source_head_branch: ${{ github.event.workflow_run.head_branch }}
+          source_head_sha: ${{ github.event.workflow_run.head_sha }}
+          source_conclusion: ${{ github.event.workflow_run.conclusion }}
