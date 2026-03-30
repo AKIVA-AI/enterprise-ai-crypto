@@ -1,0 +1,3 @@
+-- Enterprise Crypto baseline: schema managed by Supabase dashboard + Lovable
+-- All prior migrations applied remotely. Local history reset 2026-03-30.
+-- See git history for original migration files.
