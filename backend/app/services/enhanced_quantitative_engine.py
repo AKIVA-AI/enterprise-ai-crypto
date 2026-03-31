@@ -328,10 +328,8 @@ class FreqAIEnhancedEngine:
 
         # Ensure timestamp is in milliseconds
         if "timestamp" in df.columns:
-            if isinstance(df["timestamp"].iloc[0], pd.Timestamp):
-                df["timestamp"] = df["timestamp"].astype(int) // 10**9 * 1000
-            elif isinstance(df["timestamp"].iloc[0], datetime):
-                df["timestamp"] = df["timestamp"].astype(int) // 10**9 * 1000
+            if isinstance(df["timestamp"].iloc[0], (pd.Timestamp, datetime)):
+                df["timestamp"] = df["timestamp"].astype("int64") // 10**9 * 1000
 
         # Add date column for FreqTrade
         df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
