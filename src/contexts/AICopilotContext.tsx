@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 
 interface AICopilotContextValue {
   isOpen: boolean;
@@ -16,8 +16,13 @@ export function AICopilotProvider({ children }: { children: ReactNode }) {
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
+  const value = useMemo<AICopilotContextValue>(
+    () => ({ isOpen, toggle, open, close }),
+    [isOpen, toggle, open, close],
+  );
+
   return (
-    <AICopilotContext.Provider value={{ isOpen, toggle, open, close }}>
+    <AICopilotContext.Provider value={value}>
       {children}
     </AICopilotContext.Provider>
   );

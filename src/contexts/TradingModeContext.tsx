@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   TradingMode, 
   TradingModeConfig, 
@@ -170,22 +170,31 @@ export function TradingModeProvider({ children }: { children: React.ReactNode })
     });
   }, [mode]);
 
-  const value: TradingModeContextValue = {
-    mode,
-    modeConfig,
-    detectedRegion,
-    isAutoDetected,
-    setMode,
-    toggleMode,
-    resetToAutoDetect,
-    availableVenues,
-    integratedVenues,
-    defaultVenue,
-    canTrade,
-    availableArbitrageStrategies,
-    validateCompliance,
-    isLoading,
-  };
+  const value = useMemo<TradingModeContextValue>(
+    () => ({
+      mode,
+      modeConfig,
+      detectedRegion,
+      isAutoDetected,
+      setMode,
+      toggleMode,
+      resetToAutoDetect,
+      availableVenues,
+      integratedVenues,
+      defaultVenue,
+      canTrade,
+      availableArbitrageStrategies,
+      validateCompliance,
+      isLoading,
+    }),
+    [
+      mode, modeConfig, detectedRegion, isAutoDetected,
+      setMode, toggleMode, resetToAutoDetect,
+      availableVenues, integratedVenues, defaultVenue,
+      canTrade, availableArbitrageStrategies, validateCompliance,
+      isLoading,
+    ],
+  );
 
   return (
     <TradingModeContext.Provider value={value}>

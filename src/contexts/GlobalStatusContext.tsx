@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useVenues } from '@/hooks/useVenues';
@@ -125,28 +125,47 @@ export function GlobalStatusProvider({ children }: { children: ReactNode }) {
     };
   }, [queryClient]);
   
-  const value: GlobalStatus = {
-    globalKillSwitch: globalSettings?.global_kill_switch ?? false,
-    reduceOnlyMode: globalSettings?.reduce_only_mode ?? false,
-    paperTradingMode: globalSettings?.paper_trading_mode ?? false,
-    demoMode: false, // Will be added to DB
-    
-    venuesDegraded,
-    venuesOffline,
-    totalVenues: venues.length,
-    
-    unreadAlertsCount,
-    criticalAlerts,
-    
-    activeBookId,
-    setActiveBookId,
-    
-    backendBaseUrl: globalSettings?.api_base_url ?? '',
-    backendConnected,
-    
-    isLoading: settingsLoading || venuesLoading || alertsLoading,
-  };
-  
+  const value = useMemo<GlobalStatus>(
+    () => ({
+      globalKillSwitch: globalSettings?.global_kill_switch ?? false,
+      reduceOnlyMode: globalSettings?.reduce_only_mode ?? false,
+      paperTradingMode: globalSettings?.paper_trading_mode ?? false,
+      demoMode: false,
+
+      venuesDegraded,
+      venuesOffline,
+      totalVenues: venues.length,
+
+      unreadAlertsCount,
+      criticalAlerts,
+
+      activeBookId,
+      setActiveBookId,
+
+      backendBaseUrl: globalSettings?.api_base_url ?? '',
+      backendConnected,
+
+      isLoading: settingsLoading || venuesLoading || alertsLoading,
+    }),
+    [
+      globalSettings?.global_kill_switch,
+      globalSettings?.reduce_only_mode,
+      globalSettings?.paper_trading_mode,
+      globalSettings?.api_base_url,
+      venuesDegraded,
+      venuesOffline,
+      venues.length,
+      unreadAlertsCount,
+      criticalAlerts,
+      activeBookId,
+      setActiveBookId,
+      backendConnected,
+      settingsLoading,
+      venuesLoading,
+      alertsLoading,
+    ],
+  );
+
   return (
     <GlobalStatusContext.Provider value={value}>
       {children}
