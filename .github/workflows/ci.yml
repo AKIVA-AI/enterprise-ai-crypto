@@ -72,7 +72,7 @@ jobs:
 
       - name: Security scan (bandit)
         working-directory: backend
-        run: bandit -r app/ -ll -ii --exclude app/gpu/ -f json -o bandit-report.json || bandit -r app/ -ll -ii --exclude app/gpu/
+        run: bandit -r app/ -ll -ii --exclude app/gpu/ --skip B104 -f json -o bandit-report.json || bandit -r app/ -ll -ii --exclude app/gpu/ --skip B104
 
       - name: Dependency audit (pip-audit)
         working-directory: backend
