@@ -1,8 +1,8 @@
 # Enterprise Crypto — Codebase Map
 
-**Version:** 1.0
-**Date:** 2026-03-14
-**Standard:** Akiva Build Standard v2.8, Phase 0.5
+**Version:** 1.1
+**Date:** 2026-04-05
+**Standard:** Akiva Build Standard v2.14, Phase 0.5
 **Archetype:** 7 — Algorithmic Trading Platform
 
 ---
@@ -11,7 +11,7 @@
 
 Enterprise Crypto is an institutional-grade, multi-agent algorithmic trading platform. It provides multi-exchange execution, fail-closed risk management, full audit trails, and AI-driven signal generation for cryptocurrency markets.
 
-**Stack:** React 18 / TypeScript (Vite) frontend, FastAPI (Python) backend, Supabase PostgreSQL database, Redis pub/sub, 38 Deno edge functions, FreqTrade integration, Docker deployment.
+**Stack:** React 18 / TypeScript (Vite) frontend, FastAPI (Python) backend, Supabase PostgreSQL database, Redis pub/sub, 36 Deno edge functions, FreqTrade integration, Docker deployment.
 
 ---
 
@@ -45,16 +45,17 @@ enterprise-crypto/
 │   │   ├── models/               # Pydantic domain models
 │   │   ├── freqtrade/            # FreqTrade bot integration
 │   │   ├── gpu/                  # GPU/CUDA acceleration
+│   │   ├── control_plane/        # Control-plane adapters (authority, evidence, risk policy)
 │   │   └── compliance/           # Trading region restrictions
-│   ├── tests/                    # 29 pytest test files
+│   ├── tests/                    # 69 pytest test files
 │   ├── requirements.txt          # Python dependencies
 │   └── Dockerfile                # Multi-stage Docker build
 │
 ├── supabase/
-│   ├── migrations/               # 42 SQL migrations (64 tables, 212 RLS policies)
-│   └── functions/                # 38 Deno edge functions
+│   ├── migrations/               # 1 baseline SQL migration (64 tables, 212 RLS policies)
+│   └── functions/                # 36 Deno edge functions
 │
-├── e2e/                          # 5 Playwright E2E test specs
+├── e2e/                          # 4 Playwright E2E test specs
 ├── data/freqtrade/strategies/    # FreqTrade strategy files
 ├── scripts/                      # Deployment, health check, setup scripts
 ├── docs/                         # 45+ documentation files
@@ -143,6 +144,27 @@ All 4 adapters (Coinbase, Kraken, MEXC, DEX) use `random.uniform()` for prices, 
 - `risk_limits.py` — Position/loss/drawdown/exposure/velocity limits with breach tracking
 - `compliance.py` — Trading region restrictions, rule engine
 
+### Control-Plane Adapters (`backend/app/control_plane/`)
+
+Bridges the multi-agent trading system to the Akiva execution-contracts and policy-runtime packages. Uses the optional-import guard pattern (`_HAS_CONTROL_PLANE` flag) so the trading backend runs without framework packages installed.
+
+**Three adapters:**
+
+| Adapter | Purpose | Framework Package |
+|---------|---------|-------------------|
+| `authority_adapter.py` | Maps agent roles (meta-decision, execution, risk, signal, etc.) to `AuthorityBoundary` contracts with `PermissionScope` and `ApprovalPolicy`. Unknown agents get READ_ONLY + DENY (fail-closed). | `akiva-execution-contracts` |
+| `evidence_adapter.py` | Converts order fills and META-DECISION vetoes into immutable `EvidenceRecord` objects for the append-only audit trail. | `akiva-execution-contracts` |
+| `risk_policy.py` | Three composable `PolicyAdapter` implementations (VaRPolicy, PositionLimitPolicy, DailyLossPolicy) wired into a `PolicyEngine`. Factory `build_risk_engine()` draws limits from trading config with conservative fallback defaults. | `akiva-policy-runtime` |
+
+**Agent authority mapping:**
+
+- META-DECISION: `FULL_ACCESS` + `REQUIRE_APPROVAL` (supreme veto)
+- Execution / Risk / Capital Allocation / Arbitrage / Strategy Lifecycle: `WORKSPACE_WRITE` + `AUTO`
+- Signal / FreqTrade Signal: `READ_ONLY` + `AUTO`
+- Unknown: `READ_ONLY` + `DENY` (fail-closed)
+
+**Tests:** `backend/tests/test_control_plane.py`
+
 ---
 
 ## Frontend Architecture
@@ -189,7 +211,7 @@ shadcn/ui (Radix UI primitives) with Tailwind CSS. Dark theme trading UI. Rechar
 
 ## Database Schema
 
-### Tables (64 total across 42 migrations)
+### Tables (64 total in 1 baseline migration)
 
 **Core Trading:** books, orders, positions, strategies, venues, instruments, leg_events
 **Risk:** risk_limits, circuit_breaker_events, global_settings (kill switch)
@@ -217,7 +239,7 @@ Migration `20260220042730` implements Postgres triggers on fills/positions that:
 
 ---
 
-## Edge Functions (38 in `supabase/functions/`)
+## Edge Functions (36 in `supabase/functions/`)
 
 **Trading (7):** live-trading, trading-api, binance-us-trading, coinbase-trading, kraken-trading, hyperliquid, toggle-strategy
 **Arbitrage (4):** cross-exchange-arbitrage, funding-arbitrage, basis-arbitrage, approve-meme-launch
@@ -230,32 +252,27 @@ Migration `20260220042730` implements Postgres triggers on fills/positions that:
 **Audit (1):** audit-log
 **Shared:** `_shared/` (cors, security, oms-client, tenant-guard, validation)
 
-All 38 are real implementations (not stubs).
+All 36 are real implementations (not stubs).
 
 ---
 
 ## Testing Infrastructure
 
-### Backend Tests (`backend/tests/` — 29 files)
+### Backend Tests (`backend/tests/` — 69 files)
 
-Covers: risk engine, arbitrage engine, backtesting, capital allocator, edge/cost models, execution, freqtrade integration, health, order gateway, order simulator, performance metrics, position manager, scanners, strategy registry, walk-forward engine, security middleware, WebSocket auth, health metrics.
+Covers: risk engine (controls, edge cases), arbitrage engine (basis, spot arb, integration), backtesting (enhanced, institutional, walk-forward, e2e workflow), capital allocator (agent, integration), edge/cost models, execution (planner, API), freqtrade (integration, backtester), health (metrics), order gateway (critical), order simulator, performance metrics, portfolio analytics, position manager (sizer, coverage), quant engine (enhanced), scanners (scanner-to-OMS cost gate), strategy (registry, lifecycle agent), security middleware, WebSocket auth, enterprise (audit, compliance, controls, features, reporting), adapters (coverage), agent identity, behavior tracking, config, control plane, database & security, drawdown monitor, engine runner, integration coverage, live reconciliation, logging config, meta-decision agent, model registry, observability, smart order router, system API, trading engine coverage.
 
 **Coverage floor:** 20% (CI `--cov-fail-under=20`)
 
-### Frontend Tests (`src/` — 6 test files)
+### Frontend Tests (`src/` — 18 test files)
 
-- KillSwitchPanel.test.tsx (12 tests, 5 skipped)
-- AdvancedRiskDashboard.test.tsx (14 tests, 11 skipped)
-- TradeTicket.test.tsx (6 tests, 1 skipped)
-- PositionManagementPanel.test.tsx (6 tests, 1 skipped)
-- RiskGauge.test.tsx
-- tradingGate.test.ts
+**Component tests (5):** KillSwitchPanel, AdvancedRiskDashboard, TradeTicket, PositionManagementPanel, RiskGauge.
+**Hook tests (5):** useAlerts, useDashboardMetrics, usePositions, useStrategies, useSystemHealth.
+**Library tests (8):** complianceEnforcement, instrumentParser, schemas, status-colors, symbolUtils, tradingGate, tradingModes, userModes.
 
-**Active tests:** ~18/39 (46% — dialog portal rendering issues)
+### E2E Tests (`e2e/` — 4 Playwright specs)
 
-### E2E Tests (`e2e/` — 5 Playwright specs)
-
-kill-switch, position-management, risk-dashboard, trade-flow + README
+kill-switch, position-management, risk-dashboard, trade-flow
 
 ### Load Tests
 
@@ -302,7 +319,7 @@ Weekly updates for pip, npm, and GitHub Actions with reviewer `adii2025`.
 1. **Exchange adapters scaffolded** — All 4 backend adapters return random data. Real exchange API calls not implemented.
 2. **CI type-check ineffective** — Bare `tsc --noEmit` on Vite project with `"files": []` compiles nothing.
 3. **No deployment pipeline** — Manual deploy only, no CD in GitHub Actions.
-4. **Frontend test coverage thin** — 6 test files for 285 source files.
+4. **Frontend test coverage thin** — 18 test files for 280 source files.
 5. **Security scanning non-blocking** — npm audit and pip-audit don't fail CI.
 6. **147 hardcoded colors** — Violates design token discipline.
 7. **18 fire-and-forget mutations** — Orders/actions submitted without proper error handling.
@@ -312,5 +329,5 @@ Weekly updates for pip, npm, and GitHub Actions with reviewer `adii2025`.
 
 ---
 
-_This codebase map was created as Phase 0.5 per Akiva Build Standard v2.8._
-_158 Python files, 285 TypeScript files, 42 SQL migrations, 38 edge functions examined._
+_This codebase map was created as Phase 0.5 per Akiva Build Standard v2.14._
+_139 Python files, 280 TypeScript files, 1 SQL baseline migration, 36 edge functions examined._
