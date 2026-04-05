@@ -86,7 +86,7 @@ export function LiveOrderBook({ symbol, depth = 10, className }: LiveOrderBookPr
   );
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-3', className)} role="region" aria-label={`Order book for ${symbol}`} aria-live="polite">
       {/* Header with status */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm text-muted-foreground">Order Book</h3>
@@ -106,7 +106,7 @@ export function LiveOrderBook({ symbol, depth = 10, className }: LiveOrderBookPr
 
       <div className="grid grid-cols-2 gap-4">
         {/* Bids */}
-        <div className="glass-panel rounded-xl p-4">
+        <div className="glass-panel rounded-xl p-4" role="table" aria-label="Bid orders">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="h-4 w-4 text-long" />
             <span className="font-semibold text-sm">Bids</span>
@@ -147,7 +147,7 @@ export function LiveOrderBook({ symbol, depth = 10, className }: LiveOrderBookPr
         </div>
 
         {/* Asks */}
-        <div className="glass-panel rounded-xl p-4">
+        <div className="glass-panel rounded-xl p-4" role="table" aria-label="Ask orders">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="h-4 w-4 text-short" />
             <span className="font-semibold text-sm">Asks</span>

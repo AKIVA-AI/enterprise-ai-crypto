@@ -117,7 +117,7 @@ export function PnLChart() {
   }
 
   return (
-    <Card className="p-4">
+    <Card className="p-4" role="region" aria-label="Daily P&L Performance">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold">Daily P&L Performance</h3>
@@ -129,6 +129,8 @@ export function PnLChart() {
             size="sm"
             className="h-7 text-xs gap-1"
             onClick={() => setShowVolatility(!showVolatility)}
+            aria-pressed={showVolatility}
+            aria-label="Toggle volatility overlay"
           >
             <Activity className="h-3 w-3" />
             Volatility

@@ -45,7 +45,7 @@ export function SystemStatusBanner() {
   const Icon = c.icon;
 
   return (
-    <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium', c.bg, c.text)}>
+    <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium', c.bg, c.text)} role="status" aria-live="polite" aria-label={`System status: ${c.label}`}>
       <Icon className="h-3.5 w-3.5" />
       <span>{c.label}</span>
       {data.flags.length > 0 && (

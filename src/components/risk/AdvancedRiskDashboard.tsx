@@ -156,7 +156,7 @@ export default function AdvancedRiskDashboard() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Advanced risk management dashboard">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

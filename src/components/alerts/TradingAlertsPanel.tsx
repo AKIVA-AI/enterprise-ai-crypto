@@ -135,7 +135,7 @@ export function TradingAlertsPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="region" aria-label="Trading alerts">
       {/* Header */}
       <div className="glass-panel rounded-xl p-4">
         <div className="flex items-center justify-between">

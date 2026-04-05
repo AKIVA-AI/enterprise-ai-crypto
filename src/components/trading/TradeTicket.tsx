@@ -199,7 +199,7 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
   };
 
   return (
-    <Card className="glass-panel w-full max-w-md">
+    <Card className="glass-panel w-full max-w-md" role="form" aria-label="Trade ticket">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
@@ -242,6 +242,8 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
               side === 'buy' && 'bg-success hover:bg-success/90 text-success-foreground shadow-glow-success'
             )}
             onClick={() => setSide('buy')}
+            aria-pressed={side === 'buy'}
+            aria-label="Buy order"
           >
             <TrendingUp className="mr-2 h-5 w-5" />
             BUY
@@ -254,6 +256,8 @@ export function TradeTicket({ onClose, defaultInstrument = 'BTC/USDT', defaultBo
               side === 'sell' && 'bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-glow-destructive'
             )}
             onClick={() => setSide('sell')}
+            aria-pressed={side === 'sell'}
+            aria-label="Sell order"
           >
             <TrendingDown className="mr-2 h-5 w-5" />
             SELL

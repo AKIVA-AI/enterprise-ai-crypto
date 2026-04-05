@@ -71,7 +71,7 @@ export function RealtimePnLTracker({ className }: RealtimePnLTrackerProps) {
   const totalPnLPercent = totalNotional > 0 ? (totalUnrealizedPnL / totalNotional) * 100 : 0;
 
   return (
-    <Card className={cn('glass-panel', className)}>
+    <Card className={cn('glass-panel', className)} role="region" aria-label="Real-time P&L tracker" aria-live="polite">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>

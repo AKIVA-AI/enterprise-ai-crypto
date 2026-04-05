@@ -24,8 +24,8 @@ export function MetricCard({
   const isPositive = change !== undefined && change >= 0;
 
   return (
-    <div className={cn('metric-card', className)}>
-      <div className="flex items-start justify-between">
+    <div className={cn('metric-card', className)} role="region" aria-label={title}>
+      <div className="flex items-start justify-between" aria-live="polite">
         <div>
           <p className="text-sm text-muted-foreground">{title}</p>
           <p className="mt-1 text-2xl font-semibold font-mono tracking-tight">

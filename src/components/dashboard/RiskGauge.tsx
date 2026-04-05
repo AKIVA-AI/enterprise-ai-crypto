@@ -24,7 +24,14 @@ export function RiskGauge({ value, max = 100, label, className }: RiskGaugeProps
   };
 
   return (
-    <div className={cn('flex flex-col items-center', className)}>
+    <div
+      className={cn('flex flex-col items-center', className)}
+      role="meter"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-label={label || 'Risk gauge'}
+    >
       <div className="relative w-32 h-16 overflow-hidden">
         {/* Background arc */}
         <div className="absolute inset-0 border-8 border-muted rounded-t-full border-b-0" />

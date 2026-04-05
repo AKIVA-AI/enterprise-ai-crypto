@@ -128,7 +128,7 @@ export function PortfolioSummaryWidget() {
   const pnlPercent = totalCapital > 0 ? (totalPnl / totalCapital) * 100 : 0;
 
   return (
-    <Card className="glass-panel">
+    <Card className="glass-panel" role="region" aria-label="Portfolio summary">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
