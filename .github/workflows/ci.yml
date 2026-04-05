@@ -70,6 +70,13 @@ jobs:
         working-directory: backend
         run: ruff check app/ --select E,W,F --ignore E501
 
+      - name: Type check (mypy)
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          pip install mypy
+          mypy app/ --ignore-missing-imports --no-error-summary
+
       - name: Security scan (bandit)
         working-directory: backend
         run: bandit -r app/ -ll -ii --exclude app/gpu/ --skip B104 -f json -o bandit-report.json || bandit -r app/ -ll -ii --exclude app/gpu/ --skip B104
