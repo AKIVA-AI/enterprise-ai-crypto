@@ -4,7 +4,7 @@
 **Composite Score:** 74/100 (re-scored 2026-04-05 in cross-system gap closure sprint, +3.0 from 71/100; D8 7→9 false negative correction, mypy CI, onboarding wizard, ARIA on 10 components)
 **Prior Scores:** 71/100 (v2.14 baseline, 2026-04-04, full audit) | 72/100 (v2.11, 2026-03-17, post-Sprint 4)
 **Evidence:** workspace memory `project_cross_system_gap_closure.md` and `project_crypto_full_audit_2026_04_04.md`
-**Standards:** Akiva Build Standard v2.14 — see `akiva-enterprise-products/CLAUDE.md` for full standards reference.
+**Standards:** See `akiva-enterprise-products/CLAUDE.md` for current Akiva Build Standard version and full standards reference.
 
 ## Key Paths
 
