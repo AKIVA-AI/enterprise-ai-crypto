@@ -2,7 +2,7 @@
 
 **Version:** 1.1
 **Date:** 2026-04-05
-**Standard:** Akiva Build Standard v2.14, Phase 0.5
+**Standard:** Akiva Build Standard v2.15, Phase 0.5
 **Archetype:** 7 — Algorithmic Trading Platform
 
 ---
