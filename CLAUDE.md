@@ -6,6 +6,21 @@
 **Evidence:** workspace memory `project_cross_system_gap_closure.md` and `project_crypto_full_audit_2026_04_04.md`
 **Standards:** See `akiva-enterprise-products/CLAUDE.md` for current Akiva Build Standard version and full standards reference.
 
+## Stack
+
+- **Backend:** Python (FastAPI) at `apps/backend/` — trading engine, strategy/PnL services, structlog observability
+- **Frontend:** TypeScript / React (Vite) at repo root — onboarding wizard, dashboards, ARIA-compliant trading UI
+- **Coverage gates:** mypy (CI-blocking, lifted D8 7→9 in 2026-04-05 closure sprint)
+
+## Verification Commands
+
+| Action | Command | Run from |
+|--------|---------|----------|
+| Backend test | `pytest --cov=app` | `apps/backend/` |
+| Backend lint / type-check | `ruff check app/` | `apps/backend/` |
+| Frontend test | `npm test` | repo root |
+| Frontend type-check | `npm run typecheck` | repo root |
+
 ## Key Paths
 
 - **Codebase map:** `docs/CODEBASE_MAP.md`
