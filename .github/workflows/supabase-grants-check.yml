@@ -1,0 +1,75 @@
+name: Supabase GRANT compliance
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**.sql'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**.sql'
+
+permissions:
+  contents: read
+
+jobs:
+  grants-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Identify newly added migration files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="HEAD~1"
+            HEAD="HEAD"
+            git rev-parse HEAD~1 >/dev/null 2>&1 || BASE=""
+          fi
+          if [ -n "$BASE" ]; then
+            files=$(git diff --name-only --diff-filter=A "$BASE" "$HEAD" -- 'supabase/migrations/*.sql' 2>/dev/null || true)
+          else
+            files=""
+          fi
+          {
+            echo "files<<__EOF__"
+            echo "$files"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify GRANTs on new public-schema CREATE TABLE statements
+        if: steps.changed.outputs.files != ''
+        env:
+          FILES: ${{ steps.changed.outputs.files }}
+        run: |
+          set -uo pipefail
+          failed=0
+          create_re='CREATE[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?(public\.|[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*\()'
+          grant_re='^[[:space:]]*GRANT[[:space:]]+(SELECT|INSERT|UPDATE|DELETE|ALL)'
+          optout_re='^[[:space:]]*--[[:space:]]*supabase-grants-check:[[:space:]]*ignore'
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if ! grep -Eiv '^[[:space:]]*--' "$file" | grep -Eiq "$create_re"; then
+              continue
+            fi
+            if grep -Eiq "$optout_re" "$file"; then
+              echo "::notice file=$file::Skipping GRANT check (opt-out marker present)"
+              continue
+            fi
+            if ! grep -Eiq "$grant_re" "$file"; then
+              echo "::error file=$file::Migration creates a public table but has no GRANT statement. After 2026-10-30, Supabase no longer auto-grants Data API access — add explicit GRANTs (see supabase/migrations/_GRANT_TEMPLATE.sql), or add '-- supabase-grants-check: ignore' if this table is intentionally service-role-only."
+              failed=1
+            fi
+          done <<< "$FILES"
+
+          if [ "$failed" -eq 1 ]; then
+            exit 1
+          fi
+          echo "All new migrations are GRANT-compliant."
